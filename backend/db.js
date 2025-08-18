@@ -1,6 +1,6 @@
 //db.js
 const mysql = require('mysql2');//conectar seu código Node.js ao MySQL.
-require('dontev').config(); //- Isso carrega as variáveis do arquivo .env para o process.env.
+require('dotenv').config(); //- Isso carrega as variáveis do arquivo .env para o process.env.
 
 
 const pool = mysql.createPool({
