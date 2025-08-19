@@ -64,11 +64,21 @@ exports.pesquisarProduto = async (req, res) => {
 // Rota protegida - só admin pode criar
 exports.createProduto = async (req, res) => {
   try {
-    const { nome, descricao, valor, categoria, imagem_produto_url } = req.body;
-    
+    // 1. Os dados de texto, vêm de req.body
+    const { nome, descricao, valor, categoria, estoque } = req.body;
+
+    // 2. A informação da imagem vem de req.file (se o usuário enviar uma)
+    const imagem_produto_url = req.file ? req.file.filename : null;
+
+    // 3. Validação robusta para os campos obrigatórios
+    //    Verificamos se 'estoque' não é undefined para permitir o valor 0
+    if(!nome || !valor || !categoria || estoque === undefined){
+      return res.status(400).json({message: 'Nome, valor, categoria e estoque são obrigatórios.'});
+    }
+
     const [result] = await db.query(
-      'INSERT INTO produtos (nome, descricao, valor, categoria, imagem_produto_url) VALUES (?, ?, ?, ?, ?)',
-      [nome, descricao, valor, categoria, imagem_produto_url]
+      'INSERT INTO produtos (nome, descricao, valor, categoria, imagem_produto_url, estoque) VALUES (?, ?, ?, ?, ?, ?)',
+      [nome, descricao, valor, categoria, imagem_produto_url, estoque]
     );
 
     res.status(201).json({ message: 'Produto criado!', produtoId: result.insertId });
