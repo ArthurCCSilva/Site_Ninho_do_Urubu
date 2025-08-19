@@ -9,6 +9,7 @@ const produtosController = require('../controllers/produtosController');
 // Importamos os middlewares que fazem a proteção das rotas
 const { verifyToken, isAdmin } = require('../middleware/authMiddleware');
 
+const upload = require('../config/multerConfig');//integrar multer das imagens
 /*
  * =========================================
  * ROTAS PÚBLICAS
@@ -40,15 +41,14 @@ router.get('/:id', produtosController.getProdutoById);
 // Rota para CRIAR um novo produto
 // POST -> http://localhost:3001/api/produtos/
 // A requisição só chega em 'createProduto' se passar por 'verifyToken' e 'isAdmin'
-router.post('/', [verifyToken, isAdmin], produtosController.createProduto);
+router.post('/', [verifyToken, isAdmin, upload.single('imagem_produto')], produtosController.createProduto);
 
 // Rota para ATUALIZAR um produto existente
 // PUT -> http://localhost:3001/api/produtos/123
-router.put('/:id', [verifyToken, isAdmin], produtosController.updateProduto);
+router.put('/:id', [verifyToken, isAdmin, upload.single('imagem_produto')], produtosController.updateProduto);
 
 // Rota para DELETAR um produto
 // DELETE -> http://localhost:3001/api/produtos/123
-router.delete('/:id', [verifyToken, isAdmin], produtosController.deleteProduto);
-
+router.delete('/:id', [verifyToken, isAdmin,], produtosController.deleteProduto);
 
 module.exports = router;

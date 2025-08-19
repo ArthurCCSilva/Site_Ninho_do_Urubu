@@ -27,3 +27,19 @@ exports.isAdmin = (req, res, next) => {
   }
   next();
 };
+
+// /middleware/authMiddleware.js
+
+// ... sua função verifyToken e isAdmin ...
+
+// NOVO MIDDLEWARE: Verifica se o usuário é o dono do perfil ou um admin
+exports.isOwnerOrAdmin = (req, res, next) => {
+  // req.user.id vem do token (usuário logado)
+  // req.params.id vem da URL (perfil que está sendo alterado)
+  // Usamos parseInt pois o id da URL vem como string
+  if (req.user.id === parseInt(req.params.id) || req.user.role === 'admin') {
+    next(); // Permissão concedida, pode continuar
+  } else {
+    return res.status(403).json({ message: 'Acesso negado. Você não tem permissão para alterar este perfil.' });
+  }
+};

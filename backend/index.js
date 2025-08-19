@@ -14,6 +14,7 @@ app.use(express.json());//// Permite que o servidor entenda JSON
 // --- ROTAS ---
 app.use('/api/produtos', require('./routes/produtosRoutes'));
 app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/uploads', express.static('uploads'));//adicionado depois para as imagens
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
