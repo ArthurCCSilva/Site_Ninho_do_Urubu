@@ -1,27 +1,39 @@
 // src/components/ProductModal.jsx
 import { useState, useEffect, useRef } from 'react';
 import api from '../services/api';
-import { Modal } from 'bootstrap'; // Importamos o Modal do JavaScript do Bootstrap
+import { Modal } from 'bootstrap';
 
 function ProductModal({ show, onHide, productToEdit, onSave }) {
-  const [formData, setFormData] = useState({});
+  const [formData, setFormData] = useState({
+    nome: '',
+    descricao: '',
+    valor: '',
+    categoria: '',
+    estoque: '',
+  });
   const [imagemFile, setImagemFile] = useState(null);
-  const modalRef = useRef(); // useRef cria um "link" direto para um elemento HTML
+  const modalRef = useRef();
 
-  // Este useEffect preenche o formulário quando clicamos em "Editar"
+  // Preenche o formulário ao editar
   useEffect(() => {
     if (productToEdit) {
-      setFormData(productToEdit);
+      setFormData({
+        nome: productToEdit.nome || '',
+        descricao: productToEdit.descricao || '',
+        valor: productToEdit.valor || '',
+        categoria: productToEdit.categoria || '',
+        estoque: productToEdit.estoque || '',
+      });
     } else {
       setFormData({ nome: '', descricao: '', valor: '', categoria: '', estoque: '' });
     }
+    setImagemFile(null);
   }, [productToEdit, show]);
 
-  // Este useEffect controla o abre/fecha do modal
+  // Controla a exibição do modal
   useEffect(() => {
     const modalElement = modalRef.current;
     const bsModal = Modal.getOrCreateInstance(modalElement);
-
     if (show) {
       bsModal.show();
     } else {
@@ -44,7 +56,7 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
       } else {
         await api.post('/api/produtos', data);
       }
-      onSave(); // Avisa o Dashboard que a operação foi um sucesso
+      onSave();
     } catch (error) {
       console.error("Falha ao salvar produto", error);
       alert("Erro ao salvar produto!");
@@ -60,9 +72,47 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
               <h5 className="modal-title">{productToEdit ? 'Editar Produto' : 'Adicionar Novo Produto'}</h5>
               <button type="button" className="btn-close" onClick={onHide}></button>
             </div>
+            
+            {/* --- INÍCIO DOS CAMPOS DO FORMULÁRIO --- */}
             <div className="modal-body">
-              {/* ... campos do formulário ... */}
+              {/* Nome */}
+              <div className="mb-3">
+                <label htmlFor="nome" className="form-label">Nome</label>
+                <input type="text" id="nome" name="nome" value={formData.nome} onChange={handleChange} className="form-control" required />
+              </div>
+              {/* Descrição */}
+              <div className="mb-3">
+                <label htmlFor="descricao" className="form-label">Descrição</label>
+                <textarea id="descricao" name="descricao" rows="3" value={formData.descricao} onChange={handleChange} className="form-control" />
+              </div>
+              {/* Valor e Estoque na mesma linha */}
+              <div className="row">
+                <div className="col">
+                  <div className="mb-3">
+                    <label htmlFor="valor" className="form-label">Valor</label>
+                    <input type="number" id="valor" name="valor" step="0.01" value={formData.valor} onChange={handleChange} className="form-control" required />
+                  </div>
+                </div>
+                <div className="col">
+                  <div className="mb-3">
+                    <label htmlFor="estoque" className="form-label">Estoque</label>
+                    <input type="number" id="estoque" name="estoque" value={formData.estoque} onChange={handleChange} className="form-control" required />
+                  </div>
+                </div>
+              </div>
+              {/* Categoria */}
+              <div className="mb-3">
+                <label htmlFor="categoria" className="form-label">Categoria</label>
+                <input type="text" id="categoria" name="categoria" value={formData.categoria} onChange={handleChange} className="form-control" required />
+              </div>
+              {/* Imagem */}
+              <div className="mb-3">
+                <label htmlFor="imagem_produto" className="form-label">Imagem do Produto (se quiser adicionar/alterar)</label>
+                <input type="file" id="imagem_produto" name="imagem_produto" onChange={handleFileChange} className="form-control" />
+              </div>
             </div>
+            {/* --- FIM DOS CAMPOS DO FORMULÁRIO --- */}
+            
             <div className="modal-footer">
               <button type="button" className="btn btn-secondary" onClick={onHide}>Cancelar</button>
               <button type="submit" className="btn btn-primary">Salvar</button>
