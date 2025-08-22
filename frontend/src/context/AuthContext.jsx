@@ -4,6 +4,7 @@ import { jwtDecode } from 'jwt-decode';
 import api from '../services/api';
 import { useNavigate } from 'react-router-dom';
 
+// PONTO CRÍTICO #1: A variável é declarada aqui com 'A' e 'C' maiúsculos.
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
@@ -24,8 +25,8 @@ export function AuthProvider({ children }) {
         setUser(null);
       }
     } else {
-        // Limpa o cabeçalho se não houver token
-        api.defaults.headers.common['Authorization'] = null;
+      // Limpa o cabeçalho se não houver token
+      api.defaults.headers.common['Authorization'] = null;
     }
   }, [token]);
 
@@ -48,10 +49,8 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // ✅ --- FUNÇÃO REGISTER CORRIGIDA --- ✅
   const register = async (formData) => {
     try {
-      // 1. Prepara os dados para envio (incluindo o arquivo)
       const data = new FormData();
       data.append('nome', formData.nome);
       data.append('email', formData.email);
@@ -60,16 +59,10 @@ export function AuthProvider({ children }) {
       if (formData.imagem_perfil) {
         data.append('imagem_perfil', formData.imagem_perfil);
       }
-
-      // 2. Envia os dados para a API de registro
       await api.post('/api/auth/register', data);
-
-      // 3. Se o cadastro funcionou, faz o login automático para o usuário
       await login(formData.email, formData.senha);
-
     } catch (error) {
       console.error("Falha no cadastro", error);
-      // Lança o erro para que o RegisterForm.jsx possa mostrá-lo
       throw error;
     }
   };
@@ -84,6 +77,7 @@ export function AuthProvider({ children }) {
   const authContextValue = { user, token, login, logout, register };
 
   return (
+    // PONTO CRÍTICO #2: A variável é usada aqui com o nome idêntico.
     <AuthContext.Provider value={authContextValue}>
       {children}
     </AuthContext.Provider>
@@ -92,5 +86,6 @@ export function AuthProvider({ children }) {
 
 // Hook customizado para facilitar o uso do contexto
 export const useAuth = () => {
+  // PONTO CRÍTICO #3: E usada aqui também com o nome idêntico.
   return useContext(AuthContext);
 };
