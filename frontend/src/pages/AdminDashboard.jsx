@@ -13,7 +13,7 @@ function AdminDashboard() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
   // Estados para controlar o modal de Adicionar/Editar Produto
   const [showModal, setShowModal] = useState(false);
   const [productToEdit, setProductToEdit] = useState(null);
@@ -32,7 +32,7 @@ function AdminDashboard() {
       setLoading(false);
     }
   };
-  
+
   // Executa a busca de produtos assim que a página carrega
   useEffect(() => {
     fetchProducts();
@@ -77,7 +77,7 @@ function AdminDashboard() {
     setShowModal(false);
     fetchProducts();
   };
-  
+
   // Função para deletar um produto
   const handleDelete = async (productId) => {
     if (window.confirm('Tem certeza que deseja excluir este produto? A ação não pode ser desfeita.')) {
@@ -90,7 +90,7 @@ function AdminDashboard() {
       }
     }
   };
-  
+
   // Lógica para montar a URL da imagem de perfil do admin
   const profileImageUrl = user?.imagem_perfil_url
     ? `http://localhost:3001/uploads/${user.imagem_perfil_url}`
@@ -99,7 +99,7 @@ function AdminDashboard() {
   return (
     <div>
       <h1 className="mb-4">Painel do Administrador</h1>
-      
+
       {/* --- SEÇÃO DO CARD DE INFORMAÇÕES DO ADMIN --- */}
       <div className="card mb-4">
         <div className="card-header">
@@ -108,14 +108,14 @@ function AdminDashboard() {
         <div className="card-body">
           <div className="row align-items-center">
             <div className="col-md-2 text-center">
-              <img src={profileImageUrl} alt="Foto de Perfil" className="img-fluid rounded-circle" style={{ maxWidth: '100px' }}/>
-              
+              <img src={profileImageUrl} alt="Foto de Perfil" className="img-fluid rounded-circle" style={{ maxWidth: '100px' }} />
+
               {/* ✅ NOVO: Botão de upload de imagem */}
-              <label htmlFor="profileImageInput" className="btn btn-secondary btn-sm mt-2">
+              <label htmlFor="profileImageInput" className="btn btn-outline-secondary py-1 px-2 mt-2" style={{ fontSize: '0.75rem' }}>
                 Mudar Foto
               </label>
-              <input 
-                type="file" 
+              <input
+                type="file"
                 id="profileImageInput"
                 style={{ display: 'none' }} // O input fica invisível
                 onChange={handleProfileImageChange}
@@ -148,7 +148,7 @@ function AdminDashboard() {
       {loading && <div className="text-center"><div className="spinner-border" role="status"><span className="visually-hidden">Carregando...</span></div></div>}
       {error && <div className="alert alert-danger">{error}</div>}
       {!loading && !error && (
-        <ProductAdminList 
+        <ProductAdminList
           products={products}
           onEdit={handleShowEditModal}
           onDelete={handleDelete}
@@ -157,7 +157,7 @@ function AdminDashboard() {
       {/* --- FIM DA SEÇÃO DE GERENCIAMENTO --- */}
 
       {/* O componente do Modal fica aqui, mas só é visível quando showModal é true */}
-      <ProductModal 
+      <ProductModal
         show={showModal}
         onHide={handleCloseModal}
         productToEdit={productToEdit}

@@ -63,6 +63,9 @@ export function AuthProvider({ children }) {
 
   const authContextValue = { user, token, login, logout, register };
 
+  // ADICIONE ESTA LINHA
+  console.log('[AuthContext] Valor atual do usuário:', user);
+
   return (
     <AuthContext.Provider value={authContextValue}>
       {children}
