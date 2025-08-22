@@ -66,10 +66,20 @@ exports.login = async (req, res) => {
 
     //# gerar o Tokent JWT
     // O token contém os dados que queremos que ele carregue (payload)
+    // ✅ --- CORREÇÃO AQUI --- ✅
+    // Adicionamos mais informações ao payload do token
+    const payload = {
+      id: usuario.id,
+      role: usuario.role,
+      nome: usuario.nome,
+      email: usuario.email,
+      imagem_perfil_url: usuario.imagem_perfil_url,
+    };
+
     const token = jwt.sign(
-      { id: usuario.id, role: usuario.role }, // Payload
-      process.env.JWT_SECRET,               // Segredo
-      { expiresIn: '8h' }                     // Opções (expira em 8 horas)
+      payload,                  // Use o novo payload completo
+      process.env.JWT_SECRET,
+      { expiresIn: '8h' }
     );
 
     res.status(200).json({ message: 'login bem-sucedido!', token: token });

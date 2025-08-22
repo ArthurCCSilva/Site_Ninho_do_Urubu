@@ -6,13 +6,15 @@ import ProductAdminList from '../components/ProductAdminList';
 import ProductModal from '../components/ProductModal';
 
 function AdminDashboard() {
-  // Estados para os dados do usuário e dos produtos
-  const { user } = useAuth();
+  // ✅ ALTERADO: Pegamos a função 'logout' também do nosso contexto
+  const { user, logout } = useAuth();
+
+  // Estados para os dados dos produtos
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
-  // Estados para controlar o modal
+  // Estados para controlar o modal de Adicionar/Editar Produto
   const [showModal, setShowModal] = useState(false);
   const [productToEdit, setProductToEdit] = useState(null);
 
@@ -36,14 +38,35 @@ function AdminDashboard() {
     fetchProducts();
   }, []);
 
+  // ✅ NOVO: Função para lidar com a mudança da foto de perfil
+  const handleProfileImageChange = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const data = new FormData();
+    data.append('imagem_perfil', file);
+
+    try {
+      // Usamos a rota que já criamos no backend para isso!
+      await api.put(`/api/auth/${user.id}/imagem`, data);
+      alert('Imagem de perfil atualizada com sucesso! Por favor, faça login novamente para ver a alteração.');
+      // A forma mais simples de atualizar a informação é forçar um novo login
+      // para obter um novo token com a URL da imagem atualizada.
+      logout();
+    } catch (error) {
+      console.error('Falha ao atualizar a imagem de perfil', error);
+      alert('Erro ao atualizar a imagem.');
+    }
+  };
+
   // Funções para controlar a abertura e fechamento do modal
   const handleShowAddModal = () => {
-    setProductToEdit(null); // Limpa o estado para garantir que o formulário esteja vazio
+    setProductToEdit(null);
     setShowModal(true);
   };
 
   const handleShowEditModal = (product) => {
-    setProductToEdit(product); // Define qual produto será editado
+    setProductToEdit(product);
     setShowModal(true);
   };
 
@@ -51,17 +74,16 @@ function AdminDashboard() {
 
   // Função chamada quando um produto é salvo (criado ou editado)
   const handleSave = () => {
-    setShowModal(false); // Fecha o modal
-    fetchProducts(); // E atualiza a lista de produtos para mostrar a mudança
+    setShowModal(false);
+    fetchProducts();
   };
   
   // Função para deletar um produto
   const handleDelete = async (productId) => {
-    // window.confirm abre uma caixa de diálogo nativa do navegador
     if (window.confirm('Tem certeza que deseja excluir este produto? A ação não pode ser desfeita.')) {
       try {
         await api.delete(`/api/produtos/${productId}`);
-        fetchProducts(); // Atualiza a lista após deletar
+        fetchProducts();
       } catch (err) {
         alert('Falha ao excluir produto.');
         console.error(err);
@@ -87,6 +109,18 @@ function AdminDashboard() {
           <div className="row align-items-center">
             <div className="col-md-2 text-center">
               <img src={profileImageUrl} alt="Foto de Perfil" className="img-fluid rounded-circle" style={{ maxWidth: '100px' }}/>
+              
+              {/* ✅ NOVO: Botão de upload de imagem */}
+              <label htmlFor="profileImageInput" className="btn btn-secondary btn-sm mt-2">
+                Mudar Foto
+              </label>
+              <input 
+                type="file" 
+                id="profileImageInput"
+                style={{ display: 'none' }} // O input fica invisível
+                onChange={handleProfileImageChange}
+                accept="image/png, image/jpeg" // Aceita apenas imagens
+              />
             </div>
             <div className="col-md-10">
               <h5 className="card-title">{user?.nome}</h5>
