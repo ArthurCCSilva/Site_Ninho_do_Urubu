@@ -16,7 +16,6 @@ export function AuthProvider({ children }) {
       try {
         const decodedUser = jwtDecode(token);
         setUser(decodedUser);
-        // Configura o token no cabeçalho de todas as requisições do axios
         api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       } catch (e) {
         console.error("Token inválido", e);
@@ -24,6 +23,9 @@ export function AuthProvider({ children }) {
         setToken(null);
         setUser(null);
       }
+    } else {
+        // Limpa o cabeçalho se não houver token
+        api.defaults.headers.common['Authorization'] = null;
     }
   }, [token]);
 
@@ -31,13 +33,10 @@ export function AuthProvider({ children }) {
     try {
       const response = await api.post('/api/auth/login', { email, senha });
       const newToken = response.data.token;
-
       localStorage.setItem('token', newToken);
-      setToken(newToken); // Isso vai disparar o useEffect
-
+      setToken(newToken);
+      
       const decodedUser = jwtDecode(newToken);
-
-      // Redireciona com base no cargo (role)
       if (decodedUser.role === 'admin') {
         navigate('/admin/dashboard');
       } else {
@@ -45,26 +44,44 @@ export function AuthProvider({ children }) {
       }
     } catch (error) {
       console.error("Falha no login", error);
-      throw error; // Lança o erro para ser tratado no formulário
+      throw error;
     }
   };
 
-  const register = async (userData) => {
-    // Implementação do registro virá aqui depois
+  // ✅ --- FUNÇÃO REGISTER CORRIGIDA --- ✅
+  const register = async (formData) => {
+    try {
+      // 1. Prepara os dados para envio (incluindo o arquivo)
+      const data = new FormData();
+      data.append('nome', formData.nome);
+      data.append('email', formData.email);
+      data.append('senha', formData.senha);
+      data.append('telefone', formData.telefone);
+      if (formData.imagem_perfil) {
+        data.append('imagem_perfil', formData.imagem_perfil);
+      }
+
+      // 2. Envia os dados para a API de registro
+      await api.post('/api/auth/register', data);
+
+      // 3. Se o cadastro funcionou, faz o login automático para o usuário
+      await login(formData.email, formData.senha);
+
+    } catch (error) {
+      console.error("Falha no cadastro", error);
+      // Lança o erro para que o RegisterForm.jsx possa mostrá-lo
+      throw error;
+    }
   };
 
   const logout = () => {
     localStorage.removeItem('token');
     setToken(null);
     setUser(null);
-    api.defaults.headers.common['Authorization'] = null;
     navigate('/login');
   };
 
   const authContextValue = { user, token, login, logout, register };
-
-  // ADICIONE ESTA LINHA
-  console.log('[AuthContext] Valor atual do usuário:', user);
 
   return (
     <AuthContext.Provider value={authContextValue}>
