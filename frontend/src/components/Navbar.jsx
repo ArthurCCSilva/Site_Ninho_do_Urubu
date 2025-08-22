@@ -6,7 +6,7 @@ function AppNavbar() {
   // 2. Pegue o usuário e a função logout do nosso contexto
   const { user, logout } = useAuth();
   // ADICIONE ESTA LINHA
-  console.log('[Navbar] Usuário recebido do contexto:', user);
+  //console.log('[Navbar] Usuário recebido do contexto:', user);
   
   return (
     <nav className="navbar navbar-expand-lg navbar-dark bg-dark">

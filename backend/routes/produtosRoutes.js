@@ -1,4 +1,4 @@
-// /routes/produtosRoutes.js
+// backend/routes/produtosRoutes.js
 
 const express = require('express');
 const router = express.Router();
@@ -10,6 +10,7 @@ const produtosController = require('../controllers/produtosController');
 const { verifyToken, isAdmin } = require('../middleware/authMiddleware');
 
 const upload = require('../config/multerConfig');//integrar multer das imagens
+
 /*
  * =========================================
  * ROTAS PÚBLICAS
@@ -17,14 +18,11 @@ const upload = require('../config/multerConfig');//integrar multer das imagens
  * =========================================
  */
 
-// Rota para LISTAR TODOS os produtos
+// Rota principal para LISTAR TODOS os produtos (agora também lida com busca, filtro e ordenação)
 // GET -> http://localhost:3001/api/produtos/
 router.get('/', produtosController.getAllProdutos);
 
-// Rota para PESQUISAR produtos por um termo
-// GET -> http://localhost:3001/api/produtos/pesquisar?q=camiseta
-// IMPORTANTE: Esta rota deve vir ANTES da rota /:id para não haver conflito.
-router.get('/pesquisar', produtosController.pesquisarProduto);
+// A rota '/pesquisar' foi removida, pois sua funcionalidade foi integrada à rota '/' acima.
 
 // Rota para buscar UM ÚNICO produto pelo seu ID
 // GET -> http://localhost:3001/api/produtos/123
@@ -40,7 +38,6 @@ router.get('/:id', produtosController.getProdutoById);
 
 // Rota para CRIAR um novo produto
 // POST -> http://localhost:3001/api/produtos/
-// A requisição só chega em 'createProduto' se passar por 'verifyToken' e 'isAdmin'
 router.post('/', [verifyToken, isAdmin, upload.single('imagem_produto')], produtosController.createProduto);
 
 // Rota para ATUALIZAR um produto existente
@@ -49,6 +46,6 @@ router.put('/:id', [verifyToken, isAdmin, upload.single('imagem_produto')], prod
 
 // Rota para DELETAR um produto
 // DELETE -> http://localhost:3001/api/produtos/123
-router.delete('/:id', [verifyToken, isAdmin,], produtosController.deleteProduto);
+router.delete('/:id', [verifyToken, isAdmin], produtosController.deleteProduto); // Vírgula extra removida daqui
 
 module.exports = router;

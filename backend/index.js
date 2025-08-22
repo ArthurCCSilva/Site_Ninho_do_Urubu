@@ -6,14 +6,21 @@ const cors = require('cors')//Para permitir que o frontend se comunique com o ba
 // Importa as rotas
 const authRoutes = require('./routes/authRoutes');
 const produtosRoutes = require('./routes/produtosRoutes');
+// ✅ 1. IMPORTE A NOVA ROTA DE CATEGORIAS
+const categoriasRoutes = require('./routes/categoriasRoutes');
+
 
 const app = express();//- Cria uma instância do servidor Express.
 app.use(cors());// Habilita o CORS
 app.use(express.json());//// Permite que o servidor entenda JSON
 
 // --- ROTAS ---
-app.use('/api/produtos', require('./routes/produtosRoutes'));
-app.use('/api/auth', require('./routes/authRoutes'));
+// ✅ 2. USE AS VARIÁVEIS QUE VOCÊ JÁ IMPORTOU (CÓDIGO MAIS LIMPO)
+app.use('/api/produtos', produtosRoutes);
+app.use('/api/auth', authRoutes);
+// ✅ 3. ADICIONE A NOVA ROTA DE CATEGORIAS AQUI
+app.use('/api/categorias', categoriasRoutes);
+
 app.use('/uploads', express.static('uploads'));//adicionado depois para as imagens
 
 const PORT = process.env.PORT || 3001;

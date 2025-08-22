@@ -1,125 +1,140 @@
-// /controllers/produtosController.js
+// backend/controllers/produtosController.js
 const db = require('../db');
 
-// Rota pública - qualquer um pode ver
+// --- Função Principal para buscar produtos (com filtros, join e ordenação) ---
+// Esta função substitui a sua 'getAllProdutos' antiga e a 'pesquisarProduto'
 exports.getAllProdutos = async (req, res) => {
   try {
-    const [produtos] = await db.query('SELECT * FROM produtos');
+    const { search, category, sort } = req.query;
+    
+    // Query base com JOIN para buscar o nome da categoria na tabela 'categorias'
+    let sql = `
+      SELECT p.*, c.nome AS categoria_nome 
+      FROM produtos p 
+      LEFT JOIN categorias c ON p.categoria_id = c.id
+    `;
+    const params = [];
+    let conditions = [];
+
+    // Lógica de busca por nome ou descrição
+    if (search) {
+      conditions.push('(p.nome LIKE ? OR p.descricao LIKE ?)');
+      params.push(`%${search}%`, `%${search}%`);
+    }
+
+    // Lógica de filtro por nome da categoria
+    if (category) {
+      conditions.push('c.nome = ?');
+      params.push(category);
+    }
+    
+    // Constrói a cláusula WHERE se houver condições
+    if (conditions.length > 0) {
+      sql += ' WHERE ' + conditions.join(' AND ');
+    }
+
+    // Lógica de ordenação segura
+    if (sort) {
+      const allowedSorts = {
+        'price_asc': 'ORDER BY p.valor ASC',
+        'price_desc': 'ORDER BY p.valor DESC',
+        'name_asc': 'ORDER BY p.nome ASC',
+        'name_desc': 'ORDER BY p.nome DESC',
+      };
+      if (allowedSorts[sort]) {
+        sql += ` ${allowedSorts[sort]}`;
+      }
+    }
+
+    const [produtos] = await db.query(sql, params);
     res.status(200).json(produtos);
   } catch (error) {
+    console.error('Erro ao buscar produtos com filtros:', error);
     res.status(500).json({ message: 'Erro ao buscar produtos.', error: error.message });
   }
 };
 
-// Rota pública - buscar um produto pelo ID
+// --- Função para buscar um produto pelo seu ID (com JOIN) ---
+// Esta função está atualizada para trazer o nome da categoria
 exports.getProdutoById = async (req, res) => {
   try {
     const { id } = req.params;
-
-    const [produtos] = await db.query('SELECT * FROM produtos WHERE id = ?', [id]);
+    const sql = `
+      SELECT p.*, c.nome AS categoria_nome 
+      FROM produtos p 
+      LEFT JOIN categorias c ON p.categoria_id = c.id 
+      WHERE p.id = ?
+    `;
+    const [produtos] = await db.query(sql, [id]);
 
     if (produtos.length === 0) {
       return res.status(404).json({ message: 'Produto não encontrado.' });
     }
-
     res.status(200).json(produtos[0]);
   } catch (error) {
     res.status(500).json({ message: 'Erro ao buscar produto.', error: error.message });
   }
 };
 
-
-// --- FUNÇÃO DE PESQUISA---
-// Rota pública - qualquer um pode pesquisar
-exports.pesquisarProduto = async (req, res) => {
-  try {
-    // 1. Pegar o termo de pesquisa da query string da URL (ex: /pesquisar?q=termo)
-    const { q } = req.query;
-
-    if (!q) {
-      return res.status(400).json({ message: 'Termo de pesquisa não fornecido.' });
-    }
-
-    // 2. Montar o termo para a busca com LIKE
-    const termoPesquisa = `%${q}%`;
-
-    // 3. Executar a query usando LIKE para buscar no nome e na descrição
-    const [produtos] = await db.query(
-      'SELECT * FROM produtos WHERE nome LIKE ? OR descricao LIKE ?',
-      [termoPesquisa, termoPesquisa]
-    );
-
-    // 4. Verificar se encontrou resultados
-    if (produtos.length === 0) {
-      return res.status(404).json({ message: 'Nenhum produto encontrado com o termo pesquisado.' });
-    }
-
-    res.status(200).json(produtos);
-  } catch (error) {
-    res.status(500).json({ message: 'Erro ao pesquisar produtos.', error: error.message });
-  }
-};
-
-
-// Rota protegida - só admin pode criar
+// --- Função para CRIAR um novo produto (usando categoria_id) ---
+// Esta função está atualizada para usar 'categoria_id' (número) em vez de 'categoria' (texto)
 exports.createProduto = async (req, res) => {
   try {
-    // 1. Os dados de texto, vêm de req.body
-    const { nome, descricao, valor, categoria, estoque } = req.body;
-
-    // 2. A informação da imagem vem de req.file (se o usuário enviar uma)
+    const { nome, descricao, valor, categoria_id, estoque } = req.body;
     const imagem_produto_url = req.file ? req.file.filename : null;
 
-    // 3. Validação robusta para os campos obrigatórios
-    //    Verificamos se 'estoque' não é undefined para permitir o valor 0
-    if(!nome || !valor || !categoria || estoque === undefined){
-      return res.status(400).json({message: 'Nome, valor, categoria e estoque são obrigatórios.'});
+    if (!nome || !valor || !categoria_id || estoque === undefined) {
+      return res.status(400).json({ message: 'Nome, valor, ID da categoria e estoque são obrigatórios.' });
     }
 
     const [result] = await db.query(
-      'INSERT INTO produtos (nome, descricao, valor, categoria, imagem_produto_url, estoque) VALUES (?, ?, ?, ?, ?, ?)',
-      [nome, descricao, valor, categoria, imagem_produto_url, estoque]
+      'INSERT INTO produtos (nome, descricao, valor, categoria_id, estoque, imagem_produto_url) VALUES (?, ?, ?, ?, ?, ?)',
+      [nome, descricao, valor, categoria_id, estoque, imagem_produto_url]
     );
-
     res.status(201).json({ message: 'Produto criado!', produtoId: result.insertId });
   } catch (error) {
     res.status(500).json({ message: 'Erro ao criar produto.', error: error.message });
   }
 };
 
-// Rota protegida - só admin pode alterar
+// --- Função para ATUALIZAR um produto (usando categoria_id) ---
+// Esta função está atualizada para usar 'categoria_id'
 exports.updateProduto = async (req, res) => {
   try {
     const { id } = req.params;
-    const { nome, descricao, valor, categoria, imagem_produto_url } = req.body;
+    const { nome, descricao, valor, categoria_id, estoque } = req.body;
+    const imagem_produto_url = req.file ? req.file.filename : null;
+    
+    let sql = 'UPDATE produtos SET nome = ?, descricao = ?, valor = ?, categoria_id = ?, estoque = ?';
+    const params = [nome, descricao, valor, categoria_id, estoque];
 
-    const [result] = await db.query(
-      'UPDATE produtos SET nome = ?, descricao = ?, valor = ?, categoria = ?, imagem_produto_url = ? WHERE id = ?',
-      [nome, descricao, valor, categoria, imagem_produto_url, id]
-    );
+    if (imagem_produto_url) {
+      sql += ', imagem_produto_url = ?';
+      params.push(imagem_produto_url);
+    }
+    sql += ' WHERE id = ?';
+    params.push(id);
 
+    const [result] = await db.query(sql, params);
     if (result.affectedRows === 0) {
       return res.status(404).json({ message: 'Produto não encontrado.' });
     }
-
     res.status(200).json({ message: 'Produto atualizado com sucesso!' });
   } catch (error) {
     res.status(500).json({ message: 'Erro ao atualizar produto.', error: error.message });
   }
 };
 
-// Rota protegida - só admin pode deletar
+// --- Função para DELETAR um produto ---
+// Esta função não precisou de alterações
 exports.deleteProduto = async (req, res) => {
   try {
     const { id } = req.params;
-
     const [result] = await db.query('DELETE FROM produtos WHERE id = ?', [id]);
-
     if (result.affectedRows === 0) {
       return res.status(404).json({ message: 'Produto não encontrado.' });
     }
-
-    res.status(200).json({ message: 'Produto deletado com sucesso!' });
+    res.status(200).json({ message: 'Produto deletado com sucesso.' });
   } catch (error) {
     res.status(500).json({ message: 'Erro ao deletar produto.', error: error.message });
   }
