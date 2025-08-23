@@ -21,6 +21,8 @@ app.use('/api/auth', authRoutes);
 // ✅ 3. ADICIONE A NOVA ROTA DE CATEGORIAS AQUI
 app.use('/api/categorias', categoriasRoutes);
 
+app.use('/api/carrinho', require('./routes/carrinhoRoutes'));//carrinho rota
+app.use('/api/pedidos', require('./routes/pedidosRoutes'));
 app.use('/uploads', express.static('uploads'));//adicionado depois para as imagens
 
 const PORT = process.env.PORT || 3001;
