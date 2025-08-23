@@ -22,7 +22,7 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await api.get('/api/categorias');
+        const response = await api.get('/api/categorias?limit=all');
         const formattedCategories = response.data.categorias.map(cat => ({
           value: cat.id,
           label: cat.nome

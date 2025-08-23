@@ -54,7 +54,7 @@ function AdminDashboard() {
   // ✅ 2. FUNÇÃO ATUALIZADA: Busca e formata as categorias para o React Select
   const fetchCategories = async () => {
     try {
-      const response = await api.get('/api/categorias');
+      const response = await api.get('/api/categorias?limit=all');
       // Transforma os dados para o formato { value, label }
       // Para o FILTRO, o 'value' será o NOME da categoria.
       const formattedCategories = response.data.categorias.map(cat => ({

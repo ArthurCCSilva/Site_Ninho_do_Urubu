@@ -4,32 +4,41 @@ const db = require('../db');
 // ✅ FUNÇÃO ATUALIZADA para aceitar busca e paginação
 exports.getAllCategorias = async (req, res) => {
   try {
-    const { search, page = 1, limit = 10 } = req.query; // Padrão: página 1, 10 itens por página
+    const { search, page = 1, limit = 10 } = req.query;
 
     let countSql = 'SELECT COUNT(*) as total FROM categorias';
     let sql = 'SELECT * FROM categorias';
     const params = [];
     
-    // Lógica de busca
     if (search) {
-      countSql += ' WHERE nome LIKE ?';
-      sql += ' WHERE nome LIKE ?';
+      const whereClause = ' WHERE nome LIKE ?';
+      countSql += whereClause;
+      sql += whereClause;
       params.push(`%${search}%`);
     }
 
-    // 1. Primeiro, contamos o total de itens (respeitando a busca)
+    // Primeiro, sempre contamos o total de itens (respeitando a busca)
     const [countRows] = await db.query(countSql, params);
     const totalItems = countRows[0].total;
-    const totalPages = Math.ceil(totalItems / limit);
+    
+    sql += ' ORDER BY nome ASC';
+    
+    let totalPages = 0; // Inicia com 0
 
-    // 2. Depois, buscamos os itens da página atual
-    sql += ' ORDER BY nome ASC LIMIT ? OFFSET ?';
-    const offset = (page - 1) * limit;
-    params.push(parseInt(limit), parseInt(offset));
+    // Lógica crucial corrigida:
+    if (limit !== 'all') {
+      // Se o limite NÃO for 'all', fazemos a matemática e adicionamos a paginação
+      totalPages = Math.ceil(totalItems / limit);
+      const offset = (page - 1) * limit;
+      sql += ' LIMIT ? OFFSET ?';
+      params.push(parseInt(limit), parseInt(offset));
+    } else {
+      // Se o limite FOR 'all', simplesmente definimos totalPages como 1
+      totalPages = 1;
+    }
     
     const [categorias] = await db.query(sql, params);
 
-    // 3. Enviamos a resposta com os dados e as informações de paginação
     res.status(200).json({
       categorias,
       totalPages,
@@ -37,6 +46,7 @@ exports.getAllCategorias = async (req, res) => {
     });
 
   } catch (error) {
+    console.error('Erro ao buscar categorias:', error);
     res.status(500).json({ message: 'Erro ao buscar categorias.', error: error.message });
   }
 };

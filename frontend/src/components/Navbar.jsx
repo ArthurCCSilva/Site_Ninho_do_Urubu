@@ -1,71 +1,66 @@
 // src/components/Navbar.jsx
-import { Link, NavLink } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext'; // 1. Importe o useAuth
+import { useState, useEffect, useRef } from 'react';
+import { Link, NavLink, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 function AppNavbar() {
-  // 2. Pegue o usuário e a função logout do nosso contexto
   const { user, logout } = useAuth();
-  // ADICIONE ESTA LINHA
-  //console.log('[Navbar] Usuário recebido do contexto:', user);
-  
+  const [isNavExpanded, setIsNavExpanded] = useState(false);
+  const navRef = useRef(null); // Referência para o menu
+  const togglerRef = useRef(null); // ✅ NOVA REFERÊNCIA para o botão
+  const location = useLocation();
+
+  useEffect(() => {
+    setIsNavExpanded(false);
+  }, [location]);
+
+  // ✅ LÓGICA DE CLIQUE FORA ATUALIZADA
+  useEffect(() => {
+    function handleClickOutside(event) {
+      // Fecha o menu se o clique for fora do menu E fora do botão
+      if (
+        navRef.current && !navRef.current.contains(event.target) &&
+        togglerRef.current && !togglerRef.current.contains(event.target)
+      ) {
+        setIsNavExpanded(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [navRef, togglerRef]); // Adiciona a nova referência à lista de dependências
+
   return (
     <nav className="navbar navbar-expand-lg navbar-dark bg-dark">
       <div className="container">
         <Link className="navbar-brand" to="/">Ninho do Urubu Store</Link>
+        
         <button
+          ref={togglerRef} // ✅ Adiciona a referência ao botão
           className="navbar-toggler"
           type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#navbarNav"
-          aria-controls="navbarNav"
-          aria-expanded="false"
+          aria-expanded={isNavExpanded}
           aria-label="Toggle navigation"
+          onClick={() => setIsNavExpanded(!isNavExpanded)}
         >
-          <span className="navbar-toggler-icon"></span>
+          <span className={`toggler-icon ${isNavExpanded ? 'close-icon' : 'hamburger-icon'}`}></span>
         </button>
-        <div className="collapse navbar-collapse" id="navbarNav">
+        
+        <div ref={navRef} className={`collapse navbar-collapse ${isNavExpanded ? 'show' : ''}`} id="navbarNav">
           <ul className="navbar-nav ms-auto align-items-center">
-            <li className="nav-item">
-              {/* Usamos NavLink para que o link "ativo" ganhe um estilo especial */}
-              <NavLink className="nav-link" to="/">Home</NavLink>
-            </li>
-
-            {/* --- LÓGICA DE EXIBIÇÃO CONDICIONAL --- */}
+            {/* O conteúdo do <ul> continua o mesmo */}
+            <li className="nav-item"><NavLink className="nav-link" to="/" onClick={() => setIsNavExpanded(false)}>Home</NavLink></li>
             {user ? (
-              // 3. SE o usuário existir (estiver logado)...
               <>
-                {user.role === 'admin' && (
-                  <li className="nav-item">
-                    <NavLink className="nav-link" to="/admin/dashboard">Dashboard</NavLink>
-                  </li>
-                )}
-                <li className="nav-item">
-                  <NavLink className="nav-link" to="/carrinho">Carrinho</NavLink>
-                </li>
-                
-                {/* --- ALTERAÇÃO AQUI: De Dropdown para Botão de Sair direto --- */}
-                <li className="nav-item">
-                  <span className="nav-link text-light" style={{ cursor: 'default' }}>
-                    {/* O '?.' antes de .nome verifica se 'user' existe antes de tentar acessá-lo.
-                        O '?.' antes de .split verifica se 'user.nome' existe antes de tentar dividi-lo.
-                        O '||' fornece um valor padrão caso tudo antes dele falhe. */}
-                    Olá, {user?.nome?.split(' ')[0] || 'Usuário'}
-                  </span>
-                </li>
-                <li className="nav-item">
-                  <button className="btn btn-link nav-link" onClick={logout} style={{ textDecoration: 'none' }}>
-                    Sair
-                  </button>
-                </li>
-                {/* --- FIM DA ALTERAÇÃO --- */}
+                {user.role === 'admin' && (<li className="nav-item"><NavLink className="nav-link" to="/admin/dashboard" onClick={() => setIsNavExpanded(false)}>Dashboard</NavLink></li>)}
+                <li className="nav-item"><NavLink className="nav-link" to="/carrinho" onClick={() => setIsNavExpanded(false)}>Carrinho</NavLink></li>
+                <li className="nav-item"><span className="nav-link text-light" style={{ cursor: 'default' }}>Olá, {user?.nome?.split(' ')[0] || 'Usuário'}</span></li>
+                <li className="nav-item"><button className="btn btn-link nav-link" onClick={() => { logout(); setIsNavExpanded(false); }} style={{ textDecoration: 'none' }}>Sair</button></li>
               </>
             ) : (
-              // 4. SE o usuário NÃO existir (não estiver logado)...
-              <li className="nav-item">
-                <NavLink className="nav-link" to="/login">Login</NavLink>
-              </li>
+              <li className="nav-item"><NavLink className="nav-link" to="/login" onClick={() => setIsNavExpanded(false)}>Login</NavLink></li>
             )}
-
           </ul>
         </div>
       </div>
