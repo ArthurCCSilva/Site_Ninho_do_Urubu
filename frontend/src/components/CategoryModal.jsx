@@ -2,22 +2,24 @@
 import { useState, useEffect, useRef } from 'react';
 import api from '../services/api';
 import { Modal } from 'bootstrap';
-import Pagination from './Pagination'; // Importa o componente de paginação
+import Pagination from './Pagination';
 
 function CategoryModal({ show, onHide, onUpdate }) {
-  // Estados existentes
+  // --- Estados do Componente ---
   const [categories, setCategories] = useState([]);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [error, setError] = useState('');
   const modalRef = useRef();
 
-  // Novos estados para pesquisa, edição e paginação
+  // Estados para pesquisa, edição e paginação
   const [searchTerm, setSearchTerm] = useState('');
   const [editingCategory, setEditingCategory] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
 
-  // Função para buscar as categorias (agora com paginação e busca)
+  // --- Funções de Lógica ---
+
+  // Função para buscar as categorias de forma paginada
   const fetchCategories = async (page = 1) => {
     try {
       setError('');
@@ -44,14 +46,13 @@ function CategoryModal({ show, onHide, onUpdate }) {
   useEffect(() => {
     if (show) {
       const debounceFetch = setTimeout(() => {
-        // Sempre volta para a página 1 ao fazer uma nova busca
-        fetchCategories(1); 
+        fetchCategories(1); // Sempre volta para a página 1 ao fazer uma nova busca
       }, 300);
       return () => clearTimeout(debounceFetch);
     }
   }, [show, searchTerm]);
 
-  // useEffect para controlar a exibição do modal
+  // useEffect para controlar a exibição (abrir/fechar) do modal
   useEffect(() => {
     const modalElement = modalRef.current;
     if (!modalElement) return;
@@ -64,12 +65,13 @@ function CategoryModal({ show, onHide, onUpdate }) {
     }
   }, [show]);
 
-  // Função para adicionar uma nova categoria
+  // --- Funções de Manipulação (Handlers) ---
+
   const handleAddCategory = async (e) => {
     e.preventDefault();
     setError('');
     if (!newCategoryName.trim()) {
-      setError("O nome da categoria não pode estar vazio.");
+      setError("O nome da categoria не pode estar vazio.");
       return;
     }
     try {
@@ -82,7 +84,6 @@ function CategoryModal({ show, onHide, onUpdate }) {
     }
   };
 
-  // Função para excluir uma categoria
   const handleDeleteCategory = async (categoryId) => {
     if (window.confirm('Tem certeza? Se esta categoria estiver em uso, não será possível excluí-la.')) {
       try {
@@ -95,7 +96,6 @@ function CategoryModal({ show, onHide, onUpdate }) {
     }
   };
 
-  // Função para salvar a edição de uma categoria
   const handleUpdateCategory = async (e) => {
     e.preventDefault();
     if (!editingCategory.nome.trim()) {
@@ -104,13 +104,15 @@ function CategoryModal({ show, onHide, onUpdate }) {
     }
     try {
       await api.put(`/api/categorias/${editingCategory.id}`, { nome: editingCategory.nome });
-      setEditingCategory(null); // Sai do modo de edição
-      fetchCategories(currentPage); // Atualiza a lista
+      setEditingCategory(null);
+      fetchCategories(currentPage);
       if (onUpdate) onUpdate();
     } catch (err) {
       alert(err.response?.data?.message || "Erro ao atualizar categoria.");
     }
   };
+
+  // --- Renderização do Componente (JSX) ---
 
   return (
     <div className="modal fade" ref={modalRef} tabIndex="-1">
@@ -151,6 +153,7 @@ function CategoryModal({ show, onHide, onUpdate }) {
               {categories.length > 0 ? categories.map(cat => (
                 <li key={cat.id} className="list-group-item">
                   {editingCategory?.id === cat.id ? (
+                    // MODO DE EDIÇÃO
                     <form onSubmit={handleUpdateCategory} className="d-flex align-items-center">
                       <input 
                         type="text"
@@ -163,6 +166,7 @@ function CategoryModal({ show, onHide, onUpdate }) {
                       <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingCategory(null)}>Cancelar</button>
                     </form>
                   ) : (
+                    // MODO DE VISUALIZAÇÃO
                     <div className="d-flex justify-content-between align-items-center">
                       <span>{cat.nome}</span>
                       <div>

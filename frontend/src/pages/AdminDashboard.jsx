@@ -5,23 +5,33 @@ import api from '../services/api';
 import ProductAdminList from '../components/ProductAdminList';
 import ProductModal from '../components/ProductModal';
 import CategoryModal from '../components/CategoryModal';
+import Select from 'react-select'; // ✅ 1. Importa a nova biblioteca
 
 function AdminDashboard() {
+  // --- Estados do Componente ---
   const { user, logout } = useAuth();
+  
+  // Estados para dados e UI
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // Estados para controlar os modais
   const [showModal, setShowModal] = useState(false);
   const [productToEdit, setProductToEdit] = useState(null);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+
+  // Estados para os filtros da lista de produtos
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [sortOrder, setSortOrder] = useState('');
   
-  // Este estado guardará a lista de objetos de categoria: [{id, nome}, ...]
+  // ✅ Este estado agora guardará a lista no formato { value, label } para o React Select
   const [categories, setCategories] = useState([]);
 
-  // Função para buscar os produtos da API com base nos filtros
+
+  // --- Funções de Busca de Dados (API) ---
+
   const fetchProducts = async () => {
     try {
       setLoading(true);
@@ -41,18 +51,24 @@ function AdminDashboard() {
     }
   };
   
-  // ✅ FUNÇÃO CORRIGIDA: Agora busca da API de categorias corretamente
+  // ✅ 2. FUNÇÃO ATUALIZADA: Busca e formata as categorias para o React Select
   const fetchCategories = async () => {
     try {
       const response = await api.get('/api/categorias');
-      // A resposta da API com paginação é um objeto, então pegamos a lista de dentro dele
-      setCategories(response.data.categorias || []); 
+      // Transforma os dados para o formato { value, label }
+      // Para o FILTRO, o 'value' será o NOME da categoria.
+      const formattedCategories = response.data.categorias.map(cat => ({
+        value: cat.nome,
+        label: cat.nome
+      }));
+      setCategories(formattedCategories);
     } catch (err) {
       console.error("Falha ao buscar categorias para o filtro", err);
     }
   };
   
-  // Roda a busca de produtos sempre que um filtro mudar
+  // --- Efeitos (useEffect Hooks) ---
+
   useEffect(() => {
     const debounceFetch = setTimeout(() => {
       fetchProducts();
@@ -60,10 +76,12 @@ function AdminDashboard() {
     return () => clearTimeout(debounceFetch);
   }, [searchTerm, filterCategory, sortOrder]);
 
-  // Roda para buscar as categorias na primeira carga e quando o modal de categorias é fechado
   useEffect(() => {
     fetchCategories();
   }, [showCategoryModal]);
+
+
+  // --- Funções de Manipulação de Eventos (Handlers) ---
 
   const handleProfileImageChange = async (event) => {
     const file = event.target.files[0];
@@ -157,13 +175,14 @@ function AdminDashboard() {
             />
           </div>
           <div className="col-lg-3">
-            <select className="form-select" value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
-              <option value="">Todas as Categorias</option>
-              {/* ✅ CORREÇÃO: Mapeia a lista de objetos e usa 'cat.nome' */}
-              {categories.map(cat => (
-                <option key={cat.id} value={cat.nome}>{cat.nome}</option>
-              ))}
-            </select>
+            {/* ✅ 3. O <select> HTML foi substituído pelo componente <Select> */}
+            <Select
+              options={categories}
+              isClearable
+              placeholder="Filtrar por Categoria..."
+              onChange={(selectedOption) => setFilterCategory(selectedOption ? selectedOption.value : '')}
+              noOptionsMessage={() => "Nenhuma categoria encontrada"}
+            />
           </div>
           <div className="col-lg-4">
             <div className="btn-group w-100" role="group">

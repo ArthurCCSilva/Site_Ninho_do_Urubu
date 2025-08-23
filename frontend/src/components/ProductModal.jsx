@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import api from '../services/api';
 import { Modal } from 'bootstrap';
+import Select from 'react-select'; // Importa o novo componente Select
 
 function ProductModal({ show, onHide, productToEdit, onSave }) {
   const [formData, setFormData] = useState({
@@ -13,13 +14,20 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
   });
   const [imagemFile, setImagemFile] = useState(null);
   
-  // ✅ ADICIONADO: Lógica para buscar as categorias DENTRO do modal
+  // Este estado guardará as categorias no formato { value, label } exigido pelo React Select
   const [categories, setCategories] = useState([]);
+  const modalRef = useRef();
+
+  // Busca as categorias e as formata para o React Select
   useEffect(() => {
     const fetchCategories = async () => {
       try {
         const response = await api.get('/api/categorias');
-        setCategories(response.data.categorias || []);
+        const formattedCategories = response.data.categorias.map(cat => ({
+          value: cat.id,
+          label: cat.nome
+        }));
+        setCategories(formattedCategories);
       } catch (err) {
         console.error("Falha ao buscar categorias para o modal de produto", err);
       }
@@ -29,8 +37,7 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
     }
   }, [show]);
 
-  const modalRef = useRef();
-
+  // Preenche o formulário ao editar (sem alterações na lógica)
   useEffect(() => {
     if (productToEdit) {
       setFormData({
@@ -46,6 +53,7 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
     setImagemFile(null);
   }, [productToEdit, show]);
   
+  // Controla a exibição do modal (sem alterações na lógica)
   useEffect(() => {
     const modalElement = modalRef.current;
     if (!modalElement) return;
@@ -54,9 +62,16 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
     else bsModal.hide();
   }, [show]);
 
+  // Handlers para os inputs normais e de arquivo
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
   const handleFileChange = (e) => setImagemFile(e.target.files[0]);
 
+  // ✅ NOVA FUNÇÃO: Handler específico para a mudança no componente React Select
+  const handleCategoryChange = (selectedOption) => {
+    setFormData({ ...formData, categoria_id: selectedOption ? selectedOption.value : '' });
+  };
+
+  // Envia o formulário para o backend (sem alterações na lógica)
   const handleSubmit = async (e) => {
     e.preventDefault();
     const data = new FormData();
@@ -91,15 +106,22 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
                 <div className="col"><div className="mb-3"><label className="form-label">Valor</label><input type="number" step="0.01" name="valor" value={formData.valor || ''} onChange={handleChange} className="form-control" required /></div></div>
                 <div className="col"><div className="mb-3"><label className="form-label">Estoque</label><input type="number" name="estoque" value={formData.estoque || ''} onChange={handleChange} className="form-control" required /></div></div>
               </div>
+              
+              {/* ✅ MUDANÇA PRINCIPAL: O <select> HTML foi substituído pelo componente <Select> */}
               <div className="mb-3">
                 <label htmlFor="categoria_id" className="form-label">Categoria</label>
-                <select id="categoria_id" name="categoria_id" value={formData.categoria_id || ''} onChange={handleChange} className="form-select" required >
-                  <option value="">Selecione uma categoria</option>
-                  {categories.map(cat => (
-                    <option key={cat.id} value={cat.id}>{cat.nome}</option>
-                  ))}
-                </select>
+                <Select
+                  id="categoria_id"
+                  name="categoria_id"
+                  options={categories}
+                  placeholder="Selecione ou digite para pesquisar..."
+                  value={categories.find(option => option.value === formData.categoria_id)}
+                  onChange={handleCategoryChange}
+                  isClearable
+                  noOptionsMessage={() => "Nenhuma categoria encontrada"}
+                />
               </div>
+
               <div className="mb-3"><label className="form-label">Imagem</label><input type="file" name="imagem_produto" onChange={handleFileChange} className="form-control" /></div>
             </div>
             <div className="modal-footer">
