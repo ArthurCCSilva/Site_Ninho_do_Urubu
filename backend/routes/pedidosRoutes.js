@@ -9,5 +9,6 @@ router.use(verifyToken);
 
 router.post('/', pedidosController.criarPedido);
 router.get('/meus-pedidos', pedidosController.getPedidosUsuario);
+router.get('/:id', pedidosController.getPedidoDetalhes);
 
 module.exports = router;

@@ -77,3 +77,48 @@ exports.getPedidosUsuario = async (req, res) => {
     res.status(500).json({ message: 'Erro ao buscar pedidos.', error: error.message });
   }
 };
+
+// ✅ --- NOVA FUNÇÃO ADICIONADA AQUI --- ✅
+// GET /api/pedidos/:id - Busca os detalhes de um pedido específico
+exports.getPedidoDetalhes = async (req, res) => {
+  const { id: pedidoId } = req.params; // Pega o ID do pedido da URL
+  const { id: usuarioId, role: usuarioRole } = req.user; // Pega dados do usuário do token
+
+  try {
+    // 1. Busca os dados gerais do pedido e verifica a permissão
+    let sqlPedido = 'SELECT * FROM pedidos WHERE id = ?';
+    const paramsPedido = [pedidoId];
+
+    // Se o usuário não for admin, ele só pode ver o próprio pedido
+    if (usuarioRole !== 'admin') {
+      sqlPedido += ' AND usuario_id = ?';
+      paramsPedido.push(usuarioId);
+    }
+    
+    const [pedidos] = await db.query(sqlPedido, paramsPedido);
+
+    if (pedidos.length === 0) {
+      return res.status(404).json({ message: 'Pedido não encontrado ou acesso negado.' });
+    }
+
+    // 2. Busca os itens específicos daquele pedido
+    const sqlItens = `
+      SELECT pi.quantidade, pi.preco_unitario, p.nome, p.imagem_produto_url
+      FROM pedido_itens pi
+      JOIN produtos p ON pi.produto_id = p.id
+      WHERE pi.pedido_id = ?
+    `;
+    const [itens] = await db.query(sqlItens, [pedidoId]);
+
+    // 3. Monta a resposta final
+    const detalhesPedido = {
+      ...pedidos[0], // Pega os dados do pedido (id, valor_total, status, etc)
+      itens: itens   // Adiciona a lista de itens
+    };
+    
+    res.status(200).json(detalhesPedido);
+
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao buscar detalhes do pedido.', error: error.message });
+  }
+};
