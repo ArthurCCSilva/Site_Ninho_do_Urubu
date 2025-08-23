@@ -1,6 +1,7 @@
 // src/components/OrderList.jsx
 
-function OrderList({ pedidos }) {
+// ✅ 1. RECEBA a nova prop 'onCancelarPedido' na lista de argumentos
+function OrderList({ pedidos, onShowDetails, onCancelarPedido }) {
   // Se a lista de pedidos estiver vazia, mostra uma mensagem
   if (pedidos.length === 0) {
     return <p className="text-muted">Nenhum pedido encontrado nesta categoria.</p>;
@@ -40,7 +41,22 @@ function OrderList({ pedidos }) {
                 </span>
               </td>
               <td>
-                <button className="btn btn-primary btn-sm">Ver Detalhes</button>
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={() => onShowDetails(pedido.id)}>
+                    Ver Detalhes
+                </button>
+                
+                {/* ✅ 2. RENDERIZAÇÃO CONDICIONAL do botão de cancelar */}
+                {/* Este botão só aparecerá na tela se o status do pedido for 'Processando' */}
+                {pedido.status === 'Processando' && (
+                  <button 
+                    className="btn btn-danger btn-sm ms-2"
+                    onClick={() => onCancelarPedido(pedido.id)}
+                  >
+                    Cancelar
+                  </button>
+                )}
               </td>
             </tr>
           ))}

@@ -122,3 +122,28 @@ exports.getPedidoDetalhes = async (req, res) => {
     res.status(500).json({ message: 'Erro ao buscar detalhes do pedido.', error: error.message });
   }
 };
+
+// ✅ NOVA FUNÇÃO para o cliente cancelar o próprio pedido
+exports.cancelarPedido = async (req, res) => {
+  const { id: pedidoId } = req.params;
+  const { id: usuarioId } = req.user;
+
+  try {
+    // Lógica de segurança: só permite cancelar se o pedido for do usuário
+    // e se o status ainda for 'Processando'.
+    const [result] = await db.query(
+      "UPDATE pedidos SET status = 'Cancelado' WHERE id = ? AND usuario_id = ? AND status = 'Processando'",
+      [pedidoId, usuarioId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Pedido não encontrado, não pertence a você ou não pode mais ser cancelado.' });
+    }
+
+    // Futuramente, aqui entraria a lógica para devolver os itens ao estoque.
+
+    res.status(200).json({ message: 'Pedido cancelado com sucesso.' });
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao cancelar pedido.', error: error.message });
+  }
+};

@@ -4,14 +4,14 @@ import { jwtDecode } from 'jwt-decode';
 import api from '../services/api';
 import { useNavigate } from 'react-router-dom';
 
+// PONTO CRÍTICO #1: A variável é declarada aqui com 'A' e 'C' maiúsculos.
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem('token'));
+
   
-  // ✅ 1. ADICIONA O ESTADO DE CARREGAMENTO, INICIANDO COMO 'true'
-  const [isLoading, setIsLoading] = useState(true);
 
   const navigate = useNavigate();
 
@@ -28,12 +28,9 @@ export function AuthProvider({ children }) {
         setUser(null);
       }
     } else {
+      // Limpa o cabeçalho se não houver token
       api.defaults.headers.common['Authorization'] = null;
     }
-    
-    // ✅ 2. AO FINAL DA VERIFICAÇÃO, DEFINE O CARREGAMENTO COMO 'false'
-    //    Isso sinaliza para o resto da aplicação que a checagem inicial terminou.
-    setIsLoading(false); 
   }, [token]);
 
   const login = async (email, senha) => {
@@ -80,16 +77,18 @@ export function AuthProvider({ children }) {
     navigate('/login');
   };
 
-  // ✅ 3. EXPÕE A VARIÁVEL 'isLoading' NO VALOR DO CONTEXTO
-  const authContextValue = { user, token, isLoading, login, logout, register };
+  const authContextValue = { user, token, login, logout, register };
 
   return (
+    // PONTO CRÍTICO #2: A variável é usada aqui com o nome idêntico.
     <AuthContext.Provider value={authContextValue}>
       {children}
     </AuthContext.Provider>
   );
 }
 
+// Hook customizado para facilitar o uso do contexto
 export const useAuth = () => {
+  // PONTO CRÍTICO #3: E usada aqui também com o nome idêntico.
   return useContext(AuthContext);
 };
