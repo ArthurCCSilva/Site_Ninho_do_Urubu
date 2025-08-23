@@ -1,16 +1,49 @@
 // backend/controllers/categoriasController.js
 const db = require('../db');
 
-// GET /api/categorias - Rota pública para buscar todas as categorias
+// ✅ FUNÇÃO ATUALIZADA para aceitar o parâmetro de busca
 exports.getAllCategorias = async (req, res) => {
   try {
-    const [categorias] = await db.query('SELECT * FROM categorias ORDER BY nome ASC');
+    const { search } = req.query;
+    let sql = 'SELECT * FROM categorias';
+    const params = [];
+
+    if (search) {
+      sql += ' WHERE nome LIKE ?';
+      params.push(`%${search}%`);
+    }
+
+    sql += ' ORDER BY nome ASC';
+    
+    const [categorias] = await db.query(sql, params);
     res.status(200).json(categorias);
   } catch (error) {
     res.status(500).json({ message: 'Erro ao buscar categorias.', error: error.message });
   }
 };
 
+// ✅ FUNÇÃO NOVA para editar/atualizar uma categoria
+exports.updateCategoria = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nome } = req.body;
+    if (!nome) {
+      return res.status(400).json({ message: 'O nome da categoria é obrigatório.' });
+    }
+    const [result] = await db.query('UPDATE categorias SET nome = ? WHERE id = ?', [nome, id]);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Categoria não encontrada.' });
+    }
+    res.status(200).json({ message: 'Categoria atualizada com sucesso!' });
+  } catch (error) {
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ message: 'Essa categoria já existe.' });
+    }
+    res.status(500).json({ message: 'Erro ao atualizar categoria.', error: error.message });
+  }
+};
+
+// --- Função mantida (já estava correta) ---
 // POST /api/categorias - Rota de Admin para criar uma nova categoria
 exports.createCategoria = async (req, res) => {
   try {
@@ -28,6 +61,7 @@ exports.createCategoria = async (req, res) => {
   }
 };
 
+// --- Função mantida (já estava correta) ---
 // DELETE /api/categorias/:id - Rota de Admin para deletar uma categoria
 exports.deleteCategoria = async (req, res) => {
   try {
