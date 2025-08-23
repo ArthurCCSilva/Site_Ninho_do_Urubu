@@ -12,25 +12,25 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
     estoque: '',
   });
   const [imagemFile, setImagemFile] = useState(null);
-  const [categories, setCategories] = useState([]); // NOVO ESTADO: para guardar a lista de categorias
-  const modalRef = useRef();
-
-  // Busca as categorias para popular o dropdown
+  
+  // ✅ ADICIONADO: Lógica para buscar as categorias DENTRO do modal
+  const [categories, setCategories] = useState([]);
   useEffect(() => {
     const fetchCategories = async () => {
       try {
         const response = await api.get('/api/categorias');
-        setCategories(response.data);
+        setCategories(response.data.categorias || []);
       } catch (err) {
-        console.error("Falha ao buscar categorias para o modal", err);
+        console.error("Falha ao buscar categorias para o modal de produto", err);
       }
     };
-    if (show) { // Só busca quando o modal for aberto
+    if (show) {
       fetchCategories();
     }
   }, [show]);
 
-  // Preenche o formulário ao editar
+  const modalRef = useRef();
+
   useEffect(() => {
     if (productToEdit) {
       setFormData({
@@ -45,16 +45,13 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
     }
     setImagemFile(null);
   }, [productToEdit, show]);
-
-  // Controla a exibição do modal
+  
   useEffect(() => {
     const modalElement = modalRef.current;
+    if (!modalElement) return;
     const bsModal = Modal.getOrCreateInstance(modalElement);
-    if (show) {
-      bsModal.show();
-    } else {
-      bsModal.hide();
-    }
+    if (show) bsModal.show();
+    else bsModal.hide();
   }, [show]);
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -65,7 +62,6 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
     const data = new FormData();
     Object.keys(formData).forEach(key => data.append(key, formData[key]));
     if (imagemFile) data.append('imagem_produto', imagemFile);
-
     try {
       if (productToEdit) {
         await api.put(`/api/produtos/${productToEdit.id}`, data);
@@ -79,7 +75,7 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
     }
   };
 
-return (
+  return (
     <div className="modal fade" ref={modalRef} tabIndex="-1">
       <div className="modal-dialog">
         <div className="modal-content">
@@ -88,63 +84,24 @@ return (
               <h5 className="modal-title">{productToEdit ? 'Editar Produto' : 'Adicionar Novo Produto'}</h5>
               <button type="button" className="btn-close" onClick={onHide}></button>
             </div>
-            
             <div className="modal-body">
-              {/* Nome */}
-              <div className="mb-3">
-                <label htmlFor="nome" className="form-label">Nome</label>
-                <input type="text" id="nome" name="nome" value={formData.nome || ''} onChange={handleChange} className="form-control" required />
-              </div>
-              {/* Descrição */}
-              <div className="mb-3">
-                <label htmlFor="descricao" className="form-label">Descrição</label>
-                <textarea id="descricao" name="descricao" rows="3" value={formData.descricao || ''} onChange={handleChange} className="form-control" />
-              </div>
-              {/* Valor e Estoque na mesma linha */}
+              <div className="mb-3"><label className="form-label">Nome</label><input type="text" name="nome" value={formData.nome || ''} onChange={handleChange} className="form-control" required /></div>
+              <div className="mb-3"><label className="form-label">Descrição</label><textarea rows="3" name="descricao" value={formData.descricao || ''} onChange={handleChange} className="form-control" /></div>
               <div className="row">
-                <div className="col">
-                  <div className="mb-3">
-                    <label htmlFor="valor" className="form-label">Valor</label>
-                    <input type="number" id="valor" name="valor" step="0.01" value={formData.valor || ''} onChange={handleChange} className="form-control" required />
-                  </div>
-                </div>
-                <div className="col">
-                  <div className="mb-3">
-                    <label htmlFor="estoque" className="form-label">Estoque</label>
-                    <input type="number" id="estoque" name="estoque" value={formData.estoque || ''} onChange={handleChange} className="form-control" required />
-                  </div>
-                </div>
+                <div className="col"><div className="mb-3"><label className="form-label">Valor</label><input type="number" step="0.01" name="valor" value={formData.valor || ''} onChange={handleChange} className="form-control" required /></div></div>
+                <div className="col"><div className="mb-3"><label className="form-label">Estoque</label><input type="number" name="estoque" value={formData.estoque || ''} onChange={handleChange} className="form-control" required /></div></div>
               </div>
-
-              {/* --- CAMPO DE CATEGORIA ATUALIZADO (DE INPUT PARA SELECT) --- */}
               <div className="mb-3">
                 <label htmlFor="categoria_id" className="form-label">Categoria</label>
-                <select 
-                  id="categoria_id"
-                  name="categoria_id" // O 'name' agora é 'categoria_id'
-                  value={formData.categoria_id || ''}
-                  onChange={handleChange}
-                  className="form-select"
-                  required
-                >
+                <select id="categoria_id" name="categoria_id" value={formData.categoria_id || ''} onChange={handleChange} className="form-select" required >
                   <option value="">Selecione uma categoria</option>
-                  {/* Mapeia a lista de categorias buscadas da API para criar as opções */}
                   {categories.map(cat => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.nome}
-                    </option>
+                    <option key={cat.id} value={cat.id}>{cat.nome}</option>
                   ))}
                 </select>
               </div>
-              {/* --- FIM DA ATUALIZAÇÃO DO CAMPO DE CATEGORIA --- */}
-
-              {/* Imagem */}
-              <div className="mb-3">
-                <label htmlFor="imagem_produto" className="form-label">Imagem do Produto (se quiser adicionar/alterar)</label>
-                <input type="file" id="imagem_produto" name="imagem_produto" onChange={handleFileChange} className="form-control" />
-              </div>
+              <div className="mb-3"><label className="form-label">Imagem</label><input type="file" name="imagem_produto" onChange={handleFileChange} className="form-control" /></div>
             </div>
-            
             <div className="modal-footer">
               <button type="button" className="btn btn-secondary" onClick={onHide}>Cancelar</button>
               <button type="submit" className="btn btn-primary">Salvar</button>

@@ -1,22 +1,41 @@
 // backend/controllers/categoriasController.js
 const db = require('../db');
 
-// ✅ FUNÇÃO ATUALIZADA para aceitar o parâmetro de busca
+// ✅ FUNÇÃO ATUALIZADA para aceitar busca e paginação
 exports.getAllCategorias = async (req, res) => {
   try {
-    const { search } = req.query;
+    const { search, page = 1, limit = 10 } = req.query; // Padrão: página 1, 10 itens por página
+
+    let countSql = 'SELECT COUNT(*) as total FROM categorias';
     let sql = 'SELECT * FROM categorias';
     const params = [];
-
+    
+    // Lógica de busca
     if (search) {
+      countSql += ' WHERE nome LIKE ?';
       sql += ' WHERE nome LIKE ?';
       params.push(`%${search}%`);
     }
 
-    sql += ' ORDER BY nome ASC';
+    // 1. Primeiro, contamos o total de itens (respeitando a busca)
+    const [countRows] = await db.query(countSql, params);
+    const totalItems = countRows[0].total;
+    const totalPages = Math.ceil(totalItems / limit);
+
+    // 2. Depois, buscamos os itens da página atual
+    sql += ' ORDER BY nome ASC LIMIT ? OFFSET ?';
+    const offset = (page - 1) * limit;
+    params.push(parseInt(limit), parseInt(offset));
     
     const [categorias] = await db.query(sql, params);
-    res.status(200).json(categorias);
+
+    // 3. Enviamos a resposta com os dados e as informações de paginação
+    res.status(200).json({
+      categorias,
+      totalPages,
+      currentPage: parseInt(page)
+    });
+
   } catch (error) {
     res.status(500).json({ message: 'Erro ao buscar categorias.', error: error.message });
   }
