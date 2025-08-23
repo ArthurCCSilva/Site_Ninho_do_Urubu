@@ -7,64 +7,75 @@ const CartContext = createContext();
 
 export function CartProvider({ children }) {
   const [cartItems, setCartItems] = useState([]);
-  // ✅ 1. PEGUE O 'token' E TAMBÉM O 'isLoading' DO AuthContext
-  const { token, isLoading } = useAuth();
+  const { token, isLoading: isAuthLoading } = useAuth();
 
+  // Função para buscar os itens do carrinho
   const fetchCartItems = async () => {
-    // A condição 'if (!token)' já existe, mas a lógica no useEffect será mais segura
+    if (!token) return; // Se não houver token, não faz nada
     try {
-      const response = await api.get('/api/carrinho');
+      // ✅ Passa o token diretamente na configuração da chamada
+      const response = await api.get('/api/carrinho', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       setCartItems(response.data);
     } catch (error) {
       console.error("Falha ao buscar itens do carrinho", error);
-      // Limpa o carrinho em caso de erro (ex: token expirado)
       setCartItems([]);
     }
   };
 
-  // ✅ 2. ATUALIZE O useEffect PARA ESPERAR O FIM DO CARREGAMENTO DA AUTENTICAÇÃO
+  // useEffect para buscar os itens de forma segura
   useEffect(() => {
-    // Só tenta buscar os itens se:
-    // a) A verificação de autenticação já terminou (isLoading é false)
-    // b) O usuário está de fato logado (token existe)
-    if (!isLoading && token) {
+    // Só tenta buscar os itens se a autenticação já terminou E se o usuário está logado
+    if (!isAuthLoading && token) {
       fetchCartItems();
-    } else if (!isLoading && !token) {
-      // Se a verificação terminou e não há token (logout), limpa o carrinho
+    } else if (!isAuthLoading && !token) {
+      // Garante que o carrinho esteja vazio para visitantes ou após o logout
       setCartItems([]);
     }
-  }, [token, isLoading]); // O gatilho agora é o token OU o estado de carregamento
+  }, [token, isAuthLoading]);
 
+  // Função para adicionar itens (também envia o token diretamente)
   const addToCart = async (produto_id, quantidade = 1) => {
+    if (!token) {
+      alert('Você precisa estar logado para adicionar itens ao carrinho.');
+      return;
+    }
     try {
-      await api.post('/api/carrinho', { produto_id, quantidade });
-      fetchCartItems(); // Atualiza o carrinho
+      await api.post('/api/carrinho', { produto_id, quantidade }, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      fetchCartItems(); // Re-busca os itens para atualizar o estado
     } catch (error) {
       console.error("Falha ao adicionar ao carrinho", error);
-      alert('Erro ao adicionar item. Tente fazer o login novamente.');
+      alert('Erro ao adicionar item. Por favor, tente fazer o login novamente.');
     }
   };
 
+  // Função para remover itens (também envia o token diretamente)
   const removeFromCart = async (produto_id) => {
+    if (!token) return;
     try {
-      await api.delete(`/api/carrinho/${produto_id}`);
-      fetchCartItems(); // Atualiza o carrinho
+      await api.delete(`/api/carrinho/${produto_id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      fetchCartItems(); // Re-busca os itens para atualizar o estado
     } catch (error) {
       console.error("Falha ao remover do carrinho", error);
     }
   };
-
+  
+  // Função de checkout (também envia o token diretamente)
   const checkout = async () => {
+    if (!token) throw new Error("Usuário não autenticado.");
     try {
-      // Chama a API para criar o pedido a partir do carrinho
-      const response = await api.post('/api/pedidos');
-      // Após o sucesso, limpa os itens do carrinho no frontend
+      const response = await api.post('/api/pedidos', {}, { // Adicionado objeto vazio para o body
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       setCartItems([]);
-      // Retorna os dados do novo pedido, como o ID
       return response.data; 
     } catch (error) {
       console.error("Falha ao finalizar a compra", error);
-      // Lança o erro para que a página do carrinho possa mostrar uma mensagem
       throw error; 
     }
   };
@@ -76,6 +87,7 @@ export function CartProvider({ children }) {
   );
 }
 
+// O hook de exportação se chama 'useCart'
 export const useCart = () => {
   return useContext(CartContext);
 };
