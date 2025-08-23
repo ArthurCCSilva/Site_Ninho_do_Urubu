@@ -124,7 +124,6 @@ function CustomerDashboard() {
                 <label htmlFor="customerProfileImageInput" className="btn btn-secondary">Mudar Foto de Perfil</label>
                 <input type="file" id="customerProfileImageInput" style={{ display: 'none' }} onChange={handleProfileImageChange} accept="image/png, image/jpeg"/>
               </div>
-              <p className="text-muted small">Altere sua foto de perfil.</p>
             </div>
           </div>
         </div>
