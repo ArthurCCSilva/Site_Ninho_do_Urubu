@@ -153,28 +153,55 @@ exports.cancelarPedido = async (req, res) => {
 // GET /api/pedidos/admin/todos - Busca TODOS os pedidos para o painel do admin
 exports.getTodosPedidosAdmin = async (req, res) => {
   try {
-    // Pega os parâmetros da URL, com valores padrão de página 1 e limite 10
-    const { page = 1, limit = 10 } = req.query;
+    const { page = 1, limit = 10, search, status } = req.query;
 
-    // 1. Query para contar o número TOTAL de pedidos
-    const countSql = 'SELECT COUNT(*) as total FROM pedidos';
-    const [countRows] = await db.query(countSql);
-    const totalItems = countRows[0].total;
-    const totalPages = Math.ceil(totalItems / limit);
-
-    // 2. Query para buscar os pedidos da página atual
-    const offset = (page - 1) * limit;
-    const sql = `
+    let params = [];
+    let countParams = [];
+    
+    // Inicia as queries base
+    let countSql = 'SELECT COUNT(p.id) as total FROM pedidos p JOIN usuarios u ON p.usuario_id = u.id';
+    let sql = `
       SELECT p.*, u.nome AS cliente_nome, u.imagem_perfil_url AS cliente_imagem_url
       FROM pedidos p
       JOIN usuarios u ON p.usuario_id = u.id
-      ORDER BY p.data_pedido DESC
-      LIMIT ? OFFSET ?
     `;
     
-    const [pedidos] = await db.query(sql, [parseInt(limit), parseInt(offset)]);
+    let conditions = [];
 
-    // 3. Retorna os pedidos junto com as informações de paginação
+    // Adiciona a condição de busca pelo nome do cliente
+    if (search) {
+      conditions.push('u.nome LIKE ?');
+      params.push(`%${search}%`);
+    }
+
+    // Adiciona a condição de filtro por status
+    if (status) {
+      conditions.push('p.status = ?');
+      params.push(status);
+    }
+    
+    // Se houver condições, anexa à query
+    if (conditions.length > 0) {
+      const whereClause = ' WHERE ' + conditions.join(' AND ');
+      countSql += whereClause;
+      sql += whereClause;
+      // Os parâmetros para a contagem são os mesmos da busca principal
+      countParams = [...params];
+    }
+    
+    // 1. Conta o total de itens com os filtros aplicados
+    const [countRows] = await db.query(countSql, countParams);
+    const totalItems = countRows[0].total;
+    const totalPages = Math.ceil(totalItems / limit);
+
+    // 2. Busca os pedidos da página atual com ordenação, filtros e paginação
+    sql += ' ORDER BY p.data_pedido DESC LIMIT ? OFFSET ?';
+    const offset = (page - 1) * limit;
+    params.push(parseInt(limit), parseInt(offset));
+    
+    const [pedidos] = await db.query(sql, params);
+
+    // 3. Retorna a resposta completa
     res.status(200).json({
       pedidos,
       totalPages,

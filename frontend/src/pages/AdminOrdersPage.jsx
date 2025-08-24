@@ -3,28 +3,31 @@ import { useState, useEffect } from 'react';
 import api from '../services/api';
 import OrderDetailsModal from '../components/OrderDetailsModal';
 import AdminCancelOrderModal from '../components/AdminCancelOrderModal';
-import Pagination from '../components/Pagination'; // Importa o componente de paginação
+import Pagination from '../components/Pagination';
+import AdminActionModal from '../components/AdminActionModal';
 
 function AdminOrdersPage() {
   const [pedidos, setPedidos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
-  // Estados para os modais
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedPedidoId, setSelectedPedidoId] = useState(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
-
-  // Estados para a paginação
+  const [showActionModal, setShowActionModal] = useState(false);
+  const [selectedPedido, setSelectedPedido] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
-  const [limit, setLimit] = useState(10); // Limite de itens por página
+  const [limit, setLimit] = useState(10);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
 
-  // Função atualizada para enviar os parâmetros de paginação
   const fetchPedidos = async (page = 1) => {
     try {
       setLoading(true);
-      const response = await api.get(`/api/pedidos/admin/todos?page=${page}&limit=${limit}`);
+      const params = new URLSearchParams({ page, limit });
+      if (searchTerm) params.append('search', searchTerm);
+      if (filterStatus) params.append('status', filterStatus);
+      const response = await api.get(`/api/pedidos/admin/todos?${params.toString()}`);
       setPedidos(response.data.pedidos);
       setTotalPages(response.data.totalPages);
       setCurrentPage(response.data.currentPage);
@@ -36,10 +39,14 @@ function AdminOrdersPage() {
     }
   };
 
-  // useEffect para buscar os dados quando a página ou o limite mudam
+  useEffect(() => {
+    const debounceFetch = setTimeout(() => { fetchPedidos(1); }, 500);
+    return () => clearTimeout(debounceFetch);
+  }, [limit, searchTerm, filterStatus]);
+  
   useEffect(() => {
     fetchPedidos(currentPage);
-  }, [currentPage, limit]); // Gatilhos para a busca
+  }, [currentPage]);
 
   const handleShowDetails = (pedidoId) => { setSelectedPedidoId(pedidoId); setShowDetailsModal(true); };
   
@@ -47,7 +54,7 @@ function AdminOrdersPage() {
     try {
       await api.patch(`/api/pedidos/${pedidoId}/status`, { status: novoStatus });
       alert('Status do pedido atualizado com sucesso!');
-      fetchPedidos(currentPage); // Atualiza a página atual
+      fetchPedidos(currentPage);
     } catch (err) {
       alert('Falha ao atualizar o status do pedido.');
     }
@@ -63,10 +70,15 @@ function AdminOrdersPage() {
       await api.patch(`/api/pedidos/${selectedPedidoId}/cancelar-admin`, { motivo });
       alert('Pedido cancelado com sucesso!');
       setShowCancelModal(false);
-      fetchPedidos(currentPage); // Atualiza a página atual
+      fetchPedidos(currentPage);
     } catch (err) {
       alert('Falha ao cancelar o pedido.');
     }
+  };
+
+  const handleShowActionModal = (pedido) => {
+    setSelectedPedido(pedido);
+    setShowActionModal(true);
   };
 
   const getStatusClass = (status) => {
@@ -85,6 +97,29 @@ function AdminOrdersPage() {
     <div>
       <h1 className="mb-4">Gerenciamento de Pedidos</h1>
       
+      <div className="card card-body mb-4">
+        <div className="row g-3">
+          <div className="col-md-6">
+            <input
+              type="text"
+              className="form-control"
+              placeholder="Pesquisar por nome do cliente..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="col-md-6">
+            <select className="form-select" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+              <option value="">Todos os Status</option>
+              <option value="Processando">Processando</option>
+              <option value="Enviado">Enviado</option>
+              <option value="Entregue">Entregue</option>
+              <option value="Cancelado">Cancelado</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      
       <div className="card">
         <div className="card-body">
           <div className="table-responsive">
@@ -96,7 +131,7 @@ function AdminOrdersPage() {
                   <th>Datas</th>
                   <th>Valor Total</th>
                   <th>Status Atual</th>
-                  <th>Ações</th>
+                  <th className="text-end">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -126,26 +161,10 @@ function AdminOrdersPage() {
                     <td>
                       <span className={`badge bg-${getStatusClass(pedido.status)}`}>{pedido.status}</span>
                     </td>
-                    <td>
-                      {pedido.status === 'Cancelado' ? (
-                        <span className="text-muted fst-italic">Cancelado</span>
-                      ) : (
-                        <div className="btn-group">
-                          <button className="btn btn-secondary btn-sm" onClick={() => handleShowDetails(pedido.id)}>
-                            Detalhes
-                          </button>
-                          <button type="button" className="btn btn-secondary btn-sm dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
-                            <span className="visually-hidden">Toggle Dropdown</span>
-                          </button>
-                          <ul className="dropdown-menu">
-                            <li><button className="dropdown-item" onClick={() => handleUpdateStatus(pedido.id, 'Processando')}>Marcar como "Processando"</button></li>
-                            <li><button className="dropdown-item" onClick={() => handleUpdateStatus(pedido.id, 'Enviado')}>Marcar como "Enviado"</button></li>
-                            <li><button className="dropdown-item" onClick={() => handleUpdateStatus(pedido.id, 'Entregue')}>Marcar como "Entregue"</button></li>
-                            <li><hr className="dropdown-divider" /></li>
-                            <li><button className="dropdown-item text-danger" onClick={() => handleShowCancelModal(pedido.id)}>Cancelar Pedido (Admin)</button></li>
-                          </ul>
-                        </div>
-                      )}
+                    <td className="text-end">
+                      <button className="btn btn-secondary btn-sm" onClick={() => handleShowActionModal(pedido)}>
+                        Ações
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -189,6 +208,14 @@ function AdminOrdersPage() {
         show={showCancelModal}
         onHide={() => setShowCancelModal(false)}
         onConfirm={handleConfirmCancel}
+      />
+      <AdminActionModal 
+        show={showActionModal}
+        onHide={() => setShowActionModal(false)}
+        pedido={selectedPedido}
+        onUpdateStatus={handleUpdateStatus}
+        onShowCancelModal={handleShowCancelModal}
+        onShowDetails={handleShowDetails} // ✅ ADICIONA A PROP FALTANTE
       />
     </div>
   );
