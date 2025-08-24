@@ -1,18 +1,18 @@
 // src/context/AuthContext.jsx
-import { createContext, useState, useContext, useEffect } from 'react';
+import { createContext, useState, useContext, useEffect, useMemo, useCallback } from 'react';
 import { jwtDecode } from 'jwt-decode';
 import api from '../services/api';
 import { useNavigate } from 'react-router-dom';
 
-// PONTO CRÍTICO #1: A variável é declarada aqui com 'A' e 'C' maiúsculos.
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('token'));
-
+  const [token, setToken] = useState(() => localStorage.getItem('token'));
   
-
+  // ✅ 1. ESTADO DE CARREGAMENTO ESSENCIAL
+  const [isLoading, setIsLoading] = useState(true);
+  
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -22,18 +22,19 @@ export function AuthProvider({ children }) {
         setUser(decodedUser);
         api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       } catch (e) {
-        console.error("Token inválido", e);
+        console.error("Token inválido, limpando...", e);
         localStorage.removeItem('token');
         setToken(null);
         setUser(null);
       }
     } else {
-      // Limpa o cabeçalho se não houver token
       api.defaults.headers.common['Authorization'] = null;
     }
+    // ✅ 2. SINALIZA QUE A VERIFICAÇÃO INICIAL TERMINOU
+    setIsLoading(false);
   }, [token]);
 
-  const login = async (email, senha) => {
+  const login = useCallback(async (email, senha) => {
     try {
       const response = await api.post('/api/auth/login', { email, senha });
       const newToken = response.data.token;
@@ -50,9 +51,9 @@ export function AuthProvider({ children }) {
       console.error("Falha no login", error);
       throw error;
     }
-  };
+  }, [navigate]);
 
-  const register = async (formData) => {
+  const register = useCallback(async (formData) => {
     try {
       const data = new FormData();
       data.append('nome', formData.nome);
@@ -68,27 +69,32 @@ export function AuthProvider({ children }) {
       console.error("Falha no cadastro", error);
       throw error;
     }
-  };
+  }, [login]);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem('token');
     setToken(null);
     setUser(null);
     navigate('/login');
-  };
+  }, [navigate]);
 
-  const authContextValue = { user, token, login, logout, register };
+  // ✅ 3. useMemo PARA GARANTIR QUE O OBJETO DO CONTEXTO SEJA ESTÁVEL
+  const authContextValue = useMemo(() => ({
+    user,
+    token,
+    isLoading,
+    login,
+    logout,
+    register
+  }), [user, token, isLoading, login, logout, register]);
 
   return (
-    // PONTO CRÍTICO #2: A variável é usada aqui com o nome idêntico.
     <AuthContext.Provider value={authContextValue}>
       {children}
     </AuthContext.Provider>
   );
 }
 
-// Hook customizado para facilitar o uso do contexto
 export const useAuth = () => {
-  // PONTO CRÍTICO #3: E usada aqui também com o nome idêntico.
   return useContext(AuthContext);
 };
