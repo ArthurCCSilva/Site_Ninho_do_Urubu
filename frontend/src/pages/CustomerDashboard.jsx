@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import OrderList from '../components/OrderList';
 import OrderDetailsModal from '../components/OrderDetailsModal';
+import EditProfileModal from '../components/EditProfileModal';
 
 function CustomerDashboard() {
   const { user, logout, isLoading: isAuthLoading } = useAuth();
@@ -13,6 +14,8 @@ function CustomerDashboard() {
   const [activeTab, setActiveTab] = useState('andamento');
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedPedidoId, setSelectedPedidoId] = useState(null);
+
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
 
   // Efeito para buscar os pedidos do usuário de forma estável
   useEffect(() => {
@@ -120,10 +123,9 @@ function CustomerDashboard() {
           <div className="card h-100">
             <div className="card-header"><h4>Configurações</h4></div>
             <div className="card-body d-flex flex-column justify-content-center align-items-start">
-              <div className="mb-3">
-                <label htmlFor="customerProfileImageInput" className="btn btn-secondary">Mudar Foto de Perfil</label>
-                <input type="file" id="customerProfileImageInput" style={{ display: 'none' }} onChange={handleProfileImageChange} accept="image/png, image/jpeg"/>
-              </div>
+              <button className="btn btn-secondary" onClick={() => setShowEditProfileModal(true)}>
+                Editar Perfil e Senha
+              </button>
             </div>
           </div>
         </div>
@@ -179,6 +181,11 @@ function CustomerDashboard() {
         show={showDetailsModal}
         onHide={() => setShowDetailsModal(false)}
         pedidoId={selectedPedidoId}
+      />
+
+      <EditProfileModal 
+        show={showEditProfileModal}
+        onHide={() => setShowEditProfileModal(false)}
       />
     </div>
   );

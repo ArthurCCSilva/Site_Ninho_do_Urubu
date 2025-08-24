@@ -7,6 +7,7 @@ import ProductModal from '../components/ProductModal';
 import CategoryModal from '../components/CategoryModal';
 import Select from 'react-select'; // ✅ 1. Importa a nova biblioteca
 import { Link } from 'react-router-dom'; // Garanta que o Link está importado
+import EditProfileModal from '../components/EditProfileModal';
 
 function AdminDashboard() {
   // --- Estados do Componente ---
@@ -30,7 +31,7 @@ function AdminDashboard() {
   // ✅ Este estado agora guardará a lista no formato { value, label } para o React Select
   const [categories, setCategories] = useState([]);
 
-
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   // --- Funções de Busca de Dados (API) ---
 
   const fetchProducts = async () => {
@@ -147,18 +148,18 @@ function AdminDashboard() {
           <div className="card h-100">
             <div className="card-header"><h4>Configurações Gerais</h4></div>
             <div className="card-body d-flex flex-column justify-content-center align-items-start">
-              <div className="mb-3">
-                <label htmlFor="profileImageInput" className="btn btn-secondary">Mudar Foto de Perfil</label>
-                <input type="file" id="profileImageInput" style={{ display: 'none' }} onChange={handleProfileImageChange} accept="image/png, image/jpeg" />
-              </div>
+              
+              <button className="btn btn-secondary mb-3" onClick={() => setShowEditProfileModal(true)}>
+                Editar Perfil e Senha
+              </button>
 
-              <Link to="/admin/pedidos" className="btn btn-primary mb-3">
-                Gerenciar Pedidos de Clientes
-              </Link>
-
-              <button className="btn btn-info" onClick={() => setShowCategoryModal(true)}>
+              <button className="btn btn-info mb-3" onClick={() => setShowCategoryModal(true)}>
                 Gerenciar Categorias
               </button>
+
+              <Link to="/admin/pedidos" className="btn btn-primary">
+                Gerenciar Pedidos de Clientes
+              </Link>
             </div>
           </div>
         </div>
@@ -222,6 +223,11 @@ function AdminDashboard() {
         show={showCategoryModal}
         onHide={() => setShowCategoryModal(false)}
         onUpdate={fetchCategories}
+      />
+
+      <EditProfileModal 
+        show={showEditProfileModal}
+        onHide={() => setShowEditProfileModal(false)}
       />
     </div>
   );
