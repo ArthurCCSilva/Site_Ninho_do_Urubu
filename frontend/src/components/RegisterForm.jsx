@@ -1,44 +1,47 @@
 // src/components/RegisterForm.jsx
 import { useState } from 'react';
-// 1. Descomente a importação do useAuth
-import { useAuth } from '../context/AuthContext'; 
+import { useAuth } from '../context/AuthContext';
+import PhoneInput from 'react-phone-number-input'; // 1. Importa o componente de telefone
 
 function RegisterForm() {
   const [formData, setFormData] = useState({
     nome: '',
     email: '',
     senha: '',
-    telefone: '',
   });
-  const [imagemFile, setImagemFile] = useState(null); // Estado para o arquivo de imagem
+  // 2. Cria um estado separado para o telefone
+  const [telefone, setTelefone] = useState('');
+  
+  const [confirmSenha, setConfirmSenha] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [imagemFile, setImagemFile] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  // 2. Descomente para pegar a função register do contexto
-  const { register } = useAuth(); 
+  const { register } = useAuth();
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleFileChange = (e) => {
-    setImagemFile(e.target.files[0]);
-  };
+  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleFileChange = (e) => setImagemFile(e.target.files[0]);
   
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
-    if (!formData.nome || !formData.email || !formData.senha || !formData.telefone) {
+    
+    if (formData.senha !== confirmSenha) {
+      setError('As senhas não coincidem.');
+      return;
+    }
+
+    // 3. Inclui o 'telefone' na validação e nos dados a serem enviados
+    if (!formData.nome || !formData.email || !formData.senha || !telefone) {
       setError('Por favor, preencha todos os campos obrigatórios.');
       return;
     }
     
-    // 3. Reative o bloco try...catch para enviar os dados
     try {
-      const fullFormData = { ...formData, imagem_perfil: imagemFile };
-      await register(fullFormData); // A chamada para a função de registro agora está ativa
+      const fullFormData = { ...formData, telefone, imagem_perfil: imagemFile };
+      await register(fullFormData);
       setSuccess('Cadastro realizado com sucesso! Redirecionando...');
-      // O redirecionamento é feito pela função 'login' que é chamada dentro de 'register'
     } catch(err) {
       setError(err.response?.data?.message || 'Falha no cadastro. Tente novamente.');
     }
@@ -51,24 +54,39 @@ function RegisterForm() {
       
       <div className="mb-3">
         <label className="form-label">Nome Completo</label>
-        <input type="text" name="nome" className="form-control" placeholder="Seu nome" onChange={handleChange} />
+        <input type="text" name="nome" className="form-control" placeholder="Seu nome" onChange={handleChange} required />
       </div>
-
       <div className="mb-3">
         <label className="form-label">Email</label>
-        <input type="email" name="email" className="form-control" placeholder="seu@email.com" onChange={handleChange} />
+        <input type="email" name="email" className="form-control" placeholder="seu@email.com" onChange={handleChange} required />
+      </div>
+      
+      {/* 4. SUBSTITUI o input de telefone antigo pelo novo componente */}
+      <div className="mb-3">
+          <label className="form-label">telefone - WhatsApp</label>
+          <PhoneInput
+            placeholder="12345678999"
+            value={telefone}
+            onChange={setTelefone}
+            defaultCountry="BR" // País padrão
+            className="form-control"
+            required
+          />
+      </div>
+      
+      <div className="mb-3 position-relative">
+        <label className="form-label">Senha</label>
+        <input type={showPassword ? 'text' : 'password'} name="senha" className="form-control" placeholder="Crie uma senha" onChange={handleChange} required />
+        <span onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '10px', top: '38px', cursor: 'pointer' }}>
+          <i className={showPassword ? 'fas fa-eye-slash' : 'fas fa-eye'}></i>
+        </span>
+      </div>
+      
+      <div className="mb-3">
+        <label className="form-label">Confirmar Senha</label>
+        <input type={showPassword ? 'text' : 'password'} name="confirmSenha" className="form-control" placeholder="Digite a senha novamente" onChange={(e) => setConfirmSenha(e.target.value)} required />
       </div>
 
-      <div className="mb-3">
-        <label className="form-label">Telefone</label>
-        <input type="text" name="telefone" className="form-control" placeholder="(XX) XXXXX-XXXX" onChange={handleChange} />
-      </div>
-      
-      <div className="mb-3">
-        <label className="form-label">Senha</label>
-        <input type="password" name="senha" className="form-control" placeholder="Crie uma senha" onChange={handleChange} />
-      </div>
-      
       <div className="mb-3">
         <label className="form-label">Foto de Perfil (Opcional)</label>
         <input type="file" name="imagem_perfil" className="form-control" onChange={handleFileChange} />

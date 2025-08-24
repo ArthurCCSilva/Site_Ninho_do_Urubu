@@ -3,7 +3,7 @@
 // ✅ 1. IMPORTAMOS AS FERRAMENTAS NECESSÁRIAS
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 function ProductCard({ product }) {
   // ✅ 2. PEGAMOS AS FUNÇÕES E DADOS DOS NOSSOS CONTEXTOS E DO ROUTER
@@ -30,23 +30,23 @@ function ProductCard({ product }) {
 
   return (
     <div className="card h-100">
-      <img src={imageUrl} className="card-img-top" alt={product.nome} style={{ height: '200px', objectFit: 'cover' }} />
-      <div className="card-body d-flex flex-column">
-        <h5 className="card-title">{product.nome}</h5>
-        <p className="card-text flex-grow-1">
-          {product.descricao ? `${product.descricao.substring(0, 80)}...` : 'Sem descrição.'}
-        </p>
-        <div>
-          <p className="card-text fw-bold fs-5">
-            R$ {parseFloat(product.valor).toFixed(2).replace('.', ',')}
+      {/* ✅ 2. ENVOLVA a imagem com o Link */}
+      <Link to={`/produtos/${product.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+        <img src={imageUrl} className="card-img-top" alt={product.nome} style={{ height: '200px', objectFit: 'cover' }} />
+        <div className="card-body">
+          <h5 className="card-title">{product.nome}</h5>
+          <p className="card-text">
+            {product.descricao ? `${product.descricao.substring(0, 80)}...` : 'Sem descrição.'}
           </p>
-          
-          {/* ✅ 4. ATUALIZAMOS O BOTÃO */}
-          {/* Trocamos <a> por <button> e conectamos o onClick */}
-          <button className="btn btn-primary w-100" onClick={handleAddToCart}>
-            Adicionar ao Carrinho
-          </button>
         </div>
+      </Link>
+      <div className="card-footer bg-transparent border-top-0">
+        <p className="card-text fw-bold fs-5">
+          R$ {parseFloat(product.valor).toFixed(2).replace('.', ',')}
+        </p>
+        <button className="btn btn-primary w-100" onClick={handleAddToCart}>
+          Adicionar ao Carrinho
+        </button>
       </div>
     </div>
   );

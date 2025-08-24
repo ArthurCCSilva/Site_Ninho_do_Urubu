@@ -14,6 +14,7 @@ import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import CustomerDashboard from './pages/CustomerDashboard';
+import ProductDetailPage from './pages/ProductDetailPage';
 
 function App() {
   return (
@@ -27,6 +28,8 @@ function App() {
               <Route path="/" element={<HomePage />} />
               <Route path="/login" element={<LoginPage />} />
 
+              <Route path="/produtos/:id" element={<ProductDetailPage />} />
+              
               {/* --- Rotas Protegidas para Admin --- */}
               <Route 
                 path="/admin/dashboard" 

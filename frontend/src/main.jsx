@@ -6,7 +6,7 @@ import App from './App.jsx'
 // 1. Importa o arquivo CSS do Bootstrap
 import 'bootstrap/dist/css/bootstrap.min.css';
 // 2. Importa o arquivo JavaScript do Bootstrap
-//import 'bootstrap/dist/js/bootstrap.bundle.min.js';
+import 'react-phone-number-input/style.css'; // <--Criar um campo de telefone internacional do zero é muito complexo
 
 import './index.css'
 

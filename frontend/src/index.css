@@ -35,3 +35,17 @@
     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255, 255, 255, 0.75%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M6 6l18 18M24 6L6 24'/%3e%3c/svg%3e");
     transform: rotate(90deg);
 }
+
+/* --- CORREÇÃO PARA O DROPDOWN DE PAÍSES --- */
+/* Força o menu de seleção de países a abrir para baixo */
+
+.PhoneInputCountry {
+  position: relative; /* Garante o contexto de posicionamento para o menu */
+}
+
+.PhoneInputCountrySelect-menu {
+  /* Remove a regra que o faz abrir para cima */
+  bottom: auto !important; 
+  /* Força o menu a se posicionar abaixo do botão */
+  top: 100% !important;
+}
