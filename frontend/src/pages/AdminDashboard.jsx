@@ -1,64 +1,57 @@
 // src/pages/AdminDashboard.jsx
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { Link } from 'react-router-dom';
 import api from '../services/api';
 import ProductAdminList from '../components/ProductAdminList';
 import ProductModal from '../components/ProductModal';
 import CategoryModal from '../components/CategoryModal';
-import Select from 'react-select'; // ✅ 1. Importa a nova biblioteca
-import { Link } from 'react-router-dom'; // Garanta que o Link está importado
+import Select from 'react-select';
 import EditProfileModal from '../components/EditProfileModal';
+import Pagination from '../components/Pagination';
 
 function AdminDashboard() {
-  // --- Estados do Componente ---
   const { user, logout } = useAuth();
-
-  // Estados para dados e UI
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  // Estados para controlar os modais
   const [showModal, setShowModal] = useState(false);
   const [productToEdit, setProductToEdit] = useState(null);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
-
-  // Estados para os filtros da lista de produtos
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [sortOrder, setSortOrder] = useState('');
-
-  // ✅ Este estado agora guardará a lista no formato { value, label } para o React Select
   const [categories, setCategories] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [limit, setLimit] = useState(7); // Limite de 7 itens por página
 
-  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
-  // --- Funções de Busca de Dados (API) ---
-
-  const fetchProducts = async () => {
+  const fetchProducts = async (page = 1) => {
     try {
       setLoading(true);
-      const params = new URLSearchParams();
+      const params = new URLSearchParams({ page, limit });
       if (searchTerm) params.append('search', searchTerm);
       if (filterCategory) params.append('category', filterCategory);
       if (sortOrder) params.append('sort', sortOrder);
-
+      
       const response = await api.get(`/api/produtos?${params.toString()}`);
-      setProducts(response.data);
+      
+      setProducts(response.data.produtos);
+      setTotalPages(response.data.totalPages);
+      setCurrentPage(response.data.currentPage);
       setError(null);
     } catch (err) {
-      setError('Falha ao carregar produtos. Verifique se o backend está rodando.');
+      setError('Falha ao carregar produtos.');
       console.error(err);
     } finally {
       setLoading(false);
     }
   };
-
-  // ✅ 2. FUNÇÃO ATUALIZADA: Busca e formata as categorias para o React Select
+  
   const fetchCategories = async () => {
     try {
       const response = await api.get('/api/categorias?limit=all');
-      // Transforma os dados para o formato { value, label }
-      // Para o FILTRO, o 'value' será o NOME da categoria.
       const formattedCategories = response.data.categorias.map(cat => ({
         value: cat.nome,
         label: cat.nome
@@ -68,22 +61,20 @@ function AdminDashboard() {
       console.error("Falha ao buscar categorias para o filtro", err);
     }
   };
-
-  // --- Efeitos (useEffect Hooks) ---
-
+  
   useEffect(() => {
     const debounceFetch = setTimeout(() => {
-      fetchProducts();
+      if (currentPage !== 1) { setCurrentPage(1); } 
+      else { fetchProducts(1); }
     }, 500);
     return () => clearTimeout(debounceFetch);
-  }, [searchTerm, filterCategory, sortOrder]);
+  }, [limit, searchTerm, filterCategory, sortOrder]);
 
   useEffect(() => {
-    fetchCategories();
-  }, [showCategoryModal]);
-
-
-  // --- Funções de Manipulação de Eventos (Handlers) ---
+    fetchProducts(currentPage);
+  }, [currentPage]);
+  
+  useEffect(() => { fetchCategories(); }, [showCategoryModal]);
 
   const handleProfileImageChange = async (event) => {
     const file = event.target.files[0];
@@ -103,28 +94,24 @@ function AdminDashboard() {
   const handleShowAddModal = () => { setProductToEdit(null); setShowModal(true); };
   const handleShowEditModal = (product) => { setProductToEdit(product); setShowModal(true); };
   const handleCloseModal = () => setShowModal(false);
-  const handleSaveProduct = () => { setShowModal(false); fetchProducts(); };
-
+  const handleSaveProduct = () => { setShowModal(false); fetchProducts(currentPage); };
+  
   const handleDelete = async (productId) => {
-    if (window.confirm('Tem certeza que deseja excluir este produto? A ação não pode ser desfeita.')) {
+    if (window.confirm('Tem certeza que deseja excluir este produto?')) {
       try {
         await api.delete(`/api/produtos/${productId}`);
-        fetchProducts();
+        fetchProducts(currentPage);
       } catch (err) {
         alert('Falha ao excluir produto.');
-        console.error(err);
       }
     }
   };
-
-  const profileImageUrl = user?.imagem_perfil_url
-    ? `http://localhost:3001/uploads/${user.imagem_perfil_url}`
-    : 'https://placehold.co/150';
+  
+  const profileImageUrl = user?.imagem_perfil_url ? `http://localhost:3001/uploads/${user.imagem_perfil_url}` : 'https://placehold.co/150';
 
   return (
     <div>
       <h1 className="mb-4">Painel do Administrador</h1>
-
       <div className="row">
         <div className="col-lg-6 mb-4">
           <div className="card h-100">
@@ -132,7 +119,7 @@ function AdminDashboard() {
             <div className="card-body">
               <div className="row align-items-center">
                 <div className="col-md-3 text-center">
-                  <img src={profileImageUrl} alt="Foto de Perfil" className="img-fluid rounded-circle" style={{ maxWidth: '100px' }} />
+                  <img src={profileImageUrl} alt="Foto de Perfil" className="img-fluid rounded-circle" style={{ maxWidth: '100px' }}/>
                 </div>
                 <div className="col-md-9">
                   <h5 className="card-title">{user?.nome}</h5>
@@ -143,35 +130,29 @@ function AdminDashboard() {
             </div>
           </div>
         </div>
-
         <div className="col-lg-6 mb-4">
           <div className="card h-100">
             <div className="card-header"><h4>Configurações Gerais</h4></div>
             <div className="card-body d-flex flex-column justify-content-center align-items-start">
-              
               <button className="btn btn-secondary mb-3" onClick={() => setShowEditProfileModal(true)}>
                 Editar Perfil e Senha
               </button>
-
-              <button className="btn btn-info mb-3" onClick={() => setShowCategoryModal(true)}>
+              <Link to="/admin/pedidos" className="btn btn-primary mb-3"> 
+                Gerenciar Pedidos
+              </Link>
+              <button className="btn btn-info" onClick={() => setShowCategoryModal(true)}>
                 Gerenciar Categorias
               </button>
-
-              <Link to="/admin/pedidos" className="btn btn-primary">
-                Gerenciar Pedidos de Clientes
-              </Link>
             </div>
           </div>
         </div>
       </div>
-
-
-
+      
       <div className="d-flex justify-content-between align-items-center my-4">
         <h2>Gerenciamento de Produtos</h2>
         <button className="btn btn-primary" onClick={handleShowAddModal}>Adicionar Novo Produto</button>
       </div>
-
+      
       <div className="card card-body mb-4">
         <div className="row g-3 align-items-center">
           <div className="col-lg-5">
@@ -184,7 +165,6 @@ function AdminDashboard() {
             />
           </div>
           <div className="col-lg-3">
-            {/* ✅ 3. O <select> HTML foi substituído pelo componente <Select> */}
             <Select
               options={categories}
               isClearable
@@ -202,33 +182,27 @@ function AdminDashboard() {
           </div>
         </div>
       </div>
-
-      {loading ? <div className="text-center"><div className="spinner-border" /></div>
-        : error ? <div className="alert alert-danger">{error}</div>
-          : <ProductAdminList
-            products={products}
-            onEdit={handleShowEditModal}
-            onDelete={handleDelete}
+      
+      <div className="card">
+        <div className="card-body">
+          {loading ? ( <div className="text-center my-5"><div className="spinner-border" /></div> ) 
+            : error ? ( <div className="alert alert-danger">{error}</div> ) 
+            : ( <ProductAdminList products={products} onEdit={handleShowEditModal} onDelete={handleDelete} /> )
+          }
+        </div>
+        
+        <div className="card-footer d-flex justify-content-center">
+          <Pagination 
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={(page) => setCurrentPage(page)}
           />
-      }
+        </div>
+      </div>
 
-      <ProductModal
-        show={showModal}
-        onHide={handleCloseModal}
-        productToEdit={productToEdit}
-        onSave={handleSaveProduct}
-      />
-
-      <CategoryModal
-        show={showCategoryModal}
-        onHide={() => setShowCategoryModal(false)}
-        onUpdate={fetchCategories}
-      />
-
-      <EditProfileModal 
-        show={showEditProfileModal}
-        onHide={() => setShowEditProfileModal(false)}
-      />
+      <ProductModal show={showModal} onHide={handleCloseModal} productToEdit={productToEdit} onSave={handleSaveProduct} />
+      <CategoryModal show={showCategoryModal} onHide={() => setShowCategoryModal(false)} onUpdate={fetchCategories} />
+      <EditProfileModal show={showEditProfileModal} onHide={() => setShowEditProfileModal(false)} />
     </div>
   );
 }

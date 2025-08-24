@@ -1,39 +1,36 @@
 // backend/controllers/produtosController.js
 const db = require('../db');
 
-// --- Função Principal para buscar produtos (com filtros, join e ordenação) ---
-// Esta função substitui a sua 'getAllProdutos' antiga e a 'pesquisarProduto'
+// --- Função Principal para buscar produtos (com filtros, join, ordenação e paginação) ---
 exports.getAllProdutos = async (req, res) => {
   try {
-    const { search, category, sort } = req.query;
-    
-    // Query base com JOIN para buscar o nome da categoria na tabela 'categorias'
-    let sql = `
-      SELECT p.*, c.nome AS categoria_nome 
-      FROM produtos p 
-      LEFT JOIN categorias c ON p.categoria_id = c.id
-    `;
-    const params = [];
+    const { search, category, sort, page = 1, limit = 7 } = req.query; // Limite padrão de 7
+
+    let baseSql = 'FROM produtos p LEFT JOIN categorias c ON p.categoria_id = c.id';
+    let params = [];
     let conditions = [];
 
-    // Lógica de busca por nome ou descrição
     if (search) {
       conditions.push('(p.nome LIKE ? OR p.descricao LIKE ?)');
       params.push(`%${search}%`, `%${search}%`);
     }
-
-    // Lógica de filtro por nome da categoria
     if (category) {
       conditions.push('c.nome = ?');
       params.push(category);
     }
     
-    // Constrói a cláusula WHERE se houver condições
     if (conditions.length > 0) {
-      sql += ' WHERE ' + conditions.join(' AND ');
+      baseSql += ' WHERE ' + conditions.join(' AND ');
     }
 
-    // Lógica de ordenação segura
+    // 1. Primeiro, contamos o total de itens com os filtros aplicados para saber o total de páginas
+    const countSql = `SELECT COUNT(p.id) as total ${baseSql}`;
+    const [countRows] = await db.query(countSql, params);
+    const totalItems = countRows[0].total;
+    const totalPages = Math.ceil(totalItems / limit);
+
+    // 2. Depois, buscamos os produtos da página atual com ordenação
+    let sql = `SELECT p.*, c.nome AS categoria_nome ${baseSql}`;
     if (sort) {
       const allowedSorts = {
         'price_asc': 'ORDER BY p.valor ASC',
@@ -44,10 +41,24 @@ exports.getAllProdutos = async (req, res) => {
       if (allowedSorts[sort]) {
         sql += ` ${allowedSorts[sort]}`;
       }
+    } else {
+      sql += ' ORDER BY p.id DESC'; // Ordenação padrão por mais recente
     }
-
+    
+    // Adiciona a paginação à query principal
+    const offset = (page - 1) * limit;
+    sql += ' LIMIT ? OFFSET ?';
+    params.push(parseInt(limit), parseInt(offset));
+    
     const [produtos] = await db.query(sql, params);
-    res.status(200).json(produtos);
+
+    // 3. Retorna a resposta com os produtos e os dados da paginação
+    res.status(200).json({
+      produtos,
+      totalPages,
+      currentPage: parseInt(page)
+    });
+
   } catch (error) {
     console.error('Erro ao buscar produtos com filtros:', error);
     res.status(500).json({ message: 'Erro ao buscar produtos.', error: error.message });
@@ -55,18 +66,11 @@ exports.getAllProdutos = async (req, res) => {
 };
 
 // --- Função para buscar um produto pelo seu ID (com JOIN) ---
-// Esta função está atualizada para trazer o nome da categoria
 exports.getProdutoById = async (req, res) => {
   try {
     const { id } = req.params;
-    const sql = `
-      SELECT p.*, c.nome AS categoria_nome 
-      FROM produtos p 
-      LEFT JOIN categorias c ON p.categoria_id = c.id 
-      WHERE p.id = ?
-    `;
+    const sql = `SELECT p.*, c.nome AS categoria_nome FROM produtos p LEFT JOIN categorias c ON p.categoria_id = c.id WHERE p.id = ?`;
     const [produtos] = await db.query(sql, [id]);
-
     if (produtos.length === 0) {
       return res.status(404).json({ message: 'Produto não encontrado.' });
     }
@@ -77,19 +81,13 @@ exports.getProdutoById = async (req, res) => {
 };
 
 // --- Função para CRIAR um novo produto (usando categoria_id) ---
-// Esta função está atualizada para usar 'categoria_id' (número) em vez de 'categoria' (texto)
 exports.createProduto = async (req, res) => {
-  
-
-
   try {
     const { nome, descricao, valor, categoria_id, estoque } = req.body;
     const imagem_produto_url = req.file ? req.file.filename : null;
-
     if (!nome || !valor || !categoria_id || estoque === undefined) {
       return res.status(400).json({ message: 'Nome, valor, ID da categoria e estoque são obrigatórios.' });
     }
-
     const [result] = await db.query(
       'INSERT INTO produtos (nome, descricao, valor, categoria_id, estoque, imagem_produto_url) VALUES (?, ?, ?, ?, ?, ?)',
       [nome, descricao, valor, categoria_id, estoque, imagem_produto_url]
@@ -101,23 +99,19 @@ exports.createProduto = async (req, res) => {
 };
 
 // --- Função para ATUALIZAR um produto (usando categoria_id) ---
-// Esta função está atualizada para usar 'categoria_id'
 exports.updateProduto = async (req, res) => {
   try {
     const { id } = req.params;
     const { nome, descricao, valor, categoria_id, estoque } = req.body;
     const imagem_produto_url = req.file ? req.file.filename : null;
-    
     let sql = 'UPDATE produtos SET nome = ?, descricao = ?, valor = ?, categoria_id = ?, estoque = ?';
     const params = [nome, descricao, valor, categoria_id, estoque];
-
     if (imagem_produto_url) {
       sql += ', imagem_produto_url = ?';
       params.push(imagem_produto_url);
     }
     sql += ' WHERE id = ?';
     params.push(id);
-
     const [result] = await db.query(sql, params);
     if (result.affectedRows === 0) {
       return res.status(404).json({ message: 'Produto não encontrado.' });
@@ -129,7 +123,6 @@ exports.updateProduto = async (req, res) => {
 };
 
 // --- Função para DELETAR um produto ---
-// Esta função não precisou de alterações
 exports.deleteProduto = async (req, res) => {
   try {
     const { id } = req.params;
