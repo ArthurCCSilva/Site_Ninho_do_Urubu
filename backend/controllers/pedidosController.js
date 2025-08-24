@@ -176,14 +176,14 @@ exports.getTodosPedidosAdmin = async (req, res) => {
     const { page = 1, limit = 10, search, status } = req.query;
 
     let params = [];
-    let countParams = [];
     
-    // Inicia as queries base
-    let countSql = 'SELECT COUNT(p.id) as total FROM pedidos p JOIN usuarios u ON p.usuario_id = u.id';
+    // Inicia as queries base, AGORA COM O JOIN EM AMBAS
+    let baseSql = 'FROM pedidos p JOIN usuarios u ON p.usuario_id = u.id';
+    
+    let countSql = `SELECT COUNT(p.id) as total ${baseSql}`;
     let sql = `
-      SELECT p.*, u.nome AS cliente_nome, u.imagem_perfil_url AS cliente_imagem_url
-      FROM pedidos p
-      JOIN usuarios u ON p.usuario_id = u.id
+      SELECT p.*, u.nome AS cliente_nome, u.imagem_perfil_url AS cliente_imagem_url, u.telefone AS cliente_telefone
+      ${baseSql}
     `;
     
     let conditions = [];
@@ -205,21 +205,20 @@ exports.getTodosPedidosAdmin = async (req, res) => {
       const whereClause = ' WHERE ' + conditions.join(' AND ');
       countSql += whereClause;
       sql += whereClause;
-      // Os parâmetros para a contagem são os mesmos da busca principal
-      countParams = [...params];
     }
     
     // 1. Conta o total de itens com os filtros aplicados
-    const [countRows] = await db.query(countSql, countParams);
+    const [countRows] = await db.query(countSql, params);
     const totalItems = countRows[0].total;
     const totalPages = Math.ceil(totalItems / limit);
 
-    // 2. Busca os pedidos da página atual com ordenação, filtros e paginação
+    // 2. Busca os pedidos da página atual com ordenação e paginação
     sql += ' ORDER BY p.data_pedido DESC LIMIT ? OFFSET ?';
     const offset = (page - 1) * limit;
-    params.push(parseInt(limit), parseInt(offset));
+    // Adiciona os parâmetros de paginação DEPOIS dos parâmetros de filtro
+    const finalParams = [...params, parseInt(limit), parseInt(offset)];
     
-    const [pedidos] = await db.query(sql, params);
+    const [pedidos] = await db.query(sql, finalParams);
 
     // 3. Retorna a resposta completa
     res.status(200).json({
