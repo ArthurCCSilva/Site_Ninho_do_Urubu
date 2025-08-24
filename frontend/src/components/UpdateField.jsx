@@ -1,23 +1,29 @@
 // src/components/UpdateField.jsx
 import { useState } from 'react';
 import api from '../services/api';
-import { useAuth } from '../context/AuthContext';
 
-function UpdateField({ fieldName, label, initialValue, inputType = 'text' }) {
+// Recebe a função 'onSuccess' do modal principal
+function UpdateField({ fieldName, label, initialValue, inputType = 'text', onSuccess }) {
   const [isEditing, setIsEditing] = useState(false);
   const [value, setValue] = useState(initialValue);
-  const { logout } = useAuth();
+  const [loading, setLoading] = useState(false);
 
   const handleSave = async () => {
+    // Evita salvar se o valor não mudou
+    if (value === initialValue) {
+      setIsEditing(false);
+      return;
+    }
+    setLoading(true);
     try {
       const formData = new FormData();
       formData.append(fieldName, value);
       await api.put('/api/usuarios/perfil', formData);
-      alert('Informação atualizada! Será necessário fazer login novamente para ver as mudanças.');
-      logout();
+      onSuccess(`${label} atualizado(a)`); // Avisa o pai que deu tudo certo
     } catch (error) {
-      alert(error.response?.data?.message || 'Falha ao atualizar.');
+      alert(error.response?.data?.message || `Falha ao atualizar ${label}.`);
     } finally {
+      setLoading(false);
       setIsEditing(false);
     }
   };
@@ -35,8 +41,10 @@ function UpdateField({ fieldName, label, initialValue, inputType = 'text' }) {
               onChange={(e) => setValue(e.target.value)}
               autoFocus
             />
-            <button className="btn btn-success me-2" onClick={handleSave}>Salvar</button>
-            <button className="btn btn-secondary" onClick={() => { setIsEditing(false); setValue(initialValue); }}>Cancelar</button>
+            <button className="btn btn-success me-2" onClick={handleSave} disabled={loading}>
+              {loading ? '...' : 'Salvar'}
+            </button>
+            <button className="btn btn-secondary" onClick={() => { setIsEditing(false); setValue(initialValue); }} disabled={loading}>Cancelar</button>
           </div>
         ) : (
           <div className="d-flex justify-content-between align-items-center">
