@@ -10,24 +10,31 @@ function AdminOrdersPage() {
   const [pedidos, setPedidos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // Estados para os modais
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedPedidoId, setSelectedPedidoId] = useState(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showActionModal, setShowActionModal] = useState(false);
   const [selectedPedido, setSelectedPedido] = useState(null);
+
+  // Estados para a paginação e filtros
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [limit, setLimit] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
 
+  // Função para buscar os pedidos com base em todos os filtros e paginação
   const fetchPedidos = async (page = 1) => {
     try {
       setLoading(true);
       const params = new URLSearchParams({ page, limit });
       if (searchTerm) params.append('search', searchTerm);
       if (filterStatus) params.append('status', filterStatus);
+
       const response = await api.get(`/api/pedidos/admin/todos?${params.toString()}`);
+      
       setPedidos(response.data.pedidos);
       setTotalPages(response.data.totalPages);
       setCurrentPage(response.data.currentPage);
@@ -39,20 +46,33 @@ function AdminOrdersPage() {
     }
   };
 
+  // useEffect para buscar os dados quando um filtro (limite, busca, status) é alterado
   useEffect(() => {
-    const debounceFetch = setTimeout(() => { fetchPedidos(1); }, 500);
+    // Debounce para evitar buscas excessivas ao digitar
+    const debounceFetch = setTimeout(() => {
+      // Sempre volta para a página 1 ao aplicar um novo filtro/busca
+      if (currentPage === 1) {
+        fetchPedidos(1);
+      } else {
+        setCurrentPage(1);
+      }
+    }, 500);
     return () => clearTimeout(debounceFetch);
   }, [limit, searchTerm, filterStatus]);
   
+  // useEffect para buscar os dados quando a página atual muda (clique na paginação)
   useEffect(() => {
     fetchPedidos(currentPage);
   }, [currentPage]);
 
+  // Funções para controlar os modais e ações
+  const handleShowDetails = (pedidoId) => { setSelectedPedidoId(pedidoId); setShowDetailsModal(true); };
+  
   const handleUpdateStatus = async (pedidoId, novoStatus) => {
     try {
       await api.patch(`/api/pedidos/${pedidoId}/status`, { status: novoStatus });
       alert('Status do pedido atualizado com sucesso!');
-      fetchPedidos(currentPage);
+      fetchPedidos(currentPage); // Atualiza a página atual
     } catch (err) {
       alert('Falha ao atualizar o status do pedido.');
     }
@@ -68,7 +88,7 @@ function AdminOrdersPage() {
       await api.patch(`/api/pedidos/${selectedPedidoId}/cancelar-admin`, { motivo });
       alert('Pedido cancelado com sucesso!');
       setShowCancelModal(false);
-      fetchPedidos(currentPage);
+      fetchPedidos(currentPage); // Atualiza a página atual
     } catch (err) {
       alert('Falha ao cancelar o pedido.');
     }
@@ -79,25 +99,17 @@ function AdminOrdersPage() {
     setShowActionModal(true);
   };
 
-  // Abre o modal de detalhes E fecha o de ações
-  const handleShowDetails = (pedidoId) => { 
-    setSelectedPedidoId(pedidoId); 
-    setShowActionModal(false); // Fecha o modal de ações
-    setShowDetailsModal(true);  // Abre o modal de detalhes
-  };
-
-  // ✅ NOVA FUNÇÃO: Fecha o modal de detalhes E reabre o de ações
   const handleBackToActions = () => {
     setShowDetailsModal(false);
     setShowActionModal(true);
   };
-  
+
   const getStatusClass = (status) => {
     switch (status) {
       case 'Entregue': return 'success';
       case 'Cancelado': return 'danger';
       case 'Enviado': return 'info';
-      default: return 'warning';
+      default: return 'warning'; // Processando
     }
   };
 
@@ -107,6 +119,7 @@ function AdminOrdersPage() {
   return (
     <div>
       <h1 className="mb-4">Gerenciamento de Pedidos</h1>
+      
       <div className="card card-body mb-4">
         <div className="row g-3">
           <div className="col-md-6">
@@ -129,6 +142,7 @@ function AdminOrdersPage() {
           </div>
         </div>
       </div>
+      
       <div className="card">
         <div className="card-body">
           <div className="table-responsive">
@@ -151,7 +165,8 @@ function AdminOrdersPage() {
                         src={pedido.cliente_imagem_url ? `http://localhost:3001/uploads/${pedido.cliente_imagem_url}` : 'https://placehold.co/40'} 
                         alt={pedido.cliente_nome}
                         className="rounded-circle me-2"
-                        width="40" height="40"
+                        width="40"
+                        height="40"
                         style={{ objectFit: 'cover' }}
                       />
                       {pedido.cliente_nome}
@@ -166,11 +181,17 @@ function AdminOrdersPage() {
                       )}
                     </td>
                     <td>R$ {parseFloat(pedido.valor_total).toFixed(2).replace('.', ',')}</td>
-                    <td><span className={`badge bg-${getStatusClass(pedido.status)}`}>{pedido.status}</span></td>
+                    <td>
+                      <span className={`badge bg-${getStatusClass(pedido.status)}`}>{pedido.status}</span>
+                    </td>
                     <td className="text-end">
-                      <button className="btn btn-secondary btn-sm" onClick={() => handleShowActionModal(pedido)}>
-                        Ações
-                      </button>
+                      {(pedido.status === 'Cancelado' && pedido.cancelado_por === 'cliente') ? (
+                        <span className="text-muted fst-italic">Cancelado pelo Cliente</span>
+                      ) : (
+                        <button className="btn btn-secondary btn-sm" onClick={() => handleShowActionModal(pedido)}>
+                          Ações
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -178,6 +199,7 @@ function AdminOrdersPage() {
             </table>
           </div>
         </div>
+
         <div className="card-footer d-flex justify-content-between align-items-center">
           <div className="col-auto">
             <label htmlFor="limit-select" className="col-form-label me-2">Itens por página:</label>
@@ -186,7 +208,9 @@ function AdminOrdersPage() {
               className="form-select form-select-sm d-inline-block" 
               style={{ width: 'auto' }}
               value={limit}
-              onChange={(e) => { setLimit(Number(e.target.value)); setCurrentPage(1); }}
+              onChange={(e) => {
+                setLimit(Number(e.target.value));
+              }}
             >
               <option value="10">10</option>
               <option value="25">25</option>
@@ -205,7 +229,7 @@ function AdminOrdersPage() {
         show={showDetailsModal}
         onHide={() => setShowDetailsModal(false)}
         pedidoId={selectedPedidoId}
-        onBack={handleBackToActions} 
+        onBack={handleBackToActions}
       />
       <AdminCancelOrderModal 
         show={showCancelModal}
@@ -218,7 +242,7 @@ function AdminOrdersPage() {
         pedido={selectedPedido}
         onUpdateStatus={handleUpdateStatus}
         onShowCancelModal={handleShowCancelModal}
-        onShowDetails={handleShowDetails} 
+        onShowDetails={handleShowDetails}
       />
     </div>
   );
