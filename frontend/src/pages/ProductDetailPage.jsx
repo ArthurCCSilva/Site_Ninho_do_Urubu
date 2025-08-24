@@ -6,6 +6,12 @@ import { useCart } from '../context/CartContext';
 import api from '../services/api';
 import ProductCard from '../components/ProductCard';
 
+// Importa as ferramentas e estilos do Swiper
+import { Swiper, SwiperSlide } from 'swiper/react';
+import { Navigation } from 'swiper/modules';
+import 'swiper/css';
+import 'swiper/css/navigation';
+
 function ProductDetailPage() {
   const { id } = useParams(); 
   const { user } = useAuth();
@@ -15,13 +21,16 @@ function ProductDetailPage() {
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
   const [relatedProducts, setRelatedProducts] = useState([]);
 
+  // useEffect principal para buscar o produto da página
   useEffect(() => {
+    window.scrollTo(0, 0); // Scrolla para o topo da página
     const fetchProduct = async () => {
+      setLoading(true);
+      setProduct(null);
+      setRelatedProducts([]);
       try {
-        setLoading(true);
         const response = await api.get(`/api/produtos/${id}`);
         setProduct(response.data);
       } catch (err) {
@@ -34,6 +43,7 @@ function ProductDetailPage() {
     fetchProduct();
   }, [id]);
 
+  // useEffect secundário para buscar os produtos relacionados
   useEffect(() => {
     if (product && product.categoria_nome) {
       const fetchRelatedProducts = async () => {
@@ -41,12 +51,9 @@ function ProductDetailPage() {
           const params = new URLSearchParams();
           params.append('category', product.categoria_nome);
           const response = await api.get(`/api/produtos?${params.toString()}`);
-          
-          // Filtra o produto atual da lista de relacionados e limita a 4 itens
           const filteredProducts = response.data
             .filter(p => p.id !== product.id)
-            .slice(0, 4);
-
+            .slice(0, 8);
           setRelatedProducts(filteredProducts);
         } catch (err) {
           console.error("Falha ao buscar produtos relacionados", err);
@@ -54,9 +61,8 @@ function ProductDetailPage() {
       };
       fetchRelatedProducts();
     }
-  }, [product]); // A dependência é o 'product'
+  }, [product]);
 
-  // Função para o botão "Adicionar ao Carrinho" desta página
   const handleAddToCart = () => {
     if (!user) {
       alert('Você precisa fazer login para adicionar itens ao carrinho.');
@@ -75,34 +81,28 @@ function ProductDetailPage() {
     ? `http://localhost:3001/uploads/${product.imagem_produto_url}`
     : 'https://placehold.co/600x400';
 
-  // ✅ --- NOVA LÓGICA PARA O ESTOQUE --- ✅
-  // Variável para verificar se o produto está esgotado
   const isOutOfStock = product.estoque <= 0;
 
-  // Função auxiliar que decide qual mensagem de estoque renderizar
   const renderStockMessage = () => {
     if (isOutOfStock) {
       return <p className="text-danger fw-bold mt-3">Produto indisponível</p>;
     }
-    // Mostra a mensagem de "últimas unidades" se o estoque for 10 ou menos
-    if (product.estoque <= 10 && product.estoque > 1 ) {
+    if (product.estoque === 1) {
+      return <p className="text-warning fw-bold mt-3">Última unidade!</p>;
+    }
+    if (product.estoque <= 10) {
       return <p className="text-warning fw-bold mt-3">Últimas {product.estoque} unidades!</p>;
     }
-
-    if (product.estoque === 1) {
-      return <p className="text-warning fw-bold mt-3">Última {product.estoque} unidade!</p>;
-    }
-    // Se o estoque for maior que 10, não retorna nada (a mensagem não aparece)
     return null; 
   };
 
   return (
     <div className="container my-5">
       <div className="row">
-        <div className="col-md-6">
-          <img src={imageUrl} alt={product.nome} className="img-fluid rounded" />
+        <div className="col-lg-6 mb-4">
+          <img src={imageUrl} alt={product.nome} className="img-fluid rounded shadow-sm" />
         </div>
-        <div className="col-md-6">
+        <div className="col-lg-6">
           <nav aria-label="breadcrumb">
             <ol className="breadcrumb">
               <li className="breadcrumb-item"><Link to="/">Home</Link></li>
@@ -110,11 +110,12 @@ function ProductDetailPage() {
             </ol>
           </nav>
           <h1>{product.nome}</h1>
-          <p className="lead text-muted">{product.categoria_nome}</p>
-          <h3 className="my-3">R$ {parseFloat(product.valor).toFixed(2).replace('.', ',')}</h3>
-          <p>{product.descricao}</p>
-          <div className="d-grid gap-2">
-            {/* ✅ O botão agora é inteligente: ele é desabilitado e muda o texto se não houver estoque */}
+          {product.categoria_nome && (
+             <p className="lead text-muted">{product.categoria_nome}</p>
+          )}
+          <h3 className="my-3 display-5">R$ {parseFloat(product.valor).toFixed(2).replace('.', ',')}</h3>
+          <p className="mt-4">{product.descricao}</p>
+          <div className="d-grid gap-2 mt-4">
             <button 
               className="btn btn-primary btn-lg" 
               type="button"
@@ -125,7 +126,6 @@ function ProductDetailPage() {
             </button>
           </div>
           <div className="mt-3">
-            {/* ✅ A mensagem de estoque agora é renderizada pela nossa função */}
             {renderStockMessage()}
           </div>
         </div>
@@ -135,13 +135,24 @@ function ProductDetailPage() {
         <div className="mt-5">
           <hr />
           <h2 className="my-4">Produtos Relacionados</h2>
-          <div className="row">
-            {relatedProducts.map(relatedProduct => (
-              <div key={relatedProduct.id} className="col-12 col-md-6 col-lg-3 mb-4">
-                {/* Reutilizamos o nosso componente ProductCard! */}
-                <ProductCard product={relatedProduct} />
-              </div>
-            ))}
+          {/* ✅ CONTAINER COM A CLASSE ESPECIAL PARA O CSS */}
+          <div className="product-carousel">
+            <Swiper
+              modules={[Navigation]}
+              navigation
+              spaceBetween={30}
+              breakpoints={{
+                576: { slidesPerView: 2 },
+                768: { slidesPerView: 3 },
+                1200: { slidesPerView: 4 },
+              }}
+            >
+              {relatedProducts.map(relatedProduct => (
+                <SwiperSlide key={relatedProduct.id}>
+                  <ProductCard product={relatedProduct} />
+                </SwiperSlide>
+              ))}
+            </Swiper>
           </div>
         </div>
       )}

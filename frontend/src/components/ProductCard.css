@@ -1,0 +1,64 @@
+/* src/components/ProductCard.css */
+
+/* --- Estilos Gerais do Card de Produto --- */
+.product-card {
+  margin-bottom: 20px;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+  overflow: hidden;
+}
+
+.product-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.product-card .card-img-top {
+  height: 200px; /* Altura padrão da imagem */
+  width: 100%;
+  object-fit: cover;
+}
+
+.product-card .card-body {
+  padding-bottom: 0.5rem;
+}
+
+.product-card .card-title {
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+}
+
+.product-card .card-footer {
+  padding: 0.75rem 1rem;
+}
+
+.product-card .fs-5 {
+  font-size: 1.25rem !important; /* Tamanho padrão do preço */
+}
+
+
+/* --- ✅ NOVOS ESTILOS ESPECÍFICOS PARA O CARROSSEL --- */
+/* Estes estilos só se aplicam a um .product-card que está DENTRO de um .product-carousel */
+
+.product-carousel .product-card-img {
+  height: 160px; /* Altura da imagem menor */
+}
+
+.product-carousel .card-title {
+  font-size: 0.95rem; /* Fonte do título menor */
+}
+
+.product-carousel .card-footer {
+  padding: 0.5rem; /* Menos preenchimento no rodapé */
+}
+
+.product-carousel .fs-5 {
+  font-size: 1.1rem !important; /* Fonte do preço menor */
+  margin-bottom: 0.5rem !important;
+}
+
+.product-carousel .btn {
+  font-size: 0.85rem; /* Texto do botão menor */
+  padding: 0.25rem 0.5rem;
+}

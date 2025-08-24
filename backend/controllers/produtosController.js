@@ -79,6 +79,9 @@ exports.getProdutoById = async (req, res) => {
 // --- Função para CRIAR um novo produto (usando categoria_id) ---
 // Esta função está atualizada para usar 'categoria_id' (número) em vez de 'categoria' (texto)
 exports.createProduto = async (req, res) => {
+  
+
+
   try {
     const { nome, descricao, valor, categoria_id, estoque } = req.body;
     const imagem_produto_url = req.file ? req.file.filename : null;
