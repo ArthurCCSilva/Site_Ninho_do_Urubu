@@ -115,7 +115,6 @@ function AdminOrdersPage() {
                       <span className={`badge bg-${getStatusClass(pedido.status)}`}>{pedido.status}</span>
                     </td>
                     <td>
-                      {/* --- ✅ LÓGICA DE AÇÕES ATUALIZADA --- */}
                       {pedido.status === 'Cancelado' ? (
                         <span className="text-muted fst-italic">Cancelado</span>
                       ) : (
@@ -127,7 +126,8 @@ function AdminOrdersPage() {
                             <span className="visually-hidden">Toggle Dropdown</span>
                           </button>
                           <ul className="dropdown-menu">
-                            {/* Opções de status sempre visíveis */}
+                            {/* ✅ NOVA OPÇÃO "PROCESSANDO" ADICIONADA */}
+                            <li><button className="dropdown-item" onClick={() => handleUpdateStatus(pedido.id, 'Processando')}>Marcar como "Processando"</button></li>
                             <li><button className="dropdown-item" onClick={() => handleUpdateStatus(pedido.id, 'Enviado')}>Marcar como "Enviado"</button></li>
                             <li><button className="dropdown-item" onClick={() => handleUpdateStatus(pedido.id, 'Entregue')}>Marcar como "Entregue"</button></li>
                             <li><hr className="dropdown-divider" /></li>

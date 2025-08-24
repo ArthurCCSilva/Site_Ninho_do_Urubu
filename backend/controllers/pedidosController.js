@@ -172,7 +172,8 @@ exports.updateStatusPedido = async (req, res) => {
   const { id: pedidoId } = req.params;
   const { status } = req.body;
 
-  if (!['Enviado', 'Entregue'].includes(status)) {
+  // ✅ CORREÇÃO AQUI: Adicionamos 'Processando' à lista
+  if (!['Processando', 'Enviado', 'Entregue'].includes(status)) {
     return res.status(400).json({ message: 'Status inválido.' });
   }
 
@@ -180,9 +181,12 @@ exports.updateStatusPedido = async (req, res) => {
     let sql = 'UPDATE pedidos SET status = ?';
     const params = [status];
 
-    // Se o novo status for 'Entregue', também definimos a data de entrega
+    // Se o novo status for 'Entregue', definimos a data de entrega.
+    // Se for revertido para 'Processando' ou 'Enviado', podemos limpar a data de entrega.
     if (status === 'Entregue') {
-      sql += ', data_entrega = NOW()'; // NOW() insere a data e hora atuais
+      sql += ', data_entrega = NOW()';
+    } else {
+      sql += ', data_entrega = NULL';
     }
 
     sql += ' WHERE id = ?';
