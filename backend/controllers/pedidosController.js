@@ -127,17 +127,44 @@ exports.getPedidoDetalhes = async (req, res) => {
 exports.cancelarPedido = async (req, res) => {
   const { id: pedidoId } = req.params;
   const { id: usuarioId } = req.user;
+  const connection = await db.getConnection();
+
   try {
-    const [result] = await db.query(
+    await connection.beginTransaction(); // Inicia a transação
+
+    // 1. Busca os itens do pedido que será cancelado
+    const [itensDoPedido] = await connection.query(
+      'SELECT produto_id, quantidade FROM pedido_itens WHERE pedido_id = ?',
+      [pedidoId]
+    );
+
+    // 2. Devolve cada item ao estoque
+    for (const item of itensDoPedido) {
+      await connection.query(
+        'UPDATE produtos SET estoque = estoque + ? WHERE id = ?',
+        [item.quantidade, item.produto_id]
+      );
+    }
+
+    // 3. Atualiza o status do pedido e registra que foi o cliente que cancelou
+    const [result] = await connection.query(
       "UPDATE pedidos SET status = 'Cancelado', cancelado_por = 'cliente' WHERE id = ? AND usuario_id = ? AND status = 'Processando'",
       [pedidoId, usuarioId]
     );
+
     if (result.affectedRows === 0) {
-      return res.status(400).json({ message: 'Pedido não pode ser cancelado.' });
+      // Se nenhuma linha foi afetada, o pedido não existe, não é do usuário ou não pode ser cancelado
+      throw new Error('Pedido não pode ser cancelado.');
     }
-    res.status(200).json({ message: 'Pedido cancelado com sucesso.' });
+    
+    await connection.commit(); // 4. Se tudo deu certo, confirma a transação
+    res.status(200).json({ message: 'Pedido cancelado com sucesso e itens devolvidos ao estoque.' });
+
   } catch (error) {
+    await connection.rollback(); // 5. Se algo deu errado, desfaz tudo
     res.status(500).json({ message: 'Erro ao cancelar pedido.', error: error.message });
+  } finally {
+    connection.release(); // 6. Libera a conexão com o banco
   }
 };
 
@@ -210,36 +237,62 @@ exports.getTodosPedidosAdmin = async (req, res) => {
 // PATCH /api/pedidos/:id/status - Admin atualiza o status de um pedido
 exports.updateStatusPedido = async (req, res) => {
   const { id: pedidoId } = req.params;
-  const { status } = req.body;
-
-  // ✅ CORREÇÃO AQUI: Adicionamos 'Processando' à lista
-  if (!['Processando', 'Enviado', 'Entregue'].includes(status)) {
+  const { status: novoStatus } = req.body;
+  const connection = await db.getConnection();
+  
+  if (!['Processando', 'Enviado', 'Entregue'].includes(novoStatus)) {
     return res.status(400).json({ message: 'Status inválido.' });
   }
 
   try {
-    let sql = 'UPDATE pedidos SET status = ?';
-    const params = [status];
+    await connection.beginTransaction();
 
-    // Se o novo status for 'Entregue', definimos a data de entrega.
-    // Se for revertido para 'Processando' ou 'Enviado', podemos limpar a data de entrega.
-    if (status === 'Entregue') {
-      sql += ', data_entrega = NOW()';
-    } else {
-      sql += ', data_entrega = NULL';
+    // 1. Busca o status ATUAL do pedido
+    const [pedidosAtuais] = await connection.query('SELECT status FROM pedidos WHERE id = ?', [pedidoId]);
+    if (pedidosAtuais.length === 0) { throw new Error('Pedido não encontrado.'); }
+    const statusAtual = pedidosAtuais[0].status;
+
+    // Se o status já for o desejado, não faz nada.
+    if(statusAtual === novoStatus) {
+        await connection.commit();
+        return res.status(200).json({ message: 'O pedido já está com este status.' });
     }
 
+    // 2. Lógica para REATIVAR um pedido cancelado
+    if (statusAtual === 'Cancelado') {
+      const [itensDoPedido] = await connection.query('SELECT produto_id, quantidade FROM pedido_itens WHERE pedido_id = ?', [pedidoId]);
+      
+      // Verifica se há estoque para todos os itens ANTES de reativar
+      for (const item of itensDoPedido) {
+        const [produto] = await connection.query('SELECT estoque FROM produtos WHERE id = ?', [item.produto_id]);
+        if (produto[0].estoque < item.quantidade) {
+          throw new Error(`Estoque insuficiente para reativar o pedido (produto ID: ${item.produto_id}).`);
+        }
+      }
+
+      // Se houver estoque, deduz a quantidade de cada item
+      for (const item of itensDoPedido) {
+        await connection.query('UPDATE produtos SET estoque = estoque - ? WHERE id = ?', [item.quantidade, item.produto_id]);
+      }
+    }
+
+    // 3. Atualiza o status e a data de entrega (se aplicável)
+    let sql = 'UPDATE pedidos SET status = ?, cancelado_por = NULL'; // Limpa o 'cancelado_por'
+    const params = [novoStatus];
+    if (novoStatus === 'Entregue') { sql += ', data_entrega = NOW()'; } 
+    else { sql += ', data_entrega = NULL'; }
     sql += ' WHERE id = ?';
     params.push(pedidoId);
-
-    const [result] = await db.query(sql, params);
-
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: 'Pedido não encontrado.' });
-    }
-    res.status(200).json({ message: `Status do pedido atualizado para ${status}.` });
+    
+    await connection.query(sql, params);
+    
+    await connection.commit();
+    res.status(200).json({ message: `Status do pedido atualizado para ${novoStatus}.` });
   } catch (error) {
-    res.status(500).json({ message: 'Erro ao atualizar status do pedido.', error: error.message });
+    await connection.rollback();
+    res.status(500).json({ message: `Erro ao atualizar status: ${error.message}` });
+  } finally {
+    connection.release();
   }
 };
 
@@ -247,25 +300,43 @@ exports.updateStatusPedido = async (req, res) => {
 exports.cancelarPedidoAdmin = async (req, res) => {
   const { id: pedidoId } = req.params;
   const { motivo } = req.body;
+  const connection = await db.getConnection();
+
   if (!motivo) {
     return res.status(400).json({ message: 'O motivo do cancelamento é obrigatório.' });
   }
+
   try {
-    const [pedidoInfo] = await db.query(
-      'SELECT u.telefone FROM pedidos p JOIN usuarios u ON p.usuario_id = u.id WHERE p.id = ?',
-      [pedidoId]
-    );
-    if (pedidoInfo.length === 0) {
-      return res.status(404).json({ message: 'Pedido não encontrado.' });
+    await connection.beginTransaction();
+
+    // 1. Busca o status ATUAL do pedido
+    const [pedidosAtuais] = await connection.query('SELECT status, u.telefone FROM pedidos p JOIN usuarios u ON p.usuario_id = u.id WHERE p.id = ?', [pedidoId]);
+    if (pedidosAtuais.length === 0) { throw new Error('Pedido não encontrado.'); }
+    
+    // 2. VERIFICA se o pedido já não está cancelado para evitar devolução dupla de estoque
+    if (pedidosAtuais[0].status === 'Cancelado') {
+        throw new Error('Este pedido já está cancelado.');
+    }
+    
+    const [itensDoPedido] = await connection.query('SELECT produto_id, quantidade FROM pedido_itens WHERE pedido_id = ?', [pedidoId]);
+    
+    // 3. Devolve cada item ao estoque
+    for (const item of itensDoPedido) {
+      await connection.query('UPDATE produtos SET estoque = estoque + ? WHERE id = ?', [item.quantidade, item.produto_id]);
     }
 
-    await db.query("UPDATE pedidos SET status = 'Cancelado', cancelado_por = 'admin' WHERE id = ?", [pedidoId]);
+    // 4. Atualiza o status do pedido
+    await connection.query("UPDATE pedidos SET status = 'Cancelado', cancelado_por = 'admin' WHERE id = ?", [pedidoId]);
+    
+    // Simulação de notificação via WhatsApp
+    console.log(`SIMULAÇÃO WHATSAPP para ${pedidosAtuais[0].telefone}: Pedido #${pedidoId} cancelado. Motivo: ${motivo}`);
 
-    // --- PONTO DE INTEGRAÇÃO COM A API DO WHATSAPP BUSINESS ---
-    // ... (sua simulação de envio continua a mesma) ...
-
-    res.status(200).json({ message: 'Pedido cancelado e cliente notificado (simulação).' });
+    await connection.commit();
+    res.status(200).json({ message: 'Pedido cancelado e itens devolvidos ao estoque.' });
   } catch (error) {
-    res.status(500).json({ message: 'Erro ao cancelar pedido.', error: error.message });
+    await connection.rollback();
+    res.status(500).json({ message: `Erro ao cancelar pedido: ${error.message}` });
+  } finally {
+    connection.release();
   }
 };
