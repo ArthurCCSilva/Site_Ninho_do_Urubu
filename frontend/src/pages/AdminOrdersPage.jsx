@@ -48,8 +48,6 @@ function AdminOrdersPage() {
     fetchPedidos(currentPage);
   }, [currentPage]);
 
-  const handleShowDetails = (pedidoId) => { setSelectedPedidoId(pedidoId); setShowDetailsModal(true); };
-  
   const handleUpdateStatus = async (pedidoId, novoStatus) => {
     try {
       await api.patch(`/api/pedidos/${pedidoId}/status`, { status: novoStatus });
@@ -81,12 +79,25 @@ function AdminOrdersPage() {
     setShowActionModal(true);
   };
 
+  // Abre o modal de detalhes E fecha o de ações
+  const handleShowDetails = (pedidoId) => { 
+    setSelectedPedidoId(pedidoId); 
+    setShowActionModal(false); // Fecha o modal de ações
+    setShowDetailsModal(true);  // Abre o modal de detalhes
+  };
+
+  // ✅ NOVA FUNÇÃO: Fecha o modal de detalhes E reabre o de ações
+  const handleBackToActions = () => {
+    setShowDetailsModal(false);
+    setShowActionModal(true);
+  };
+  
   const getStatusClass = (status) => {
     switch (status) {
       case 'Entregue': return 'success';
       case 'Cancelado': return 'danger';
       case 'Enviado': return 'info';
-      default: return 'warning'; // Processando
+      default: return 'warning';
     }
   };
 
@@ -96,7 +107,6 @@ function AdminOrdersPage() {
   return (
     <div>
       <h1 className="mb-4">Gerenciamento de Pedidos</h1>
-      
       <div className="card card-body mb-4">
         <div className="row g-3">
           <div className="col-md-6">
@@ -119,7 +129,6 @@ function AdminOrdersPage() {
           </div>
         </div>
       </div>
-      
       <div className="card">
         <div className="card-body">
           <div className="table-responsive">
@@ -142,8 +151,7 @@ function AdminOrdersPage() {
                         src={pedido.cliente_imagem_url ? `http://localhost:3001/uploads/${pedido.cliente_imagem_url}` : 'https://placehold.co/40'} 
                         alt={pedido.cliente_nome}
                         className="rounded-circle me-2"
-                        width="40"
-                        height="40"
+                        width="40" height="40"
                         style={{ objectFit: 'cover' }}
                       />
                       {pedido.cliente_nome}
@@ -158,9 +166,7 @@ function AdminOrdersPage() {
                       )}
                     </td>
                     <td>R$ {parseFloat(pedido.valor_total).toFixed(2).replace('.', ',')}</td>
-                    <td>
-                      <span className={`badge bg-${getStatusClass(pedido.status)}`}>{pedido.status}</span>
-                    </td>
+                    <td><span className={`badge bg-${getStatusClass(pedido.status)}`}>{pedido.status}</span></td>
                     <td className="text-end">
                       <button className="btn btn-secondary btn-sm" onClick={() => handleShowActionModal(pedido)}>
                         Ações
@@ -172,7 +178,6 @@ function AdminOrdersPage() {
             </table>
           </div>
         </div>
-
         <div className="card-footer d-flex justify-content-between align-items-center">
           <div className="col-auto">
             <label htmlFor="limit-select" className="col-form-label me-2">Itens por página:</label>
@@ -181,10 +186,7 @@ function AdminOrdersPage() {
               className="form-select form-select-sm d-inline-block" 
               style={{ width: 'auto' }}
               value={limit}
-              onChange={(e) => {
-                setLimit(Number(e.target.value));
-                setCurrentPage(1);
-              }}
+              onChange={(e) => { setLimit(Number(e.target.value)); setCurrentPage(1); }}
             >
               <option value="10">10</option>
               <option value="25">25</option>
@@ -203,6 +205,7 @@ function AdminOrdersPage() {
         show={showDetailsModal}
         onHide={() => setShowDetailsModal(false)}
         pedidoId={selectedPedidoId}
+        onBack={handleBackToActions} 
       />
       <AdminCancelOrderModal 
         show={showCancelModal}
@@ -215,7 +218,7 @@ function AdminOrdersPage() {
         pedido={selectedPedido}
         onUpdateStatus={handleUpdateStatus}
         onShowCancelModal={handleShowCancelModal}
-        onShowDetails={handleShowDetails} // ✅ ADICIONA A PROP FALTANTE
+        onShowDetails={handleShowDetails} 
       />
     </div>
   );
