@@ -60,7 +60,10 @@ function AdminOrdersPage() {
     fetchPedidos(currentPage);
   }, [currentPage]);
 
-  const handleShowDetails = (pedidoId) => { setSelectedPedidoId(pedidoId); setShowDetailsModal(true); };
+  const handleShowDetails = (pedidoId) => {
+    setSelectedPedidoId(pedidoId);
+    setShowDetailsModal(true);
+  };
   
   const handleUpdateStatus = async (pedidoId, novoStatus) => {
     try {
@@ -78,11 +81,28 @@ function AdminOrdersPage() {
   };
   
   const handleConfirmCancel = async (motivo) => {
+    // Usamos 'selectedPedido' que já tem todos os dados, incluindo o telefone
+    if (!selectedPedido) return;
+
     try {
-      await api.patch(`/api/pedidos/${selectedPedidoId}/cancelar-admin`, { motivo });
+      // 1. Chama a API para cancelar o pedido no banco
+      await api.patch(`/api/pedidos/${selectedPedido.id}/cancelar-admin`, { motivo });
+      
+      const telefoneCliente = selectedPedido.cliente_telefone;
+
+      if (telefoneCliente) {
+        // 2. Formata a mensagem para a URL
+        const textoMensagem = `Olá, seu pedido #${selectedPedido.id} na Ninho do Urubu Store foi cancelado. Motivo: ${motivo}`;
+        const mensagemFormatada = encodeURIComponent(textoMensagem);
+
+        // 3. Cria o link do WhatsApp e abre em uma nova aba
+        const whatsappUrl = `https://wa.me/${telefoneCliente}?text=${mensagemFormatada}`;
+        window.open(whatsappUrl, '_blank');
+      }
+
       alert('Pedido cancelado com sucesso!');
       setShowCancelModal(false);
-      fetchPedidos(currentPage);
+      fetchPedidos(currentPage); // Atualiza a lista
     } catch (err) {
       alert('Falha ao cancelar o pedido.');
     }
@@ -106,8 +126,6 @@ function AdminOrdersPage() {
       default: return 'warning';
     }
   };
-
-  
 
   return (
     <div>
