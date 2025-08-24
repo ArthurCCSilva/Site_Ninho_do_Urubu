@@ -22,6 +22,8 @@ exports.register = async (req, res) => {
       return res.status(400).json({ message: 'Por favor, preencha todos os campos.' });
     }
 
+    // Isso limpa o '+', parênteses, traços, etc., deixando apenas os números.
+    const telefoneSanitizado = telefone.replace(/\D/g, '');
     // 2. Criptografar a senha
     const senhaHash = await bcrypt.hash(senha, 10); // O 10 é o "salt rounds"
 
@@ -29,7 +31,7 @@ exports.register = async (req, res) => {
     // Por padrão, todo novo registro é um 'cliente'
     const [result] = await db.query(
       'INSERT INTO usuarios (nome, email, senha_hash, role, telefone, imagem_perfil_url) VALUES (?, ?, ?, ?, ?, ?)',
-      [nome, email, senhaHash, 'cliente', telefone, imagem_perfil_url]
+      [nome, email, senhaHash, 'cliente', telefoneSanitizado, imagem_perfil_url]
     );
 
     res.status(201).json({ message: 'Usuário criado com Sucesso!', userId: result.insertId });
