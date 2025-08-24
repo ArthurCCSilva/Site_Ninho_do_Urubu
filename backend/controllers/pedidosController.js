@@ -170,20 +170,28 @@ exports.getTodosPedidosAdmin = async (req, res) => {
 // PATCH /api/pedidos/:id/status - Admin atualiza o status de um pedido
 exports.updateStatusPedido = async (req, res) => {
   const { id: pedidoId } = req.params;
-  const { status } = req.body; // Espera receber um novo status: 'Enviado' ou 'Entregue'
+  const { status } = req.body;
 
-  // Validação para garantir que o status é um dos valores permitidos
   if (!['Enviado', 'Entregue'].includes(status)) {
     return res.status(400).json({ message: 'Status inválido.' });
   }
 
   try {
-    const [result] = await db.query(
-      'UPDATE pedidos SET status = ? WHERE id = ?',
-      [status, pedidoId]
-    );
+    let sql = 'UPDATE pedidos SET status = ?';
+    const params = [status];
+
+    // Se o novo status for 'Entregue', também definimos a data de entrega
+    if (status === 'Entregue') {
+      sql += ', data_entrega = NOW()'; // NOW() insere a data e hora atuais
+    }
+
+    sql += ' WHERE id = ?';
+    params.push(pedidoId);
+
+    const [result] = await db.query(sql, params);
+
     if (result.affectedRows === 0) {
-      return res.status(404).json({ message: 'Pedido не encontrado.' });
+      return res.status(404).json({ message: 'Pedido não encontrado.' });
     }
     res.status(200).json({ message: `Status do pedido atualizado para ${status}.` });
   } catch (error) {
