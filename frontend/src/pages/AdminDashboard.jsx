@@ -6,16 +6,17 @@ import ProductAdminList from '../components/ProductAdminList';
 import ProductModal from '../components/ProductModal';
 import CategoryModal from '../components/CategoryModal';
 import Select from 'react-select'; // ✅ 1. Importa a nova biblioteca
+import { Link } from 'react-router-dom'; // Garanta que o Link está importado
 
 function AdminDashboard() {
   // --- Estados do Componente ---
   const { user, logout } = useAuth();
-  
+
   // Estados para dados e UI
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
   // Estados para controlar os modais
   const [showModal, setShowModal] = useState(false);
   const [productToEdit, setProductToEdit] = useState(null);
@@ -25,7 +26,7 @@ function AdminDashboard() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [sortOrder, setSortOrder] = useState('');
-  
+
   // ✅ Este estado agora guardará a lista no formato { value, label } para o React Select
   const [categories, setCategories] = useState([]);
 
@@ -39,7 +40,7 @@ function AdminDashboard() {
       if (searchTerm) params.append('search', searchTerm);
       if (filterCategory) params.append('category', filterCategory);
       if (sortOrder) params.append('sort', sortOrder);
-      
+
       const response = await api.get(`/api/produtos?${params.toString()}`);
       setProducts(response.data);
       setError(null);
@@ -50,7 +51,7 @@ function AdminDashboard() {
       setLoading(false);
     }
   };
-  
+
   // ✅ 2. FUNÇÃO ATUALIZADA: Busca e formata as categorias para o React Select
   const fetchCategories = async () => {
     try {
@@ -66,7 +67,7 @@ function AdminDashboard() {
       console.error("Falha ao buscar categorias para o filtro", err);
     }
   };
-  
+
   // --- Efeitos (useEffect Hooks) ---
 
   useEffect(() => {
@@ -102,7 +103,7 @@ function AdminDashboard() {
   const handleShowEditModal = (product) => { setProductToEdit(product); setShowModal(true); };
   const handleCloseModal = () => setShowModal(false);
   const handleSaveProduct = () => { setShowModal(false); fetchProducts(); };
-  
+
   const handleDelete = async (productId) => {
     if (window.confirm('Tem certeza que deseja excluir este produto? A ação não pode ser desfeita.')) {
       try {
@@ -114,7 +115,7 @@ function AdminDashboard() {
       }
     }
   };
-  
+
   const profileImageUrl = user?.imagem_perfil_url
     ? `http://localhost:3001/uploads/${user.imagem_perfil_url}`
     : 'https://placehold.co/150';
@@ -130,7 +131,7 @@ function AdminDashboard() {
             <div className="card-body">
               <div className="row align-items-center">
                 <div className="col-md-3 text-center">
-                  <img src={profileImageUrl} alt="Foto de Perfil" className="img-fluid rounded-circle" style={{ maxWidth: '100px' }}/>
+                  <img src={profileImageUrl} alt="Foto de Perfil" className="img-fluid rounded-circle" style={{ maxWidth: '100px' }} />
                 </div>
                 <div className="col-md-9">
                   <h5 className="card-title">{user?.nome}</h5>
@@ -148,8 +149,13 @@ function AdminDashboard() {
             <div className="card-body d-flex flex-column justify-content-center align-items-start">
               <div className="mb-3">
                 <label htmlFor="profileImageInput" className="btn btn-secondary">Mudar Foto de Perfil</label>
-                <input type="file" id="profileImageInput" style={{ display: 'none' }} onChange={handleProfileImageChange} accept="image/png, image/jpeg"/>
+                <input type="file" id="profileImageInput" style={{ display: 'none' }} onChange={handleProfileImageChange} accept="image/png, image/jpeg" />
               </div>
+
+              <Link to="/admin/pedidos" className="btn btn-primary mb-3">
+                Gerenciar Pedidos de Clientes
+              </Link>
+
               <button className="btn btn-info" onClick={() => setShowCategoryModal(true)}>
                 Gerenciar Categorias
               </button>
@@ -157,12 +163,14 @@ function AdminDashboard() {
           </div>
         </div>
       </div>
-      
+
+
+
       <div className="d-flex justify-content-between align-items-center my-4">
         <h2>Gerenciamento de Produtos</h2>
         <button className="btn btn-primary" onClick={handleShowAddModal}>Adicionar Novo Produto</button>
       </div>
-      
+
       <div className="card card-body mb-4">
         <div className="row g-3 align-items-center">
           <div className="col-lg-5">
@@ -196,21 +204,21 @@ function AdminDashboard() {
 
       {loading ? <div className="text-center"><div className="spinner-border" /></div>
         : error ? <div className="alert alert-danger">{error}</div>
-        : <ProductAdminList 
+          : <ProductAdminList
             products={products}
             onEdit={handleShowEditModal}
             onDelete={handleDelete}
           />
       }
-      
-      <ProductModal 
+
+      <ProductModal
         show={showModal}
         onHide={handleCloseModal}
         productToEdit={productToEdit}
         onSave={handleSaveProduct}
       />
-      
-      <CategoryModal 
+
+      <CategoryModal
         show={showCategoryModal}
         onHide={() => setShowCategoryModal(false)}
         onUpdate={fetchCategories}

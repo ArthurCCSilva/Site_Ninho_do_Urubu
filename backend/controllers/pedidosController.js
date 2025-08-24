@@ -147,3 +147,88 @@ exports.cancelarPedido = async (req, res) => {
     res.status(500).json({ message: 'Erro ao cancelar pedido.', error: error.message });
   }
 };
+
+// ✅ --- NOVAS FUNÇÕES DE ADMIN --- ✅
+
+// GET /api/pedidos/admin/todos - Busca TODOS os pedidos para o painel do admin
+exports.getTodosPedidosAdmin = async (req, res) => {
+  try {
+    // Usamos JOIN para pegar o nome e a foto do cliente junto com os dados do pedido
+    const sql = `
+      SELECT p.*, u.nome AS cliente_nome, u.imagem_perfil_url AS cliente_imagem_url
+      FROM pedidos p
+      JOIN usuarios u ON p.usuario_id = u.id
+      ORDER BY p.data_pedido DESC
+    `;
+    const [pedidos] = await db.query(sql);
+    res.status(200).json(pedidos);
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao buscar todos os pedidos.', error: error.message });
+  }
+};
+
+// PATCH /api/pedidos/:id/status - Admin atualiza o status de um pedido
+exports.updateStatusPedido = async (req, res) => {
+  const { id: pedidoId } = req.params;
+  const { status } = req.body; // Espera receber um novo status: 'Enviado' ou 'Entregue'
+
+  // Validação para garantir que o status é um dos valores permitidos
+  if (!['Enviado', 'Entregue'].includes(status)) {
+    return res.status(400).json({ message: 'Status inválido.' });
+  }
+
+  try {
+    const [result] = await db.query(
+      'UPDATE pedidos SET status = ? WHERE id = ?',
+      [status, pedidoId]
+    );
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Pedido не encontrado.' });
+    }
+    res.status(200).json({ message: `Status do pedido atualizado para ${status}.` });
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao atualizar status do pedido.', error: error.message });
+  }
+};
+
+// PATCH /api/pedidos/:id/cancelar-admin - Admin cancela um pedido
+exports.cancelarPedidoAdmin = async (req, res) => {
+  const { id: pedidoId } = req.params;
+  const { motivo } = req.body; // Recebe o motivo do cancelamento
+
+  if (!motivo) {
+    return res.status(400).json({ message: 'O motivo do cancelamento é obrigatório.' });
+  }
+
+  try {
+    // Primeiro, busca o telefone do cliente dono do pedido
+    const [pedidoInfo] = await db.query(
+      'SELECT u.telefone FROM pedidos p JOIN usuarios u ON p.usuario_id = u.id WHERE p.id = ?',
+      [pedidoId]
+    );
+
+    if (pedidoInfo.length === 0) {
+      return res.status(404).json({ message: 'Pedido não encontrado.' });
+    }
+
+    // Atualiza o status do pedido para 'Cancelado'
+    await db.query("UPDATE pedidos SET status = 'Cancelado' WHERE id = ?", [pedidoId]);
+
+    // --- PONTO DE INTEGRAÇÃO COM SERVIÇO DE SMS ---
+    const telefoneCliente = pedidoInfo[0].telefone;
+    console.log(`
+      *****************************************************************
+      ** SIMULAÇÃO DE ENVIO DE SMS **
+      ** Destinatário: ${telefoneCliente}
+      ** Mensagem: Seu pedido #${pedidoId} foi cancelado. Motivo: ${motivo}
+      *****************************************************************
+    `);
+    // Em um projeto real, aqui você chamaria a API do Twilio/Zenvia, etc.
+    // await servicoDeSms.enviar(telefoneCliente, `Seu pedido...`);
+    // --- FIM DA INTEGRAÇÃO ---
+
+    res.status(200).json({ message: 'Pedido cancelado e cliente notificado (simulação).' });
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao cancelar pedido.', error: error.message });
+  }
+};
