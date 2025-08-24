@@ -15,6 +15,8 @@ function ProductCard({ product }) {
     ? `http://localhost:3001/uploads/${product.imagem_produto_url}`
     : 'https://placehold.co/300x200';
 
+  const isOutOfStock = product.estoque <= 0;
+
   // ✅ 3. CRIAMOS A LÓGICA PARA O CLIQUE NO BOTÃO
   const handleAddToCart = () => {
     if (!user) {
@@ -44,9 +46,17 @@ function ProductCard({ product }) {
         <p className="card-text fw-bold fs-5">
           R$ {parseFloat(product.valor).toFixed(2).replace('.', ',')}
         </p>
-        <button className="btn btn-primary w-100" onClick={handleAddToCart}>
-          Adicionar ao Carrinho
-        </button>
+        {/* ✅ 2. RENDERIZAÇÃO CONDICIONAL */}
+        {/* Se o produto estiver sem estoque, mostra um aviso. Senão, mostra o botão. */}
+        {isOutOfStock ? (
+          <div className="d-grid">
+            <button className="btn btn-secondary" disabled>Sem Estoque</button>
+          </div>
+        ) : (
+          <button className="btn btn-primary w-100" onClick={handleAddToCart}>
+            Adicionar ao Carrinho
+          </button>
+        )}
       </div>
     </div>
   );

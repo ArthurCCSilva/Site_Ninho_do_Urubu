@@ -4,6 +4,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import api from '../services/api';
+import ProductCard from '../components/ProductCard';
 
 function ProductDetailPage() {
   const { id } = useParams(); 
@@ -14,6 +15,8 @@ function ProductDetailPage() {
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const [relatedProducts, setRelatedProducts] = useState([]);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -30,6 +33,28 @@ function ProductDetailPage() {
     };
     fetchProduct();
   }, [id]);
+
+  useEffect(() => {
+    if (product && product.categoria_nome) {
+      const fetchRelatedProducts = async () => {
+        try {
+          const params = new URLSearchParams();
+          params.append('category', product.categoria_nome);
+          const response = await api.get(`/api/produtos?${params.toString()}`);
+          
+          // Filtra o produto atual da lista de relacionados e limita a 4 itens
+          const filteredProducts = response.data
+            .filter(p => p.id !== product.id)
+            .slice(0, 4);
+
+          setRelatedProducts(filteredProducts);
+        } catch (err) {
+          console.error("Falha ao buscar produtos relacionados", err);
+        }
+      };
+      fetchRelatedProducts();
+    }
+  }, [product]); // A dependência é o 'product'
 
   // Função para o botão "Adicionar ao Carrinho" desta página
   const handleAddToCart = () => {
@@ -105,6 +130,21 @@ function ProductDetailPage() {
           </div>
         </div>
       </div>
+
+      {relatedProducts.length > 0 && (
+        <div className="mt-5">
+          <hr />
+          <h2 className="my-4">Produtos Relacionados</h2>
+          <div className="row">
+            {relatedProducts.map(relatedProduct => (
+              <div key={relatedProduct.id} className="col-12 col-md-6 col-lg-3 mb-4">
+                {/* Reutilizamos o nosso componente ProductCard! */}
+                <ProductCard product={relatedProduct} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
