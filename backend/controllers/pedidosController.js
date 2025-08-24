@@ -153,16 +153,36 @@ exports.cancelarPedido = async (req, res) => {
 // GET /api/pedidos/admin/todos - Busca TODOS os pedidos para o painel do admin
 exports.getTodosPedidosAdmin = async (req, res) => {
   try {
-    // Usamos JOIN para pegar o nome e a foto do cliente junto com os dados do pedido
+    // Pega os parâmetros da URL, com valores padrão de página 1 e limite 10
+    const { page = 1, limit = 10 } = req.query;
+
+    // 1. Query para contar o número TOTAL de pedidos
+    const countSql = 'SELECT COUNT(*) as total FROM pedidos';
+    const [countRows] = await db.query(countSql);
+    const totalItems = countRows[0].total;
+    const totalPages = Math.ceil(totalItems / limit);
+
+    // 2. Query para buscar os pedidos da página atual
+    const offset = (page - 1) * limit;
     const sql = `
       SELECT p.*, u.nome AS cliente_nome, u.imagem_perfil_url AS cliente_imagem_url
       FROM pedidos p
       JOIN usuarios u ON p.usuario_id = u.id
       ORDER BY p.data_pedido DESC
+      LIMIT ? OFFSET ?
     `;
-    const [pedidos] = await db.query(sql);
-    res.status(200).json(pedidos);
+    
+    const [pedidos] = await db.query(sql, [parseInt(limit), parseInt(offset)]);
+
+    // 3. Retorna os pedidos junto com as informações de paginação
+    res.status(200).json({
+      pedidos,
+      totalPages,
+      currentPage: parseInt(page)
+    });
+
   } catch (error) {
+    console.error('Erro ao buscar todos os pedidos:', error);
     res.status(500).json({ message: 'Erro ao buscar todos os pedidos.', error: error.message });
   }
 };

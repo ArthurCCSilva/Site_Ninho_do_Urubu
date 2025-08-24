@@ -3,20 +3,31 @@ import { useState, useEffect } from 'react';
 import api from '../services/api';
 import OrderDetailsModal from '../components/OrderDetailsModal';
 import AdminCancelOrderModal from '../components/AdminCancelOrderModal';
+import Pagination from '../components/Pagination'; // Importa o componente de paginação
 
 function AdminOrdersPage() {
   const [pedidos, setPedidos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // Estados para os modais
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedPedidoId, setSelectedPedidoId] = useState(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
 
-  const fetchPedidos = async () => {
+  // Estados para a paginação
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [limit, setLimit] = useState(10); // Limite de itens por página
+
+  // Função atualizada para enviar os parâmetros de paginação
+  const fetchPedidos = async (page = 1) => {
     try {
       setLoading(true);
-      const response = await api.get('/api/pedidos/admin/todos');
-      setPedidos(response.data);
+      const response = await api.get(`/api/pedidos/admin/todos?page=${page}&limit=${limit}`);
+      setPedidos(response.data.pedidos);
+      setTotalPages(response.data.totalPages);
+      setCurrentPage(response.data.currentPage);
     } catch (err) {
       setError('Não foi possível carregar os pedidos.');
       console.error(err);
@@ -25,9 +36,10 @@ function AdminOrdersPage() {
     }
   };
 
+  // useEffect para buscar os dados quando a página ou o limite mudam
   useEffect(() => {
-    fetchPedidos();
-  }, []);
+    fetchPedidos(currentPage);
+  }, [currentPage, limit]); // Gatilhos para a busca
 
   const handleShowDetails = (pedidoId) => { setSelectedPedidoId(pedidoId); setShowDetailsModal(true); };
   
@@ -35,7 +47,7 @@ function AdminOrdersPage() {
     try {
       await api.patch(`/api/pedidos/${pedidoId}/status`, { status: novoStatus });
       alert('Status do pedido atualizado com sucesso!');
-      fetchPedidos();
+      fetchPedidos(currentPage); // Atualiza a página atual
     } catch (err) {
       alert('Falha ao atualizar o status do pedido.');
     }
@@ -51,7 +63,7 @@ function AdminOrdersPage() {
       await api.patch(`/api/pedidos/${selectedPedidoId}/cancelar-admin`, { motivo });
       alert('Pedido cancelado com sucesso!');
       setShowCancelModal(false);
-      fetchPedidos();
+      fetchPedidos(currentPage); // Atualiza a página atual
     } catch (err) {
       alert('Falha ao cancelar o pedido.');
     }
@@ -126,7 +138,6 @@ function AdminOrdersPage() {
                             <span className="visually-hidden">Toggle Dropdown</span>
                           </button>
                           <ul className="dropdown-menu">
-                            {/* ✅ NOVA OPÇÃO "PROCESSANDO" ADICIONADA */}
                             <li><button className="dropdown-item" onClick={() => handleUpdateStatus(pedido.id, 'Processando')}>Marcar como "Processando"</button></li>
                             <li><button className="dropdown-item" onClick={() => handleUpdateStatus(pedido.id, 'Enviado')}>Marcar como "Enviado"</button></li>
                             <li><button className="dropdown-item" onClick={() => handleUpdateStatus(pedido.id, 'Entregue')}>Marcar como "Entregue"</button></li>
@@ -141,6 +152,31 @@ function AdminOrdersPage() {
               </tbody>
             </table>
           </div>
+        </div>
+
+        <div className="card-footer d-flex justify-content-between align-items-center">
+          <div className="col-auto">
+            <label htmlFor="limit-select" className="col-form-label me-2">Itens por página:</label>
+            <select 
+              id="limit-select"
+              className="form-select form-select-sm d-inline-block" 
+              style={{ width: 'auto' }}
+              value={limit}
+              onChange={(e) => {
+                setLimit(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+            >
+              <option value="10">10</option>
+              <option value="25">25</option>
+              <option value="50">50</option>
+            </select>
+          </div>
+          <Pagination 
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={(page) => setCurrentPage(page)}
+          />
         </div>
       </div>
 
