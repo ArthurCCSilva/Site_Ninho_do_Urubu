@@ -226,3 +226,56 @@ exports.cancelarPedidoAdmin = async (req, res) => {
         connection.release();
     }
 };
+
+exports.criarVendaFisica = async (req, res) => {
+  // O corpo da requisição enviará os itens e o ID do cliente 'Venda Balcão'
+  const { itens, usuario_id } = req.body;
+  const connection = await db.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    if (!itens || itens.length === 0) {
+      return res.status(400).json({ message: 'O carrinho local está vazio.' });
+    }
+
+    // Calcula o valor total e verifica o estoque
+    let valorTotal = 0;
+    for (const item of itens) {
+      const [produto] = await connection.query('SELECT valor, estoque FROM produtos WHERE id = ?', [item.produto_id]);
+      if (produto.length === 0) throw new Error(`Produto com ID ${item.produto_id} não encontrado.`);
+      if (item.quantidade > produto[0].estoque) throw new Error(`Estoque insuficiente para o produto ID: ${item.produto_id}.`);
+      
+      valorTotal += item.quantidade * produto[0].valor;
+    }
+
+    // Cria o pedido já com o status 'Entregue'
+    const [resultadoPedido] = await connection.query(
+      "INSERT INTO pedidos (usuario_id, valor_total, status, data_entrega) VALUES (?, ?, 'Entregue', NOW())",
+      [usuario_id, valorTotal]
+    );
+    const pedidoId = resultadoPedido.insertId;
+
+    // Adiciona os itens ao pedido e atualiza o estoque
+    for (const item of itens) {
+      const [produto] = await connection.query('SELECT valor FROM produtos WHERE id = ?', [item.produto_id]);
+      await connection.query(
+        'INSERT INTO pedido_itens (pedido_id, produto_id, quantidade, preco_unitario) VALUES (?, ?, ?, ?)',
+        [pedidoId, item.produto_id, item.quantidade, produto[0].valor]
+      );
+      await connection.query(
+        'UPDATE produtos SET estoque = estoque - ? WHERE id = ?',
+        [item.quantidade, item.produto_id]
+      );
+    }
+
+    await connection.commit();
+    res.status(201).json({ message: 'Venda física registrada com sucesso!', pedidoId });
+
+  } catch (error) {
+    await connection.rollback();
+    res.status(500).json({ message: `Erro ao registrar venda física: ${error.message}` });
+  } finally {
+    connection.release();
+  }
+};

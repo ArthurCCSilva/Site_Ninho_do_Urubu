@@ -34,9 +34,9 @@ function AdminDashboard() {
       if (searchTerm) params.append('search', searchTerm);
       if (filterCategory) params.append('category', filterCategory);
       if (sortOrder) params.append('sort', sortOrder);
-      
+
       const response = await api.get(`/api/produtos?${params.toString()}`);
-      
+
       setProducts(response.data.produtos);
       setTotalPages(response.data.totalPages);
       setCurrentPage(response.data.currentPage);
@@ -48,7 +48,7 @@ function AdminDashboard() {
       setLoading(false);
     }
   };
-  
+
   const fetchCategories = async () => {
     try {
       const response = await api.get('/api/categorias?limit=all');
@@ -61,10 +61,10 @@ function AdminDashboard() {
       console.error("Falha ao buscar categorias para o filtro", err);
     }
   };
-  
+
   useEffect(() => {
     const debounceFetch = setTimeout(() => {
-      if (currentPage !== 1) { setCurrentPage(1); } 
+      if (currentPage !== 1) { setCurrentPage(1); }
       else { fetchProducts(1); }
     }, 500);
     return () => clearTimeout(debounceFetch);
@@ -73,7 +73,7 @@ function AdminDashboard() {
   useEffect(() => {
     fetchProducts(currentPage);
   }, [currentPage]);
-  
+
   useEffect(() => { fetchCategories(); }, [showCategoryModal]);
 
   const handleProfileImageChange = async (event) => {
@@ -95,7 +95,7 @@ function AdminDashboard() {
   const handleShowEditModal = (product) => { setProductToEdit(product); setShowModal(true); };
   const handleCloseModal = () => setShowModal(false);
   const handleSaveProduct = () => { setShowModal(false); fetchProducts(currentPage); };
-  
+
   const handleDelete = async (productId) => {
     if (window.confirm('Tem certeza que deseja excluir este produto?')) {
       try {
@@ -106,7 +106,7 @@ function AdminDashboard() {
       }
     }
   };
-  
+
   const profileImageUrl = user?.imagem_perfil_url ? `http://localhost:3001/uploads/${user.imagem_perfil_url}` : 'https://placehold.co/150';
 
   return (
@@ -119,7 +119,7 @@ function AdminDashboard() {
             <div className="card-body">
               <div className="row align-items-center">
                 <div className="col-md-3 text-center">
-                  <img src={profileImageUrl} alt="Foto de Perfil" className="img-fluid rounded-circle" style={{ maxWidth: '100px' }}/>
+                  <img src={profileImageUrl} alt="Foto de Perfil" className="img-fluid rounded-circle" style={{ maxWidth: '100px' }} />
                 </div>
                 <div className="col-md-9">
                   <h5 className="card-title">{user?.nome}</h5>
@@ -137,22 +137,28 @@ function AdminDashboard() {
               <button className="btn btn-secondary mb-3" onClick={() => setShowEditProfileModal(true)}>
                 Editar Perfil e Senha
               </button>
-              <Link to="/admin/pedidos" className="btn btn-primary mb-3"> 
-                Gerenciar Pedidos
-              </Link>
-              <button className="btn btn-info" onClick={() => setShowCategoryModal(true)}>
+
+              <button className="btn btn-info mb-3" onClick={() => setShowCategoryModal(true)}>
                 Gerenciar Categorias
               </button>
+
+              <Link to="/admin/pedidos" className="btn btn-primary ">
+                Gerenciar Pedidos
+              </Link>
+
+              <Link to="/admin/venda-fisica" className="btn btn-success mb-3">
+                Registrar Venda Física
+              </Link>
             </div>
           </div>
         </div>
       </div>
-      
+
       <div className="d-flex justify-content-between align-items-center my-4">
         <h2>Gerenciamento de Produtos</h2>
         <button className="btn btn-primary" onClick={handleShowAddModal}>Adicionar Novo Produto</button>
       </div>
-      
+
       <div className="card card-body mb-4">
         <div className="row g-3 align-items-center">
           <div className="col-lg-5">
@@ -182,17 +188,17 @@ function AdminDashboard() {
           </div>
         </div>
       </div>
-      
+
       <div className="card">
         <div className="card-body">
-          {loading ? ( <div className="text-center my-5"><div className="spinner-border" /></div> ) 
-            : error ? ( <div className="alert alert-danger">{error}</div> ) 
-            : ( <ProductAdminList products={products} onEdit={handleShowEditModal} onDelete={handleDelete} /> )
+          {loading ? (<div className="text-center my-5"><div className="spinner-border" /></div>)
+            : error ? (<div className="alert alert-danger">{error}</div>)
+              : (<ProductAdminList products={products} onEdit={handleShowEditModal} onDelete={handleDelete} />)
           }
         </div>
-        
+
         <div className="card-footer d-flex justify-content-center">
-          <Pagination 
+          <Pagination
             currentPage={currentPage}
             totalPages={totalPages}
             onPageChange={(page) => setCurrentPage(page)}

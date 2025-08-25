@@ -15,6 +15,7 @@ import { CartProvider } from './context/CartContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import CustomerDashboard from './pages/CustomerDashboard';
 import ProductDetailPage from './pages/ProductDetailPage';
+import PhysicalSalePage from './pages/PhysicalSalePage';
 
 function App() {
   return (
@@ -47,6 +48,11 @@ function App() {
                     <AdminOrdersPage />
                   </ProtectedRoute>
                 } 
+              />
+
+              <Route 
+                path="/admin/venda-fisica" 
+                element={<ProtectedRoute role="admin"><PhysicalSalePage /></ProtectedRoute>} 
               />
 
               {/* --- Rota Protegida para Usuários Logados (Qualquer Role) --- */}
