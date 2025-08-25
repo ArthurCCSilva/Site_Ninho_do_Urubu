@@ -2,41 +2,49 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
 import ProductCard from '../components/ProductCard';
+import './HomePage.css'; // Agora esta importação funcionará
 
 function HomePage() {
-  // useState é a "memória" do nosso componente
-  const [products, setProducts] = useState([]); // Guarda a lista de produtos
-  const [loading, setLoading] = useState(true);   // Diz se estamos carregando
-  const [error, setError] = useState(null);      // Guarda mensagens de erro
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // useEffect executa uma função depois que o componente aparece na tela
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         const response = await api.get('/api/produtos');
-        setProducts(response.data); // Sucesso: guarda os produtos na memória
+        setProducts(response.data.produtos || []);
       } catch (err) {
-        setError('Falha ao carregar os produtos. O servidor backend está rodando?');
+        setError('Falha ao carregar os produtos.');
+        console.error(err);
       } finally {
-        setLoading(false); // Terminou de carregar (com sucesso ou erro)
+        setLoading(false);
       }
     };
-
     fetchProducts();
-  }, []); // O '[]' vazio faz com que rode apenas uma vez
+  }, []);
 
-  // Mostra uma mensagem enquanto os dados carregam
-  if (loading) return <p className="text-center">Carregando produtos...</p>;
-  // Mostra uma mensagem de erro se algo deu errado
-  if (error) return <p className="alert alert-danger">{error}</p>;
+  if (loading) {
+    return (
+      <div className="text-center my-5">
+        <div className="spinner-border" role="status">
+          <span className="visually-hidden">Carregando...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return <div className="alert alert-danger">{error}</div>;
+  }
 
   return (
     <div>
-      <h1 className="mb-4">Nossos Produtos</h1>
-      <div className="row">
-        {/* O .map() cria um componente ProductCard para cada produto na lista */}
+      <h1 className="homepage-title">Nossos Produtos</h1>
+      {/* Usamos divs com classes do Bootstrap em vez de componentes */}
+      <div className="row g-4">
         {products.map(product => (
-          <div key={product.id} className="col-12 col-md-6 col-lg-4 col-xl-3 mb-4">
+          <div key={product.id} className="col-12 col-sm-6 col-md-4 col-lg-3 d-flex align-items-stretch">
             <ProductCard product={product} />
           </div>
         ))}
