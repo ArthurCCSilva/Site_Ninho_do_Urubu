@@ -6,7 +6,7 @@ import { useCart } from '../context/CartContext';
 import api from '../services/api';
 import ProductCard from '../components/ProductCard';
 
-// Importa as ferramentas e estilos do Swiper
+// ✅ Importa as ferramentas e estilos do Swiper
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation } from 'swiper/modules';
 import 'swiper/css';
@@ -21,11 +21,14 @@ function ProductDetailPage() {
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // ✅ Estado para guardar os produtos relacionados
   const [relatedProducts, setRelatedProducts] = useState([]);
 
   // useEffect principal para buscar o produto da página
   useEffect(() => {
-    window.scrollTo(0, 0); // Scrolla para o topo da página
+    window.scrollTo(0, 0); // Leva o usuário para o topo da página
+
     const fetchProduct = async () => {
       setLoading(true);
       setProduct(null);
@@ -43,7 +46,7 @@ function ProductDetailPage() {
     fetchProduct();
   }, [id]);
 
-  // useEffect secundário para buscar os produtos relacionados
+  // ✅ useEffect secundário para buscar os produtos relacionados
   useEffect(() => {
     if (product && product.categoria_nome) {
       const fetchRelatedProducts = async () => {
@@ -51,9 +54,11 @@ function ProductDetailPage() {
           const params = new URLSearchParams();
           params.append('category', product.categoria_nome);
           const response = await api.get(`/api/produtos?${params.toString()}`);
-          const filteredProducts = response.data
+          
+          const filteredProducts = response.data.produtos
             .filter(p => p.id !== product.id)
             .slice(0, 8);
+
           setRelatedProducts(filteredProducts);
         } catch (err) {
           console.error("Falha ao buscar produtos relacionados", err);
@@ -61,7 +66,7 @@ function ProductDetailPage() {
       };
       fetchRelatedProducts();
     }
-  }, [product]);
+  }, [product]); // Roda sempre que o produto principal for carregado
 
   const handleAddToCart = () => {
     if (!user) {
@@ -115,6 +120,7 @@ function ProductDetailPage() {
           )}
           <h3 className="my-3 display-5">R$ {parseFloat(product.valor).toFixed(2).replace('.', ',')}</h3>
           <p className="mt-4">{product.descricao}</p>
+          
           <div className="d-grid gap-2 mt-4">
             <button 
               className="btn btn-primary btn-lg" 
@@ -131,11 +137,11 @@ function ProductDetailPage() {
         </div>
       </div>
 
+      {/* ✅ SEÇÃO DE PRODUTOS RELACIONADOS COM O CARROSSEL */}
       {relatedProducts.length > 0 && (
         <div className="mt-5">
           <hr />
           <h2 className="my-4">Produtos Relacionados</h2>
-          {/* ✅ CONTAINER COM A CLASSE ESPECIAL PARA O CSS */}
           <div className="product-carousel">
             <Swiper
               modules={[Navigation]}
