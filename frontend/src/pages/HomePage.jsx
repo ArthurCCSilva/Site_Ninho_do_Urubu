@@ -4,9 +4,7 @@ import api from '../services/api';
 import ProductCard from '../components/ProductCard';
 import Pagination from '../components/Pagination';
 import Select from 'react-select';
-
-// Importa os estilos que já criamos para o ProductCard
-import '../components/ProductCard.css'; 
+import './HomePage.css'; // ✅ Garante que os estilos da página sejam importados
 
 function HomePage() {
   // --- Estados para os dados ---
@@ -23,7 +21,7 @@ function HomePage() {
   // --- Estados para a paginação ---
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
-  const [limit] = useState(12); // 12 produtos por página como você pediu
+  const [limit] = useState(12);
 
   // --- Funções de Busca de Dados ---
   const fetchProducts = async (page = 1) => {
@@ -81,18 +79,14 @@ function HomePage() {
     fetchCategories();
   }, []);
 
-  // --- Renderização do Componente ---
   if (error) return <div className="alert alert-danger">{error}</div>;
 
   return (
     <div>
-      <div className="d-flex flex-column flex-md-row justify-content-between align-items-center mb-4">
-        <h1 className="homepage-title mb-3 mb-md-0">Nossos Produtos</h1>
-      </div>
+      <h1 className="homepage-title">Nossos Produtos</h1>
       
-      {/* --- NOVA INTERFACE DE FILTROS --- */}
       <div className="card card-body mb-4">
-        <div className="row g-3">
+        <div className="row g-3 align-items-center">
           <div className="col-lg-5">
             <input
               type="text"
@@ -121,14 +115,12 @@ function HomePage() {
         </div>
       </div>
       
-      {/* --- LISTA DE PRODUTOS E MENSAGEM DE CARREGAMENTO --- */}
       {loading ? (
         <div className="text-center my-5"><div className="spinner-border" /></div>
       ) : (
         <>
           <div className="row g-4 product-grid">
             {products.length > 0 ? products.map(product => (
-              // Classes de grid responsivas como você pediu
               <div key={product.id} className="col-12 col-sm-6 col-md-4 col-xl-2 d-flex align-items-stretch">
                 <ProductCard product={product} />
               </div>

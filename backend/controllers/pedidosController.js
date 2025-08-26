@@ -62,7 +62,6 @@ exports.getPedidosUsuario = async (req, res) => {
   }
 };
 
-// GET /api/pedidos/:id - Busca os detalhes de um pedido específico
 exports.getPedidoDetalhes = async (req, res) => {
   const { id: pedidoId } = req.params;
   const { id: usuarioId, role: usuarioRole } = req.user;

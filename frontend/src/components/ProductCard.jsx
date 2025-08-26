@@ -2,16 +2,17 @@
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
-import './ProductCard.css'; // O CSS importado já contém as novas regras
+import './ProductCard.css';
 
 function ProductCard({ product }) {
   const { addToCart } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  // ✅ 1. Resolução da imagem placeholder alterada para 200x200
   const imageUrl = product.imagem_produto_url
     ? `http://localhost:3001/uploads/${product.imagem_produto_url}`
-    : 'https://placehold.co/300x200';
+    : 'https://placehold.co/200x200';
   
   const isOutOfStock = product.estoque <= 0;
 
@@ -34,7 +35,7 @@ function ProductCard({ product }) {
         </div>
       </Link>
 
-      <div className="card-footer bg-transparent border-top-0">
+      <div className="card-footer">
         <p className="card-text fw-bold fs-5 mb-2">
           R$ {parseFloat(product.valor).toFixed(2).replace('.', ',')}
         </p>
