@@ -2,7 +2,12 @@
 
 /* --- Estilos Gerais do Card de Produto --- */
 .product-card {
-  width: 100%;
+  /* ✅ Correção para deixar o card mais atraente */
+  width: 100%; 
+  max-width: 280px; /* Impede que o card se estique demais em telas largas */
+  margin-left: auto;
+  margin-right: auto;
+  
   border: 1px solid #e9ecef;
   border-radius: 8px;
   transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
@@ -19,53 +24,59 @@
 .product-card .card-img-top {
   height: 200px;
   width: 100%;
-  /* ✅ CORREÇÃO AQUI: de 'cover' para 'contain' */
-  /* Isso garante que a imagem inteira seja exibida, sem cortes. */
-  object-fit: contain; 
+  object-fit: contain;
 }
 
 .product-card .card-body {
   flex-grow: 1;
   padding: 1rem;
   padding-bottom: 0.5rem;
+  text-align: center;
 }
 
 .product-card .card-title {
-  font-size: 1rem;
+  font-size: 1rem; /* Mantivemos o tamanho da fonte */
+  font-weight: 700;  /* '700' é o valor para negrito (bold) */
   margin-bottom: 0.5rem;
-  font-weight: 600;
+  color: #212529; /* Uma cor de texto mais escura para maior destaque */
 }
 
 .product-card .card-footer {
   padding: 0.75rem 1rem;
   border-top: none;
   background-color: transparent;
+  text-align: center;
 }
 
 .product-card .fs-5 {
   font-size: 1.25rem !important;
 }
 
-
 /* --- ESTILOS ESPECÍFICOS PARA O CARROSSEL --- */
+/* Estes estilos só se aplicam a um card que está DENTRO de um .product-carousel */
+
+.product-carousel .product-card {
+  max-width: none; /* No carrossel, removemos a largura máxima */
+}
+
 .product-carousel .card-img-top {
-  height: 160px;
+  height: 160px; /* Altura da imagem menor */
 }
 
 .product-carousel .card-title {
-  font-size: 0.95rem;
+  font-size: 0.95rem; /* Fonte do título menor */
 }
 
 .product-carousel .card-footer {
-  padding: 0.5rem;
+  padding: 0.5rem; /* Menos preenchimento no rodapé */
 }
 
 .product-carousel .fs-5 {
-  font-size: 1.1rem !important;
+  font-size: 1.1rem !important; /* Fonte do preço menor */
   margin-bottom: 0.5rem !important;
 }
 
 .product-carousel .btn {
-  font-size: 0.85rem;
+  font-size: 0.85rem; /* Texto do botão menor */
   padding: 0.25rem 0.5rem;
 }
