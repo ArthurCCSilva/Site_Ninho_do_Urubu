@@ -3,10 +3,10 @@ import { useState, useEffect } from 'react';
 import api from '../services/api';
 import Pagination from '../components/Pagination';
 import LocalCartModal from '../components/LocalCartModal';
-import Select from 'react-select'; // ✅ 1. Importa o Select para o filtro de categoria
+import Select from 'react-select';
 
 // Lembre-se de colocar aqui o ID do seu usuário "Venda Balcão"
-const ID_CLIENTE_BALCAO = 4; // Substitua 4 pelo ID correto
+const ID_CLIENTE_BALCAO = 11; // Substitua 4 pelo ID correto
 
 function PhysicalSalePage() {
   const [products, setProducts] = useState([]);
@@ -16,60 +16,44 @@ function PhysicalSalePage() {
   const [totalPages, setTotalPages] = useState(0);
   const [localCart, setLocalCart] = useState([]);
   const [showCartModal, setShowCartModal] = useState(false);
+  const [customerImage, setCustomerImage] = useState(null);
+  const [categories, setCategories] = useState([]);
+  const [filterCategory, setFilterCategory] = useState('');
 
-  // ✅ 2. NOVOS ESTADOS para as novas funcionalidades
-  const [customerImage, setCustomerImage] = useState(null); // Guarda a URL da foto do cliente
-  const [categories, setCategories] = useState([]); // Guarda a lista de categorias para o filtro
-  const [filterCategory, setFilterCategory] = useState(''); // Guarda a categoria selecionada
+  // Função para buscar os produtos
+  const fetchProducts = async (page = 1) => {
+    try {
+      setLoading(true);
+      const params = new URLSearchParams({ page, limit: 10 });
+      if (searchTerm) params.append('search', searchTerm);
+      if (filterCategory) params.append('category', filterCategory);
 
-  // ✅ 3. ATUALIZA a busca de produtos para incluir o filtro de categoria
+      const response = await api.get(`/api/produtos?${params.toString()}`);
+      setProducts(response.data.produtos);
+      setTotalPages(response.data.totalPages);
+      setCurrentPage(response.data.currentPage);
+    } catch (err) {
+      console.error("Falha ao buscar produtos", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // useEffect para buscar quando um filtro muda
   useEffect(() => {
-    const fetchProducts = async (page = 1) => {
-      try {
-        setLoading(true);
-        const params = new URLSearchParams({ page, limit: 10 });
-        if (searchTerm) params.append('search', searchTerm);
-        if (filterCategory) params.append('category', filterCategory); // Adiciona o filtro
-
-        const response = await api.get(`/api/produtos?${params.toString()}`);
-        setProducts(response.data.produtos);
-        setTotalPages(response.data.totalPages);
-        setCurrentPage(response.data.currentPage);
-      } catch (err) {
-        console.error("Falha ao buscar produtos", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     const debounceFetch = setTimeout(() => {
-      // Volta para a primeira página se o filtro ou busca mudarem
       if (currentPage !== 1) { setCurrentPage(1); }
       else { fetchProducts(1); }
     }, 500);
     return () => clearTimeout(debounceFetch);
-  }, [searchTerm, filterCategory]); // Adiciona filterCategory como gatilho
+  }, [searchTerm, filterCategory]);
 
   // useEffect para buscar quando a página muda
   useEffect(() => {
-    const fetchProducts = async (page = 1) => {
-        try {
-            setLoading(true);
-            const params = new URLSearchParams({ page, limit: 10, search: searchTerm, category: filterCategory });
-            const response = await api.get(`/api/produtos?${params.toString()}`);
-            setProducts(response.data.produtos);
-            setTotalPages(response.data.totalPages);
-            setCurrentPage(response.data.currentPage);
-        } catch (err) {
-            console.error("Falha ao buscar produtos", err);
-        } finally {
-            setLoading(false);
-        }
-    };
     fetchProducts(currentPage);
   }, [currentPage]);
 
-  // ✅ 4. NOVO useEffect para buscar as categorias UMA VEZ
+  // useEffect para buscar as categorias uma vez
   useEffect(() => {
     const fetchCategories = async () => {
       try {
@@ -86,7 +70,6 @@ function PhysicalSalePage() {
     fetchCategories();
   }, []);
 
-  // ✅ 5. NOVA FUNÇÃO para lidar com a mudança de imagem do cliente
   const handleImageChange = (event) => {
     const file = event.target.files[0];
     if (file) {
@@ -94,11 +77,59 @@ function PhysicalSalePage() {
     }
   };
 
-  // ... (suas outras funções handle... continuam aqui, sem alteração)
-  const handleAddToCart = (product) => { /* ... */ };
-  const handleUpdateQuantity = (productId, newQuantity) => { /* ... */ };
-  const handleRemoveItem = (productId) => { /* ... */ };
-  const handleFinalizeSale = async (formaPagamento) => { /* ... */ };
+  // ✅ --- FUNÇÃO DE ADICIONAR AO CARRINHO (LÓGICA REVISADA) --- ✅
+  const handleAddToCart = (productToAdd) => {
+    setLocalCart(currentCart => {
+      const itemExistente = currentCart.find(item => item.id === productToAdd.id);
+
+      if (itemExistente) {
+        // Se o item já existe, atualiza a quantidade (respeitando o estoque)
+        return currentCart.map(item =>
+          item.id === productToAdd.id && item.quantidade < productToAdd.estoque
+            ? { ...item, quantidade: item.quantidade + 1 }
+            : item
+        );
+      }
+      // Se o item não existe, adiciona ao carrinho com quantidade 1
+      return [...currentCart, { ...productToAdd, quantidade: 1 }];
+    });
+  };
+
+  const handleUpdateQuantity = (productId, newQuantity) => {
+    if (newQuantity <= 0) {
+      handleRemoveItem(productId);
+      return;
+    }
+    setLocalCart(prevCart => prevCart.map(item => 
+      item.id === productId && newQuantity <= item.estoque 
+        ? { ...item, quantidade: newQuantity } 
+        : item
+    ));
+  };
+
+  const handleRemoveItem = (productId) => {
+    setLocalCart(prevCart => prevCart.filter(item => item.id !== productId));
+  };
+  
+  const handleFinalizeSale = async (formaPagamento) => {
+    if (!window.confirm("Confirmar a finalização desta venda?")) return;
+    try {
+      const itens = localCart.map(item => ({ produto_id: item.id, quantidade: item.quantidade }));
+      const response = await api.post('/api/pedidos/admin/venda-fisica', {
+        itens: itens,
+        usuario_id: ID_CLIENTE_BALCAO,
+        forma_pagamento: formaPagamento
+      });
+      alert(`Venda #${response.data.pedidoId} registrada com sucesso!`);
+      setLocalCart([]);
+      setShowCartModal(false);
+      // Atualiza a lista de produtos para refletir o novo estoque
+      fetchProducts(currentPage);
+    } catch (err) {
+      alert(err.response?.data?.message || "Erro ao registrar a venda.");
+    }
+  };
+
   const totalItemsCarrinho = localCart.reduce((total, item) => total + item.quantidade, 0);
 
   return (
@@ -115,32 +146,24 @@ function PhysicalSalePage() {
         </button>
       </div>
 
-      {/* ✅ 6. NOVA SEÇÃO para foto do cliente */}
       <div className="card card-body mb-4">
         <div className="row align-items-center">
-            <div className="col-auto">
-                <img 
-                    src={customerImage || 'https://placehold.co/100/6c757d/white?text=Cliente'} 
-                    alt="Cliente da Venda" 
-                    className="rounded-circle"
-                    style={{ width: '80px', height: '80px', objectFit: 'cover' }}
-                />
-            </div>
-            <div className="col">
-                <h5 className="card-title mb-1">Cliente da Venda</h5>
-                <label htmlFor="customer-image-upload" className="btn btn-sm btn-outline-secondary">
-                    Trocar Foto
-                </label>
-                <input type="file" id="customer-image-upload" style={{ display: 'none' }} onChange={handleImageChange} accept="image/png, image/jpeg" />
-                <p className="small text-muted mb-0 mt-1">Opcional. Apenas para referência visual nesta tela.</p>
-            </div>
-        </div>
-      </div>
-      
-      {/* ✅ 7. FILTROS ATUALIZADOS */}
-      <div className="card card-body mb-4">
-        <div className="row g-3">
-          <div className="col-md-6">
+          <div className="col-md-auto">
+            <img 
+              src={customerImage || 'https://placehold.co/100/6c757d/white?text=Cliente'} 
+              alt="Cliente da Venda" 
+              className="rounded-circle"
+              style={{ width: '80px', height: '80px', objectFit: 'cover' }}
+            />
+          </div>
+          <div className="col-md-3">
+            <h5 className="card-title mb-1">Cliente da Venda</h5>
+            <label htmlFor="customer-image-upload" className="btn btn-sm btn-outline-secondary">
+              Trocar Foto
+            </label>
+            <input type="file" id="customer-image-upload" style={{ display: 'none' }} onChange={handleImageChange} accept="image/png, image/jpeg" />
+          </div>
+          <div className="col-md">
             <input 
               type="text"
               className="form-control"
@@ -149,13 +172,13 @@ function PhysicalSalePage() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <div className="col-md-6">
+          <div className="col-md">
             <Select
               options={categories}
               isClearable
               placeholder="Filtrar por Categoria..."
               onChange={(selectedOption) => setFilterCategory(selectedOption ? selectedOption.value : '')}
-              noOptionsMessage={() => "Nenhuma categoria encontrada"}
+              noOptionsMessage={() => "Nenhuma categoria"}
             />
           </div>
         </div>
@@ -166,7 +189,7 @@ function PhysicalSalePage() {
           {products.map(product => (
             <div key={product.id} className="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
               <div className="d-flex align-items-center">
-                <img src={product.imagem_produto_url ? `http://localhost:3001/uploads/${product.imagem_produto_url}` : 'https://placehold.co/60'} alt={product.nome} className="img-thumbnail me-3" style={{width: '60px'}}/>
+                <img src={product.imagem_produto_url ? `http://localhost:3001/uploads/${product.imagem_produto_url}` : 'https://placehold.co/60'} alt={product.nome} className="img-thumbnail me-3" style={{width: '60px', height: '60px', objectFit: 'cover'}}/>
                 <div>
                   <strong>{product.nome}</strong>
                   <div className="text-muted">Estoque: {product.estoque} | R$ {parseFloat(product.valor).toFixed(2).replace('.', ',')}</div>
