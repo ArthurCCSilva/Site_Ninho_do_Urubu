@@ -2,17 +2,16 @@
 
 /* --- Estilos Gerais do Card de Produto --- */
 .product-card {
-  /* ✅ Correção para deixar o card mais atraente */
-  width: 100%; 
-  max-width: 280px; /* Impede que o card se estique demais em telas largas */
+  width: 100%;
+  max-width: 280px;
   margin-left: auto;
   margin-right: auto;
-  
   border: 1px solid #e9ecef;
   border-radius: 8px;
   transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
   overflow: hidden;
-  display: flex;
+  /* ✅ Garante que o card é um container flexbox vertical */
+  display: flex;       
   flex-direction: column;
 }
 
@@ -28,7 +27,10 @@
 }
 
 .product-card .card-body {
-  flex-grow: 1;
+  /* ✅ ESTA É A REGRA MÁGICA:
+     Faz o corpo do card esticar e ocupar todo o espaço vago,
+     empurrando o rodapé para a base do card. */
+  flex-grow: 1; 
   padding: 1rem;
   padding-bottom: 0.5rem;
   text-align: center;

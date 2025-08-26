@@ -4,7 +4,16 @@ import api from '../services/api';
 import ProductCard from '../components/ProductCard';
 import Pagination from '../components/Pagination';
 import Select from 'react-select';
-import './HomePage.css'; // ✅ Garante que os estilos da página sejam importados
+import './HomePage.css';
+
+// Função auxiliar para determinar o limite com base na largura da tela
+const getLimitForScreenSize = () => {
+  // O breakpoint de 768px é comumente usado para separar mobile de tablet
+  if (window.innerWidth < 768) {
+    return 6; // Para telas menores (mobile)
+  }
+  return 12; // Para telas maiores
+};
 
 function HomePage() {
   // --- Estados para os dados ---
@@ -21,7 +30,21 @@ function HomePage() {
   // --- Estados para a paginação ---
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
-  const [limit] = useState(12);
+  
+  // O 'limit' agora é um estado que se ajusta ao tamanho da tela
+  const [limit, setLimit] = useState(getLimitForScreenSize());
+
+  // useEffect para atualizar o limite quando a tela é redimensionada
+  useEffect(() => {
+    const handleResize = () => {
+      setLimit(getLimitForScreenSize());
+    };
+
+    window.addEventListener('resize', handleResize);
+    // Limpa o "ouvinte" quando o componente é desmontado
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
 
   // --- Funções de Busca de Dados ---
   const fetchProducts = async (page = 1) => {
@@ -60,14 +83,14 @@ function HomePage() {
   };
 
   // --- Efeitos (useEffect Hooks) ---
-  // Roda a busca quando um filtro é alterado
+  // Roda a busca quando um filtro OU o limite de páginas muda
   useEffect(() => {
     const debounceFetch = setTimeout(() => {
       if (currentPage !== 1) { setCurrentPage(1); } 
       else { fetchProducts(1); }
     }, 500);
     return () => clearTimeout(debounceFetch);
-  }, [searchTerm, filterCategory, sortOrder]);
+  }, [searchTerm, filterCategory, sortOrder, limit]);
 
   // Roda a busca quando a página muda
   useEffect(() => {

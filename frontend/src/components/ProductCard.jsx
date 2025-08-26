@@ -9,7 +9,6 @@ function ProductCard({ product }) {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  // ✅ 1. Resolução da imagem placeholder alterada para 200x200
   const imageUrl = product.imagem_produto_url
     ? `http://localhost:3001/uploads/${product.imagem_produto_url}`
     : 'https://placehold.co/200x200';
@@ -28,13 +27,22 @@ function ProductCard({ product }) {
 
   return (
     <div className="card h-100 product-card">
-      <Link to={`/produtos/${product.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+      {/* O link agora envolve apenas a imagem */}
+      <Link to={`/produtos/${product.id}`}>
         <img src={imageUrl} className="card-img-top" alt={product.nome} />
-        <div className="card-body">
-          <h5 className="card-title">{product.nome}</h5>
-        </div>
       </Link>
 
+      {/* O card-body agora é um filho direto do .product-card (flex container) */}
+      <div className="card-body">
+        {/* O título também vira um link para a página de detalhes */}
+        <h5 className="card-title">
+          <Link to={`/produtos/${product.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+            {product.nome}
+          </Link>
+        </h5>
+      </div>
+
+      {/* O card-footer é o último item do flex container, sendo empurrado para baixo */}
       <div className="card-footer">
         <p className="card-text fw-bold fs-5 mb-2">
           R$ {parseFloat(product.valor).toFixed(2).replace('.', ',')}
