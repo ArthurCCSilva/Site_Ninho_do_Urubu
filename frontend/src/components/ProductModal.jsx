@@ -5,13 +5,15 @@ import { Modal } from 'bootstrap';
 import Select from 'react-select';
 
 function ProductModal({ show, onHide, productToEdit, onSave }) {
-  // Define um estado inicial limpo, com categoria_id como null
+  // Estado inicial do formulário, agora com os novos campos
   const initialState = {
     nome: '',
     descricao: '',
     valor: '',
     categoria_id: null,
     estoque: '',
+    destaque: false,
+    promocao: false,
   };
   
   const [formData, setFormData] = useState(initialState);
@@ -51,12 +53,13 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
           valor: productToEdit.valor || '',
           categoria_id: productToEdit.categoria_id || null,
           estoque: productToEdit.estoque || '',
+          destaque: !!productToEdit.destaque, // Converte 0/1 para false/true
+          promocao: !!productToEdit.promocao, // Converte 0/1 para false/true
         });
       } else {
         // MODO ADIÇÃO: Limpa completamente o formulário
         setFormData(initialState);
       }
-      // Limpa o arquivo de imagem e os erros
       setImagemFile(null);
       setError('');
     }
@@ -71,12 +74,21 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
     else bsModal.hide();
   }, [show]);
 
+  // Handlers para os inputs
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+  
+  // Handler específico para checkboxes
+  const handleCheckboxChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.checked });
+  };
+
   const handleCategoryChange = (selectedOption) => {
     setFormData({ ...formData, categoria_id: selectedOption ? selectedOption.value : null });
   };
+  
   const handleFileChange = (e) => setImagemFile(e.target.files[0]);
 
+  // Handler para a submissão do formulário
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -123,16 +135,10 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
               </div>
               <div className="row">
                 <div className="col">
-                  <div className="mb-3">
-                    <label className="form-label">Valor</label>
-                    <input type="number" step="0.01" name="valor" value={formData.valor} onChange={handleChange} className="form-control" required />
-                  </div>
+                  <div className="mb-3"><label className="form-label">Valor</label><input type="number" step="0.01" name="valor" value={formData.valor} onChange={handleChange} className="form-control" required /></div>
                 </div>
                 <div className="col">
-                  <div className="mb-3">
-                    <label className="form-label">Estoque</label>
-                    <input type="number" name="estoque" value={formData.estoque} onChange={handleChange} className="form-control" required />
-                  </div>
+                  <div className="mb-3"><label className="form-label">Estoque</label><input type="number" name="estoque" value={formData.estoque} onChange={handleChange} className="form-control" required /></div>
                 </div>
               </div>
               <div className="mb-3">
@@ -151,6 +157,33 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
               <div className="mb-3">
                 <label className="form-label">Imagem do Produto (Opcional)</label>
                 <input type="file" name="imagem_produto" onChange={handleFileChange} className="form-control" />
+              </div>
+              
+              {/* --- NOVOS CAMPOS (DESTAQUE E PROMOÇÃO) --- */}
+              <hr />
+              <div className="form-check form-switch mb-3">
+                <input 
+                  className="form-check-input" 
+                  type="checkbox" 
+                  role="switch" 
+                  id="destaqueCheck"
+                  name="destaque"
+                  checked={formData.destaque}
+                  onChange={handleCheckboxChange}
+                />
+                <label className="form-check-label" htmlFor="destaqueCheck">Marcar como Produto Destaque</label>
+              </div>
+              <div className="form-check form-switch">
+                <input 
+                  className="form-check-input" 
+                  type="checkbox" 
+                  role="switch" 
+                  id="promocaoCheck"
+                  name="promocao"
+                  checked={formData.promocao}
+                  onChange={handleCheckboxChange}
+                />
+                <label className="form-check-label" htmlFor="promocaoCheck">Marcar como Produto em Promoção</label>
               </div>
             </div>
             <div className="modal-footer">

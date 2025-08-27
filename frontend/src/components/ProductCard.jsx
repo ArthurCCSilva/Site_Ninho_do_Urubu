@@ -27,14 +27,18 @@ function ProductCard({ product }) {
 
   return (
     <div className="card h-100 product-card">
-      {/* O link agora envolve apenas a imagem */}
-      <Link to={`/produtos/${product.id}`}>
+      
+      {/* ✅ ATUALIZAÇÃO: O Link envolve a imagem e tem a posição relativa para o selo */}
+      <Link to={`/produtos/${product.id}`} style={{ position: 'relative' }}>
+        
+        {/* O selo de promoção é renderizado aqui, se o produto tiver a flag 'promocao' */}
+        {product.promocao ? <div className="promotion-badge">PROMOÇÃO</div> : null}
+        
         <img src={imageUrl} className="card-img-top" alt={product.nome} />
       </Link>
 
-      {/* O card-body agora é um filho direto do .product-card (flex container) */}
+      {/* Mantivemos a estrutura que garante o alinhamento dos rodapés */}
       <div className="card-body">
-        {/* O título também vira um link para a página de detalhes */}
         <h5 className="card-title">
           <Link to={`/produtos/${product.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
             {product.nome}
@@ -42,7 +46,6 @@ function ProductCard({ product }) {
         </h5>
       </div>
 
-      {/* O card-footer é o último item do flex container, sendo empurrado para baixo */}
       <div className="card-footer">
         <p className="card-text fw-bold fs-5 mb-2">
           R$ {parseFloat(product.valor).toFixed(2).replace('.', ',')}

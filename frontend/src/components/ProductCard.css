@@ -82,3 +82,17 @@
   font-size: 0.85rem; /* Texto do botão menor */
   padding: 0.25rem 0.5rem;
 }
+
+/* ✅ Estilo para o selo de promoção */
+.promotion-badge {
+  position: absolute;
+  bottom: 10px; /* Posição sobre a imagem */
+  right: 10px;  /* Posição sobre a imagem */
+  background-color: yellow;
+  color: red;
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  border-radius: 5px;
+  z-index: 10;
+}

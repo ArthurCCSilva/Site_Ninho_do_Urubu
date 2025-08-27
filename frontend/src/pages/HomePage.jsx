@@ -6,18 +6,16 @@ import Pagination from '../components/Pagination';
 import Select from 'react-select';
 import './HomePage.css';
 
-// Função auxiliar para determinar o limite com base na largura da tela
-const getLimitForScreenSize = () => {
-  // O breakpoint de 768px é comumente usado para separar mobile de tablet
-  if (window.innerWidth < 768) {
-    return 6; // Para telas menores (mobile)
-  }
-  return 12; // Para telas maiores
-};
+// ✅ 1. IMPORTA as ferramentas e estilos do Swiper
+import { Swiper, SwiperSlide } from 'swiper/react';
+import { Navigation } from 'swiper/modules';
+import 'swiper/css';
+import 'swiper/css/navigation';
 
 function HomePage() {
   // --- Estados para os dados ---
   const [products, setProducts] = useState([]);
+  const [featuredProducts, setFeaturedProducts] = useState([]); // ✅ 1. NOVO ESTADO para os destaques
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -30,21 +28,7 @@ function HomePage() {
   // --- Estados para a paginação ---
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
-  
-  // O 'limit' agora é um estado que se ajusta ao tamanho da tela
-  const [limit, setLimit] = useState(getLimitForScreenSize());
-
-  // useEffect para atualizar o limite quando a tela é redimensionada
-  useEffect(() => {
-    const handleResize = () => {
-      setLimit(getLimitForScreenSize());
-    };
-
-    window.addEventListener('resize', handleResize);
-    // Limpa o "ouvinte" quando o componente é desmontado
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
+  const [limit] = useState(12);
 
   // --- Funções de Busca de Dados ---
   const fetchProducts = async (page = 1) => {
@@ -54,9 +38,9 @@ function HomePage() {
       if (searchTerm) params.append('search', searchTerm);
       if (filterCategory) params.append('category', filterCategory);
       if (sortOrder) params.append('sort', sortOrder);
-      
+
       const response = await api.get(`/api/produtos?${params.toString()}`);
-      
+
       setProducts(response.data.produtos || []);
       setTotalPages(response.data.totalPages);
       setCurrentPage(response.data.currentPage);
@@ -68,7 +52,7 @@ function HomePage() {
       setLoading(false);
     }
   };
-  
+
   const fetchCategories = async () => {
     try {
       const response = await api.get('/api/categorias?limit=all');
@@ -83,31 +67,82 @@ function HomePage() {
   };
 
   // --- Efeitos (useEffect Hooks) ---
-  // Roda a busca quando um filtro OU o limite de páginas muda
   useEffect(() => {
     const debounceFetch = setTimeout(() => {
-      if (currentPage !== 1) { setCurrentPage(1); } 
+      if (currentPage !== 1) { setCurrentPage(1); }
       else { fetchProducts(1); }
     }, 500);
     return () => clearTimeout(debounceFetch);
-  }, [searchTerm, filterCategory, sortOrder, limit]);
+  }, [searchTerm, filterCategory, sortOrder]);
 
-  // Roda a busca quando a página muda
   useEffect(() => {
     fetchProducts(currentPage);
   }, [currentPage]);
-  
-  // Roda uma vez para buscar as categorias do filtro
+
+  // Roda uma vez para buscar categorias E os produtos em destaque
   useEffect(() => {
     fetchCategories();
+
+    // ✅ 2. NOVA FUNÇÃO para buscar os produtos em destaque
+    const fetchFeaturedProducts = async () => {
+      try {
+        // ✅ 2. Busca TODOS os produtos em destaque, sem limite
+        const response = await api.get('/api/produtos?destaque=true');
+        setFeaturedProducts(response.data.produtos || []);
+      } catch (err) {
+        console.error("Falha ao buscar produtos em destaque", err);
+      }
+    };
+    fetchFeaturedProducts();
   }, []);
 
   if (error) return <div className="alert alert-danger">{error}</div>;
 
   return (
     <div>
+      {/* ✅ 3. NOVA SEÇÃO DE DESTAQUES */}
+      {/* Esta seção só aparece se houver produtos em destaque e se não estiver carregando a lista principal */}
+      {!loading && featuredProducts.length > 0 && (
+        <div className="mb-5">
+          <h2 className="homepage-title">Produtos em Destaque</h2>
+          <div className="product-carousel">
+            <Swiper
+              modules={[Navigation]}
+              navigation // Ativa as setas de navegação
+              spaceBetween={20} // Espaço entre os produtos
+              // Configuração de responsividade
+              breakpoints={{
+                // Para telas a partir de 0px (padrão mobile)
+                0: {
+                  slidesPerView: 1, // 1 produto por linha
+                },
+                // Para telas a partir de 576px
+                576: {
+                  slidesPerView: 2, // 2 produtos por linha
+                },
+                // Para telas a partir de 992px
+                992: {
+                  slidesPerView: 4,
+                },
+                // Para telas a partir de 1200px (desktop)
+                1200: {
+                  slidesPerView: 6, // 6 produtos por linha
+                },
+              }}
+            >
+              {featuredProducts.map(product => (
+                <SwiperSlide key={product.id}>
+                  <ProductCard product={product} />
+                </SwiperSlide>
+              ))}
+            </Swiper>
+          </div>
+          <hr className="my-5" />
+        </div>
+      )}
+
       <h1 className="homepage-title">Nossos Produtos</h1>
-      
+
       <div className="card card-body mb-4">
         <div className="row g-3 align-items-center">
           <div className="col-lg-5">
@@ -137,7 +172,7 @@ function HomePage() {
           </div>
         </div>
       </div>
-      
+
       {loading ? (
         <div className="text-center my-5"><div className="spinner-border" /></div>
       ) : (
@@ -156,7 +191,7 @@ function HomePage() {
           </div>
 
           <div className="d-flex justify-content-center mt-4">
-            <Pagination 
+            <Pagination
               currentPage={currentPage}
               totalPages={totalPages}
               onPageChange={(page) => setCurrentPage(page)}

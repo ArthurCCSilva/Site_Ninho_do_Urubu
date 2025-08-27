@@ -4,7 +4,8 @@ const db = require('../db');
 // --- Função Principal para buscar produtos (com filtros, join, ordenação e paginação) ---
 exports.getAllProdutos = async (req, res) => {
   try {
-    const { search, category, sort, page = 1, limit = 7 } = req.query; // Limite padrão de 7
+    // ✅ CORREÇÃO: Adiciona 'destaque' à desestruturação para poder usá-lo
+    const { search, category, sort, page = 1, limit = 12, destaque } = req.query;
 
     let baseSql = 'FROM produtos p LEFT JOIN categorias c ON p.categoria_id = c.id';
     let params = [];
@@ -18,18 +19,22 @@ exports.getAllProdutos = async (req, res) => {
       conditions.push('c.nome = ?');
       params.push(category);
     }
+    // Adiciona o filtro de destaque, se solicitado
+    if (destaque === 'true') {
+      conditions.push('p.destaque = TRUE');
+    }
     
     if (conditions.length > 0) {
       baseSql += ' WHERE ' + conditions.join(' AND ');
     }
 
-    // 1. Primeiro, contamos o total de itens com os filtros aplicados para saber o total de páginas
     const countSql = `SELECT COUNT(p.id) as total ${baseSql}`;
     const [countRows] = await db.query(countSql, params);
     const totalItems = countRows[0].total;
-    const totalPages = Math.ceil(totalItems / limit);
+    // O limite para o cálculo deve ser um número
+    const numericLimit = parseInt(limit, 10);
+    const totalPages = Math.ceil(totalItems / numericLimit);
 
-    // 2. Depois, buscamos os produtos da página atual com ordenação
     let sql = `SELECT p.*, c.nome AS categoria_nome ${baseSql}`;
     if (sort) {
       const allowedSorts = {
@@ -42,23 +47,20 @@ exports.getAllProdutos = async (req, res) => {
         sql += ` ${allowedSorts[sort]}`;
       }
     } else {
-      sql += ' ORDER BY p.id DESC'; // Ordenação padrão por mais recente
+      sql += ' ORDER BY p.id DESC';
     }
     
-    // Adiciona a paginação à query principal
-    const offset = (page - 1) * limit;
+    const offset = (page - 1) * numericLimit;
     sql += ' LIMIT ? OFFSET ?';
-    params.push(parseInt(limit), parseInt(offset));
+    params.push(numericLimit, offset);
     
     const [produtos] = await db.query(sql, params);
 
-    // 3. Retorna a resposta com os produtos e os dados da paginação
     res.status(200).json({
       produtos,
       totalPages,
       currentPage: parseInt(page)
     });
-
   } catch (error) {
     console.error('Erro ao buscar produtos com filtros:', error);
     res.status(500).json({ message: 'Erro ao buscar produtos.', error: error.message });
@@ -83,14 +85,20 @@ exports.getProdutoById = async (req, res) => {
 // --- Função para CRIAR um novo produto (usando categoria_id) ---
 exports.createProduto = async (req, res) => {
   try {
-    const { nome, descricao, valor, categoria_id, estoque } = req.body;
+    // ✅ CORREÇÃO: Remove a vírgula extra depois de 'estoque'
+    const { nome, descricao, valor, categoria_id, estoque, destaque, promocao } = req.body;
     const imagem_produto_url = req.file ? req.file.filename : null;
     if (!nome || !valor || !categoria_id || estoque === undefined) {
       return res.status(400).json({ message: 'Nome, valor, ID da categoria e estoque são obrigatórios.' });
     }
+
+    const isDestaque = destaque === 'true' ? 1 : 0;
+    const isPromocao = promocao === 'true' ? 1 : 0;
+
     const [result] = await db.query(
-      'INSERT INTO produtos (nome, descricao, valor, categoria_id, estoque, imagem_produto_url) VALUES (?, ?, ?, ?, ?, ?)',
-      [nome, descricao, valor, categoria_id, estoque, imagem_produto_url]
+      'INSERT INTO produtos (nome, descricao, valor, categoria_id, estoque, imagem_produto_url, destaque, promocao) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      // ✅ CORREÇÃO: Remove a vírgula extra do array de parâmetros
+      [nome, descricao, valor, categoria_id, estoque, imagem_produto_url, isDestaque, isPromocao]
     );
     res.status(201).json({ message: 'Produto criado!', produtoId: result.insertId });
   } catch (error) {
@@ -102,10 +110,14 @@ exports.createProduto = async (req, res) => {
 exports.updateProduto = async (req, res) => {
   try {
     const { id } = req.params;
-    const { nome, descricao, valor, categoria_id, estoque } = req.body;
+    const { nome, descricao, valor, categoria_id, estoque, destaque, promocao } = req.body;
     const imagem_produto_url = req.file ? req.file.filename : null;
-    let sql = 'UPDATE produtos SET nome = ?, descricao = ?, valor = ?, categoria_id = ?, estoque = ?';
-    const params = [nome, descricao, valor, categoria_id, estoque];
+
+    const isDestaque = destaque === 'true' ? 1 : 0;
+    const isPromocao = promocao === 'true' ? 1 : 0;
+
+    let sql = 'UPDATE produtos SET nome = ?, descricao = ?, valor = ?, categoria_id = ?, estoque = ?, destaque = ?, promocao = ?';
+    const params = [nome, descricao, valor, categoria_id, estoque, isDestaque, isPromocao];
     if (imagem_produto_url) {
       sql += ', imagem_produto_url = ?';
       params.push(imagem_produto_url);
