@@ -125,6 +125,9 @@ function AdminDashboard() {
                   <h5 className="card-title">{user?.nome}</h5>
                   <p className="card-text mb-0"><strong>Email:</strong> {user?.email}</p>
                   <p className="card-text"><strong>Status:</strong> <span className="badge bg-success text-uppercase">{user?.role}</span></p>
+                  <button className="btn btn-secondary mb-3" onClick={() => setShowEditProfileModal(true)}>
+                    Editar dados do perfil
+                  </button>
                 </div>
               </div>
             </div>
@@ -134,21 +137,18 @@ function AdminDashboard() {
           <div className="card h-100">
             <div className="card-header"><h4>Configurações Gerais</h4></div>
             <div className="card-body d-flex flex-column justify-content-center align-items-start">
-              <button className="btn btn-secondary mb-3" onClick={() => setShowEditProfileModal(true)}>
-                Editar Perfil e Senha
-              </button>
+              <Link to="/admin/venda-fisica" className="btn btn-success mb-3">
+                Registrar Venda Física
+              </Link>
+
+              <Link to="/admin/pedidos" className="btn btn-primary mb-3">
+                Gerenciar Pedidos
+              </Link>
 
               <button className="btn btn-info mb-3" onClick={() => setShowCategoryModal(true)}>
                 Gerenciar Categorias
               </button>
 
-              <Link to="/admin/pedidos" className="btn btn-primary ">
-                Gerenciar Pedidos
-              </Link>
-
-              <Link to="/admin/venda-fisica" className="btn btn-success mb-3">
-                Registrar Venda Física
-              </Link>
             </div>
           </div>
         </div>

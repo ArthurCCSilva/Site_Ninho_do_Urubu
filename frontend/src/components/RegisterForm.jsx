@@ -65,7 +65,7 @@ function RegisterForm() {
       <div className="mb-3">
           <label className="form-label">telefone - WhatsApp</label>
           <PhoneInput
-            placeholder="12345678999"
+            placeholder="(00) 0 0000-0000"
             value={telefone}
             onChange={setTelefone}
             defaultCountry="BR" // País padrão
