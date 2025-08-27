@@ -34,9 +34,9 @@ export function AuthProvider({ children }) {
     setIsLoading(false);
   }, [token]);
 
-  const login = useCallback(async (email, senha) => {
+  const login = useCallback(async (identificador, senha) => {
     try {
-      const response = await api.post('/api/auth/login', { email, senha });
+      const response = await api.post('/api/auth/login', { identificador, senha });
       const newToken = response.data.token;
       localStorage.setItem('token', newToken);
       setToken(newToken);

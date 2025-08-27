@@ -48,4 +48,8 @@ router.put('/:id', [verifyToken, isAdmin, upload.single('imagem_produto')], prod
 // DELETE -> http://localhost:3001/api/produtos/123
 router.delete('/:id', [verifyToken, isAdmin], produtosController.deleteProduto); // Vírgula extra removida daqui
 
+// ✅ NOVA ROTA para adicionar estoque
+// PATCH -> http://localhost:3001/api/produtos/123/adicionar-estoque
+router.patch('/:id/adicionar-estoque', [verifyToken, isAdmin], produtosController.adicionarEstoque);
+
 module.exports = router;

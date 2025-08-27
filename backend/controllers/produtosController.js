@@ -40,8 +40,8 @@ exports.getAllProdutos = async (req, res) => {
     let sql = `SELECT p.*, c.nome AS categoria_nome ${baseSql}`;
     if (sort) {
       const allowedSorts = {
-        'price_asc': 'ORDER BY p.valor ASC',
-        'price_desc': 'ORDER BY p.valor DESC',
+        'price_asc': 'ORDER BY p.estoque ASC',
+        'price_desc': 'ORDER BY p.estoque DESC',
         'name_asc': 'ORDER BY p.nome ASC',
         'name_desc': 'ORDER BY p.nome DESC',
       };
@@ -174,5 +174,32 @@ exports.deleteProduto = async (req, res) => {
     res.status(200).json({ message: 'Produto deletado com sucesso.' });
   } catch (error) {
     res.status(500).json({ message: 'Erro ao deletar produto.', error: error.message });
+  }
+};
+
+// ✅ NOVA FUNÇÃO para ADICIONAR (somar) ao estoque de um produto
+exports.adicionarEstoque = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { quantidadeAdicional } = req.body;
+
+    // Validação para garantir que a quantidade é um número inteiro positivo
+    const quantidade = parseInt(quantidadeAdicional, 10);
+    if (isNaN(quantidade) || quantidade <= 0) {
+      return res.status(400).json({ message: 'A quantidade a ser adicionada deve ser um número inteiro positivo.' });
+    }
+
+    // Query SQL que SOMA o valor ao estoque existente
+    const sql = 'UPDATE produtos SET estoque = estoque + ? WHERE id = ?';
+    const [result] = await db.query(sql, [quantidade, id]);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Produto não encontrado.' });
+    }
+
+    res.status(200).json({ message: 'Estoque atualizado com sucesso!' });
+  } catch (error) {
+    console.error("Erro ao adicionar estoque:", error);
+    res.status(500).json({ message: 'Erro ao atualizar o estoque.', error: error.message });
   }
 };

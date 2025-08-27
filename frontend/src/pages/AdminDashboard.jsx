@@ -11,6 +11,7 @@ import EditProfileModal from '../components/EditProfileModal';
 import Pagination from '../components/Pagination';
 
 function AdminDashboard() {
+  // --- Estados do Componente Principal ---
   const { user, logout } = useAuth();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -25,8 +26,18 @@ function AdminDashboard() {
   const [categories, setCategories] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
-  const [limit, setLimit] = useState(7); // Limite de 7 itens por página
+  const [limit, setLimit] = useState(7);
 
+  // --- Estados para a ferramenta de atualização de estoque ---
+  const [stockSearchTerm, setStockSearchTerm] = useState('');
+  const [stockFilterCategory, setStockFilterCategory] = useState('');
+  const [stockProducts, setStockProducts] = useState([]);
+  const [stockLoading, setStockLoading] = useState(false);
+  const [stockUpdateValues, setStockUpdateValues] = useState({});
+  const [stockCurrentPage, setStockCurrentPage] = useState(1);
+  const [stockTotalPages, setStockTotalPages] = useState(0);
+
+  // --- Funções de Busca de Dados ---
   const fetchProducts = async (page = 1) => {
     try {
       setLoading(true);
@@ -34,9 +45,7 @@ function AdminDashboard() {
       if (searchTerm) params.append('search', searchTerm);
       if (filterCategory) params.append('category', filterCategory);
       if (sortOrder) params.append('sort', sortOrder);
-
       const response = await api.get(`/api/produtos?${params.toString()}`);
-
       setProducts(response.data.produtos);
       setTotalPages(response.data.totalPages);
       setCurrentPage(response.data.currentPage);
@@ -48,7 +57,7 @@ function AdminDashboard() {
       setLoading(false);
     }
   };
-
+  
   const fetchCategories = async () => {
     try {
       const response = await api.get('/api/categorias?limit=all');
@@ -62,9 +71,10 @@ function AdminDashboard() {
     }
   };
 
+  // --- Efeitos (useEffect Hooks) ---
   useEffect(() => {
     const debounceFetch = setTimeout(() => {
-      if (currentPage !== 1) { setCurrentPage(1); }
+      if (currentPage !== 1) { setCurrentPage(1); } 
       else { fetchProducts(1); }
     }, 500);
     return () => clearTimeout(debounceFetch);
@@ -73,29 +83,74 @@ function AdminDashboard() {
   useEffect(() => {
     fetchProducts(currentPage);
   }, [currentPage]);
+  
+  useEffect(() => {
+    fetchCategories();
+  }, []); // Busca categorias apenas uma vez
 
-  useEffect(() => { fetchCategories(); }, [showCategoryModal]);
-
-  const handleProfileImageChange = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-    const data = new FormData();
-    data.append('imagem_perfil', file);
+  
+  // --- Funções e Efeitos para a ferramenta de estoque ---
+  const fetchStockProducts = async (page = 1) => {
+    if (!stockSearchTerm && !stockFilterCategory) {
+      setStockProducts([]);
+      setStockTotalPages(0);
+      return;
+    }
     try {
-      await api.put(`/api/auth/${user.id}/imagem`, data);
-      alert('Imagem de perfil atualizada! Por favor, faça login novamente para ver a alteração.');
-      logout();
-    } catch (error) {
-      alert('Erro ao atualizar a imagem.');
-      console.error(error);
+      setStockLoading(true);
+      const params = new URLSearchParams({ page, limit: 5 });
+      if (stockSearchTerm) params.append('search', stockSearchTerm);
+      if (stockFilterCategory) params.append('category', stockFilterCategory);
+      const response = await api.get(`/api/produtos?${params.toString()}`);
+      setStockProducts(response.data.produtos || []);
+      setStockTotalPages(response.data.totalPages);
+      setStockCurrentPage(response.data.currentPage);
+    } catch (err) {
+      console.error("Erro ao buscar produtos para estoque", err);
+    } finally {
+      setStockLoading(false);
     }
   };
 
+  useEffect(() => {
+    const debounceFetch = setTimeout(() => {
+      if (stockCurrentPage !== 1) { setStockCurrentPage(1); }
+      else { fetchStockProducts(1); }
+    }, 500);
+    return () => clearTimeout(debounceFetch);
+  }, [stockSearchTerm, stockFilterCategory]);
+
+  useEffect(() => {
+    fetchStockProducts(stockCurrentPage);
+  }, [stockCurrentPage]);
+
+  
+  // --- Funções de Manipulação de Eventos (Handlers) ---
+  const handleStockValueChange = (productId, value) => {
+    setStockUpdateValues(prev => ({ ...prev, [productId]: value }));
+  };
+
+  const handleStockUpdate = async (productId) => {
+    const quantityToAdd = stockUpdateValues[productId];
+    if (!quantityToAdd || parseInt(quantityToAdd) <= 0) {
+      return alert("Por favor, insira um valor inteiro positivo.");
+    }
+    try {
+      await api.patch(`/api/produtos/${productId}/adicionar-estoque`, { quantidadeAdicional: quantityToAdd });
+      alert('Estoque atualizado com sucesso!');
+      setStockUpdateValues(prev => ({ ...prev, [productId]: '' }));
+      fetchStockProducts(stockCurrentPage);
+      fetchProducts(currentPage);
+    } catch (err) {
+      alert(err.response?.data?.message || "Falha ao atualizar estoque.");
+    }
+  };
+  
   const handleShowAddModal = () => { setProductToEdit(null); setShowModal(true); };
   const handleShowEditModal = (product) => { setProductToEdit(product); setShowModal(true); };
   const handleCloseModal = () => setShowModal(false);
   const handleSaveProduct = () => { setShowModal(false); fetchProducts(currentPage); };
-
+  
   const handleDelete = async (productId) => {
     if (window.confirm('Tem certeza que deseja excluir este produto?')) {
       try {
@@ -106,59 +161,52 @@ function AdminDashboard() {
       }
     }
   };
-
+  
   const profileImageUrl = user?.imagem_perfil_url ? `http://localhost:3001/uploads/${user.imagem_perfil_url}` : 'https://placehold.co/150';
 
   return (
     <div>
       <h1 className="mb-4">Painel do Administrador</h1>
       <div className="row">
-        <div className="col-lg-6 mb-4">
+        <div className="col-lg-7 mb-4">
           <div className="card h-100">
-            <div className="card-header"><h4>Informações do Admin</h4></div>
+            <div className="card-header d-flex justify-content-between align-items-center">
+              <h4>Informações do Admin</h4>
+            </div>
             <div className="card-body">
               <div className="row align-items-center">
                 <div className="col-md-3 text-center">
-                  <img src={profileImageUrl} alt="Foto de Perfil" className="img-fluid rounded-circle" style={{ maxWidth: '100px' }} />
+                  <img src={profileImageUrl} alt="Foto de Perfil" className="img-fluid rounded-circle" style={{ maxWidth: '100px' }}/>
                 </div>
                 <div className="col-md-9">
                   <h5 className="card-title">{user?.nome}</h5>
                   <p className="card-text mb-0"><strong>Email:</strong> {user?.email}</p>
                   <p className="card-text"><strong>Status:</strong> <span className="badge bg-success text-uppercase">{user?.role}</span></p>
-                  <button className="btn btn-secondary mb-3" onClick={() => setShowEditProfileModal(true)}>
-                    Editar dados do perfil
+                  <button className="btn btn-secondary btn-sm mt-2" onClick={() => setShowEditProfileModal(true)}>
+                    Editar Perfil
                   </button>
                 </div>
               </div>
             </div>
           </div>
         </div>
-        <div className="col-lg-6 mb-4">
+        <div className="col-lg-5 mb-4">
           <div className="card h-100">
-            <div className="card-header"><h4>Configurações Gerais</h4></div>
+            <div className="card-header"><h4>Ações Gerais</h4></div>
             <div className="card-body d-flex flex-column justify-content-center align-items-start">
-              <Link to="/admin/venda-fisica" className="btn btn-success mb-3">
-                Registrar Venda Física
-              </Link>
-
-              <Link to="/admin/pedidos" className="btn btn-primary mb-3">
-                Gerenciar Pedidos
-              </Link>
-
-              <button className="btn btn-info mb-3" onClick={() => setShowCategoryModal(true)}>
-                Gerenciar Categorias
-              </button>
-
+              <Link to="/admin/pedidos" className="btn btn-primary mb-3 w-100">Gerenciar Pedidos</Link>
+              <Link to="/admin/venda-fisica" className="btn btn-success mb-3 w-100">Registrar Venda Física</Link>
+              <button className="btn btn-info w-100" onClick={() => setShowCategoryModal(true)}>Gerenciar Categorias</button>
             </div>
           </div>
         </div>
       </div>
-
+      
       <div className="d-flex justify-content-between align-items-center my-4">
         <h2>Gerenciamento de Produtos</h2>
         <button className="btn btn-primary" onClick={handleShowAddModal}>Adicionar Novo Produto</button>
       </div>
-
+      
       <div className="card card-body mb-4">
         <div className="row g-3 align-items-center">
           <div className="col-lg-5">
@@ -176,33 +224,97 @@ function AdminDashboard() {
               isClearable
               placeholder="Filtrar por Categoria..."
               onChange={(selectedOption) => setFilterCategory(selectedOption ? selectedOption.value : '')}
-              noOptionsMessage={() => "Nenhuma categoria encontrada"}
+              noOptionsMessage={() => "Nenhuma categoria"}
             />
           </div>
           <div className="col-lg-4">
             <div className="btn-group w-100" role="group">
-              <button type="button" className={`btn btn-outline-secondary ${sortOrder === 'price_asc' ? 'active' : ''}`} onClick={() => setSortOrder('price_asc')}>Preço ↑</button>
-              <button type="button" className={`btn btn-outline-secondary ${sortOrder === 'price_desc' ? 'active' : ''}`} onClick={() => setSortOrder('price_desc')}>Preço ↓</button>
+              <button type="button" className={`btn btn-outline-secondary ${sortOrder === 'price_asc' ? 'active' : ''}`} onClick={() => setSortOrder('price_asc')}>- ESTOQUE</button>
+              <button type="button" className={`btn btn-outline-secondary ${sortOrder === 'price_desc' ? 'active' : ''}`} onClick={() => setSortOrder('price_desc')}>+ ESTOQUE</button>
               <button type="button" className={`btn btn-outline-secondary ${!sortOrder ? 'active' : ''}`} onClick={() => setSortOrder('')}>Padrão</button>
             </div>
           </div>
         </div>
       </div>
-
+      
       <div className="card">
         <div className="card-body">
-          {loading ? (<div className="text-center my-5"><div className="spinner-border" /></div>)
-            : error ? (<div className="alert alert-danger">{error}</div>)
-              : (<ProductAdminList products={products} onEdit={handleShowEditModal} onDelete={handleDelete} />)
+          {loading ? ( <div className="text-center my-5"><div className="spinner-border" /></div> ) 
+            : error ? ( <div className="alert alert-danger">{error}</div> ) 
+            : ( <ProductAdminList products={products} onEdit={handleShowEditModal} onDelete={handleDelete} /> )
           }
         </div>
-
+        
         <div className="card-footer d-flex justify-content-center">
-          <Pagination
+          <Pagination 
             currentPage={currentPage}
             totalPages={totalPages}
             onPageChange={(page) => setCurrentPage(page)}
           />
+        </div>
+      </div>
+      
+      <div className="card mt-5">
+        <div className="card-header"><h3 className="mb-0">Atualização Rápida de Estoque</h3></div>
+        <div className="card-body">
+          <p className="text-muted">Busque por nome ou filtre por categoria para ver os produtos e adicionar ao estoque.</p>
+          <div className="row g-3 mb-4">
+            <div className="col-md-6">
+              <input 
+                type="text" 
+                className="form-control" 
+                placeholder="Pesquisar produto por nome..."
+                value={stockSearchTerm}
+                onChange={(e) => setStockSearchTerm(e.target.value)}
+              />
+            </div>
+            <div className="col-md-6">
+              <Select
+                options={categories}
+                isClearable
+                placeholder="Filtrar por Categoria..."
+                onChange={(selectedOption) => setStockFilterCategory(selectedOption ? selectedOption.value : '')}
+                noOptionsMessage={() => "Nenhuma categoria"}
+              />
+            </div>
+          </div>
+
+          {stockLoading ? (
+            <div className="text-center"><div className="spinner-border" /></div>
+          ) : (
+            <div>
+              {stockProducts.length > 0 ? stockProducts.map(product => (
+                <div key={`stock-${product.id}`} className="d-flex align-items-center border-bottom py-2">
+                  <img src={product.imagem_produto_url ? `http://localhost:3001/uploads/${product.imagem_produto_url}` : 'https://placehold.co/60'} alt={product.nome} className="rounded" style={{ width: '60px', height: '60px', objectFit: 'cover' }} />
+                  <div className="flex-grow-1 mx-3">
+                    <strong>{product.nome}</strong>
+                    <div className="text-muted">Estoque Atual: {product.estoque}</div>
+                  </div>
+                  <div className="d-flex" style={{ width: '200px' }}>
+                    <input 
+                      type="number"
+                      className="form-control me-2"
+                      placeholder="Adicionar"
+                      value={stockUpdateValues[product.id] || ''}
+                      onChange={(e) => handleStockValueChange(product.id, e.target.value)}
+                      min="1"
+                    />
+                    <button className="btn btn-success" onClick={() => handleStockUpdate(product.id)}>Atualizar</button>
+                  </div>
+                </div>
+              )) : (
+                <p className="text-center text-muted mt-3">Nenhum produto encontrado. Inicie uma busca ou filtro.</p>
+              )}
+            </div>
+          )}
+        </div>
+        
+        <div className="card-footer d-flex justify-content-center">
+            <Pagination
+                currentPage={stockCurrentPage}
+                totalPages={stockTotalPages}
+                onPageChange={(page) => setStockCurrentPage(page)}
+            />
         </div>
       </div>
 

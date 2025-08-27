@@ -1,61 +1,59 @@
 // src/components/LoginForm.jsx
-import { useState } from "react";
-import { useAuth } from '../context/AuthContext'; // Importe nosso hook de autenticação
+import { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 
 function LoginForm() {
-  const [email, setEmail] = useState('');
+  // ✅ 1. Renomeia o estado para 'identificador'
+  const [identificador, setIdentificador] = useState('');
   const [senha, setSenha] = useState('');
   const [error, setError] = useState('');
-  const { login } = useAuth(); // Pegue a função login do contexto
+  const { login } = useAuth();
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     setError('');
-    if (!email || !senha) {
-      setError('Por favor, preencha todos os campos.');
-      return;
-    }
+    setLoading(true);
     try {
-      await login(email, senha); // Use a função de login do contexto!
+      // ✅ 2. Passa 'identificador' para a função de login
+      await login(identificador, senha);
     } catch (err) {
-      setError('Falha no login. Verifique seu email e senha.');
+      setError('Falha no login. Verifique suas credenciais.');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    // A tag <form> continua a mesma
     <form onSubmit={handleSubmit}>
-      {/* O componente <Alert> vira uma <div> com classes do Bootstrap */}
       {error && <div className="alert alert-danger">{error}</div>}
-      
-      {/* O <Form.Group> vira uma <div> com a classe de margem 'mb-3' */}
       <div className="mb-3">
-        <label htmlFor="loginEmail" className="form-label">Email</label>
+        {/* ✅ 3. ATUALIZA a label e o placeholder */}
+        <label htmlFor="identificador" className="form-label">Email ou Telefone</label>
         <input 
-          type="email" 
-          className="form-control"
-          id="loginEmail"
-          placeholder="Digite seu email" 
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          type="text" 
+          id="identificador"
+          className="form-control" 
+          placeholder="Digite seu email ou telefone"
+          value={identificador}
+          onChange={(e) => setIdentificador(e.target.value)}
+          required 
         />
       </div>
-
       <div className="mb-3">
-        <label htmlFor="loginPassword"  className="form-label">Senha</label>
+        <label htmlFor="senha" className="form-label">Senha</label>
         <input 
           type="password" 
-          className="form-control"
-          id="loginPassword"
-          placeholder="Senha"
+          id="senha"
+          className="form-control" 
+          placeholder="Sua senha"
           value={senha}
           onChange={(e) => setSenha(e.target.value)}
+          required 
         />
       </div>
-
-      {/* O <Button> vira uma tag <button> com classes de botão do Bootstrap */}
-      <button type="submit" className="btn btn-primary w-100">
-        Entrar
+      <button type="submit" className="btn btn-primary w-100" disabled={loading}>
+        {loading ? 'Entrando...' : 'Entrar'}
       </button>
     </form>
   );

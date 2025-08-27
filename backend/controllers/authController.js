@@ -49,27 +49,43 @@ exports.register = async (req, res) => {
 
 exports.login = async (req, res) => {
   try {
-    const { email, senha } = req.body;
+    const { identificador, senha } = req.body;
 
-    //1.buscar usuario melo email
-    const [rows] = await db.query('SELECT * FROM usuarios WHERE email = ?', [email]);
+    let emailParaBusca = null;
+    let telefoneParaBusca = null;
+
+    // ✅ 1. Verifica se o identificador parece ser um email
+    if (identificador.includes('@')) {
+      emailParaBusca = identificador;
+    } else {
+      // Se não for um email, trata como um telefone
+      // Limpa todos os caracteres não numéricos
+      let telefoneSanitizado = identificador.replace(/\D/g, '');
+
+      // ✅ 2. Lógica "inteligente" para números brasileiros
+      // Se o número tiver 10 ou 11 dígitos (DDD + Número) E NÃO começar com 55...
+      if ((telefoneSanitizado.length === 10 || telefoneSanitizado.length === 11) && !telefoneSanitizado.startsWith('55')) {
+        // ...adiciona o código do Brasil '55' no início.
+        telefoneSanitizado = '55' + telefoneSanitizado;
+      }
+      telefoneParaBusca = telefoneSanitizado;
+    }
+
+    // ✅ 3. Executa a busca no banco com os valores preparados
+    const sql = 'SELECT * FROM usuarios WHERE email = ? OR telefone = ?';
+    const [rows] = await db.query(sql, [emailParaBusca, telefoneParaBusca]);
     const usuario = rows[0];
 
     if (!usuario) {
-      return res.status(401).json({ message: 'Email ou senha inválidos.' });
+      return res.status(401).json({ message: 'Credenciais inválidas.' });
     }
 
-    //2. Comparar a senha enviada com a senha criptografada
+    // O resto da função continua igual...
     const senhaValida = await bcrypt.compare(senha, usuario.senha_hash);
-
     if (!senhaValida) {
-      return res.status(401).json({ message: ' Email ou senha inválidos.' });
+      return res.status(401).json({ message: 'Credenciais inválidas.' });
     }
 
-    //# gerar o Tokent JWT
-    // O token contém os dados que queremos que ele carregue (payload)
-    // ✅ --- CORREÇÃO AQUI --- ✅
-    // Adicionamos mais informações ao payload do token
     const payload = {
       id: usuario.id,
       role: usuario.role,
@@ -77,16 +93,16 @@ exports.login = async (req, res) => {
       email: usuario.email,
       imagem_perfil_url: usuario.imagem_perfil_url,
     };
-
     const token = jwt.sign(
-      payload,                  // Use o novo payload completo
+      payload,
       process.env.JWT_SECRET,
       { expiresIn: '8h' }
     );
 
-    res.status(200).json({ message: 'login bem-sucedido!', token: token });
+    res.status(200).json({ message: 'Login bem-sucedido!', token: token });
 
   } catch (error) {
+    console.error("Erro no login do backend:", error);
     res.status(500).json({ message: 'Erro no servidor', error: error.message });
   }
 };
