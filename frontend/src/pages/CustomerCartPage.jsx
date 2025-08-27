@@ -5,7 +5,7 @@ import { useState } from 'react';
 import './CustomerCartPage.css';
 
 function CustomerCartPage() {
-  const { cartItems, removeFromCart, checkout } = useCart();
+  const { cartItems, removeFromCart, checkout, updateQuantity } = useCart();
   const navigate = useNavigate();
   
   const [formaPagamento, setFormaPagamento] = useState('Cartão de Crédito');
@@ -68,22 +68,28 @@ function CustomerCartPage() {
                   {cartItems.map(item => (
                     <tr key={item.produto_id}>
                       <td style={{ width: '120px' }}>
-                        <img 
-                          src={item.imagem_produto_url ? `http://localhost:3001/uploads/${item.imagem_produto_url}` : 'https://placehold.co/100'} 
-                          alt={item.nome}
-                          className="cart-product-image rounded"
-                        />
+                        <img src={item.imagem_produto_url ? `http://localhost:3001/uploads/${item.imagem_produto_url}` : 'https://placehold.co/100'} alt={item.nome} className="cart-product-image rounded" />
                       </td>
                       <td>{item.nome}</td>
                       <td className="text-center">R$ {parseFloat(item.valor).toFixed(2).replace('.', ',')}</td>
-                      <td className="text-center">{item.quantidade}</td>
+                      
+                      {/* ✅ CÉLULA DE QUANTIDADE ATUALIZADA */}
+                      <td className="text-center">
+                        <div className="input-group input-group-sm justify-content-center" style={{ width: '100px', margin: 'auto' }}>
+                          <button className="btn btn-outline-secondary" type="button" onClick={() => updateQuantity(item.produto_id, item.quantidade - 1)}>
+                            -
+                          </button>
+                          <span className="form-control text-center">{item.quantidade}</span>
+                          <button className="btn btn-outline-secondary" type="button" onClick={() => updateQuantity(item.produto_id, item.quantidade + 1)} disabled={item.quantidade >= item.estoque}>
+                            +
+                          </button>
+                        </div>
+                        <small className="text-muted d-block mt-1">Estoque: {item.estoque}</small>
+                      </td>
+
                       <td className="text-end">R$ {(parseFloat(item.valor) * item.quantidade).toFixed(2).replace('.', ',')}</td>
                       <td className="text-center">
-                        <button 
-                          className="btn btn-outline-danger btn-sm"
-                          title="Remover item"
-                          onClick={() => removeFromCart(item.produto_id)}
-                        >
+                        <button className="btn btn-outline-danger btn-sm" title="Remover item" onClick={() => removeFromCart(item.produto_id)}>
                           &times;
                         </button>
                       </td>

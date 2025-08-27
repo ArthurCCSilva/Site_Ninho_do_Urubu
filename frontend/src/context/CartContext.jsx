@@ -87,8 +87,27 @@ export function CartProvider({ children }) {
     }
   };
 
+  const updateQuantity = async (produto_id, quantidade) => {
+    // Se a quantidade for 0 ou menos, remove o item
+    if (quantidade <= 0) {
+      removeFromCart(produto_id);
+      return;
+    }
+    try {
+      await api.put('/api/carrinho', { produto_id, quantidade }, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      fetchCartItems(); // Re-busca os itens para atualizar o estado
+    } catch (error) {
+      console.error("Falha ao atualizar a quantidade", error);
+      alert(error.response?.data?.message || 'Não foi possível atualizar a quantidade.');
+      // Opcional: Re-buscar os itens mesmo em caso de erro para sincronizar com o backend
+      fetchCartItems();
+    }
+  };
+
   return (
-    <CartContext.Provider value={{ cartItems, addToCart, removeFromCart, checkout }}>
+    <CartContext.Provider value={{ cartItems, addToCart, removeFromCart, checkout, updateQuantity }}>
       {children}
     </CartContext.Provider>
   );

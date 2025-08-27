@@ -9,6 +9,7 @@ router.use(verifyToken);
 
 router.get('/', carrinhoController.getItensCarrinho);
 router.post('/', carrinhoController.adicionarItemCarrinho);
+router.put('/', carrinhoController.updateItemCarrinho);
 router.delete('/:produtoId', carrinhoController.removerItemCarrinho);
 
 module.exports = router;

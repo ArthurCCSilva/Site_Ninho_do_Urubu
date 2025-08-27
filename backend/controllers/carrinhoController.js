@@ -3,8 +3,9 @@ const db = require('../db');
 
 // GET /api/carrinho - Busca os itens do carrinho do usuário logado
 exports.getItensCarrinho = async (req, res) => {
-  const usuarioId = req.user.id; // Vem do token (middleware verifyToken)
+  const usuarioId = req.user.id;
   try {
+    // ✅ ADICIONADO 'p.estoque' à seleção
     const sql = `
       SELECT ci.produto_id, ci.quantidade, p.nome, p.valor, p.imagem_produto_url, p.estoque
       FROM carrinho_itens ci
@@ -15,6 +16,40 @@ exports.getItensCarrinho = async (req, res) => {
     res.status(200).json(itens);
   } catch (error) {
     res.status(500).json({ message: 'Erro ao buscar itens do carrinho.', error: error.message });
+  }
+};
+
+exports.updateItemCarrinho = async (req, res) => {
+  const usuarioId = req.user.id;
+  const { produto_id, quantidade } = req.body;
+
+  // Validação: a quantidade não pode ser menor que 1
+  if (quantidade < 1) {
+    return res.status(400).json({ message: 'A quantidade não pode ser menor que 1.' });
+  }
+
+  try {
+    // Verifica o estoque disponível para o produto
+    const [produtos] = await db.query('SELECT estoque FROM produtos WHERE id = ?', [produto_id]);
+    if (produtos.length === 0) {
+      return res.status(404).json({ message: 'Produto não encontrado.' });
+    }
+    
+    const estoqueDisponivel = produtos[0].estoque;
+    if (quantidade > estoqueDisponivel) {
+      return res.status(400).json({ message: `Estoque insuficiente. Apenas ${estoqueDisponivel} unidades disponíveis.` });
+    }
+
+    // Se passou nas verificações, atualiza a quantidade no carrinho
+    await db.query(
+      'UPDATE carrinho_itens SET quantidade = ? WHERE usuario_id = ? AND produto_id = ?',
+      [quantidade, usuarioId, produto_id]
+    );
+    
+    res.status(200).json({ message: 'Quantidade atualizada com sucesso!' });
+
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao atualizar a quantidade do item.', error: error.message });
   }
 };
 
