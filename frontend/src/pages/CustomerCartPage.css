@@ -4,3 +4,38 @@
   height: 100px;
   object-fit: cover;
 }
+
+/* ✅ NOVOS ESTILOS PARA A VERSÃO MOBILE */
+.cart-item-mobile {
+  display: flex;
+  padding: 1rem 0;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.cart-item-mobile:last-child {
+  border-bottom: none;
+}
+
+.cart-item-mobile-img {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.cart-item-mobile-details {
+  flex-grow: 1;
+  padding-left: 1rem;
+}
+
+.cart-item-mobile-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.5rem;
+}
+
+.cart-quantity-controls {
+  display: flex;
+  align-items: center;
+}

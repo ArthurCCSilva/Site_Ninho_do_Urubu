@@ -1,5 +1,7 @@
 // backend/controllers/produtosController.js
 const db = require('../db');
+const fs = require('fs').promises;
+const path = require('path');
 
 // --- Função Principal para buscar produtos (com filtros, join, ordenação e paginação) ---
 exports.getAllProdutos = async (req, res) => {
@@ -111,23 +113,34 @@ exports.updateProduto = async (req, res) => {
   try {
     const { id } = req.params;
     const { nome, descricao, valor, categoria_id, estoque, destaque, promocao } = req.body;
-    const imagem_produto_url = req.file ? req.file.filename : null;
-
+    
+    const [produtosAtuais] = await db.query('SELECT imagem_produto_url FROM produtos WHERE id = ?', [id]);
+    if (produtosAtuais.length === 0) {
+      return res.status(404).json({ message: 'Produto não encontrado.' });
+    }
+    const imagemAntiga = produtosAtuais[0].imagem_produto_url;
+    
+    const imagem_produto_url = req.file ? req.file.filename : imagemAntiga;
+    
     const isDestaque = destaque === 'true' ? 1 : 0;
     const isPromocao = promocao === 'true' ? 1 : 0;
 
-    let sql = 'UPDATE produtos SET nome = ?, descricao = ?, valor = ?, categoria_id = ?, estoque = ?, destaque = ?, promocao = ?';
-    const params = [nome, descricao, valor, categoria_id, estoque, isDestaque, isPromocao];
-    if (imagem_produto_url) {
-      sql += ', imagem_produto_url = ?';
-      params.push(imagem_produto_url);
+    const sql = `UPDATE produtos SET nome = ?, descricao = ?, valor = ?, categoria_id = ?, estoque = ?, destaque = ?, promocao = ?, imagem_produto_url = ? WHERE id = ?`;
+    const params = [nome, descricao, valor, categoria_id, estoque, isDestaque, isPromocao, imagem_produto_url, id];
+
+    await db.query(sql, params);
+
+    if (req.file && imagemAntiga) {
+      // ✅ CORREÇÃO DO CAMINHO AQUI
+      const caminhoImagemAntiga = path.join(__dirname, '..', 'uploads', imagemAntiga);
+      try {
+        await fs.unlink(caminhoImagemAntiga);
+        console.log(`Imagem antiga de produto ${imagemAntiga} deletada.`);
+      } catch (fileErr) {
+        console.error("Erro ao deletar a imagem antiga do produto:", fileErr.code);
+      }
     }
-    sql += ' WHERE id = ?';
-    params.push(id);
-    const [result] = await db.query(sql, params);
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: 'Produto não encontrado.' });
-    }
+
     res.status(200).json({ message: 'Produto atualizado com sucesso!' });
   } catch (error) {
     res.status(500).json({ message: 'Erro ao atualizar produto.', error: error.message });
@@ -138,10 +151,26 @@ exports.updateProduto = async (req, res) => {
 exports.deleteProduto = async (req, res) => {
   try {
     const { id } = req.params;
-    const [result] = await db.query('DELETE FROM produtos WHERE id = ?', [id]);
-    if (result.affectedRows === 0) {
+
+    const [produtos] = await db.query('SELECT imagem_produto_url FROM produtos WHERE id = ?', [id]);
+    if (produtos.length === 0) {
       return res.status(404).json({ message: 'Produto não encontrado.' });
     }
+    const imagemUrl = produtos[0].imagem_produto_url;
+
+    await db.query('DELETE FROM produtos WHERE id = ?', [id]);
+
+    if (imagemUrl) {
+      // ✅ CORREÇÃO DO CAMINHO AQUI
+      const caminhoImagem = path.join(__dirname, '..', 'uploads', imagemUrl);
+      try {
+        await fs.unlink(caminhoImagem);
+        console.log(`Arquivo de imagem ${imagemUrl} deletado com sucesso.`);
+      } catch (fileErr) {
+        console.error("Erro ao deletar o arquivo de imagem do produto:", fileErr.code);
+      }
+    }
+
     res.status(200).json({ message: 'Produto deletado com sucesso.' });
   } catch (error) {
     res.status(500).json({ message: 'Erro ao deletar produto.', error: error.message });
