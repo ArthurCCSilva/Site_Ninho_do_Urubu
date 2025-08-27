@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import api from '../services/api';
 import { Modal } from 'bootstrap';
 
-function OrderDetailsModal({ show, onHide, pedidoId, onBack }) { // ✅ RECEBE a nova prop 'onBack'
+function OrderDetailsModal({ show, onHide, pedidoId, onBack }) {
   const [pedido, setPedido] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -14,7 +14,7 @@ function OrderDetailsModal({ show, onHide, pedidoId, onBack }) { // ✅ RECEBE a
       const fetchDetalhesPedido = async () => {
         setLoading(true);
         setError('');
-        setPedido(null); // Limpa dados antigos
+        setPedido(null);
         try {
           const response = await api.get(`/api/pedidos/${pedidoId}`);
           setPedido(response.data);
@@ -53,6 +53,14 @@ function OrderDetailsModal({ show, onHide, pedidoId, onBack }) { // ✅ RECEBE a
               <div>
                 <p><strong>Data:</strong> {new Date(pedido.data_pedido).toLocaleDateString('pt-BR')}</p>
                 <p><strong>Status:</strong> {pedido.status}</p>
+                <p><strong>Pagamento:</strong> {pedido.forma_pagamento || 'Não informado'}</p>
+                
+                {pedido.local_entrega && (
+                  <div className="mt-3">
+                    <strong>Local de Entrega:</strong>
+                    <p className="bg-light p-2 rounded" style={{ whiteSpace: 'pre-wrap' }}>{pedido.local_entrega}</p>
+                  </div>
+                )}
                 
                 <h6 className="mt-4">Itens do Pedido:</h6>
                 <ul className="list-group">
@@ -82,11 +90,12 @@ function OrderDetailsModal({ show, onHide, pedidoId, onBack }) { // ✅ RECEBE a
               </div>
             )}
           </div>
-          {/* ✅ ADICIONA o botão "Voltar" no rodapé */}
           <div className="modal-footer justify-content-between">
-            <button type="button" className="btn btn-secondary" onClick={onBack}>
-              &larr; Voltar para Ações 
-            </button>
+            {onBack && 
+              <button type="button" className="btn btn-secondary" onClick={onBack}>
+                &larr; Voltar para Ações 
+              </button>
+            }
             <button type="button" className="btn btn-primary" onClick={onHide}>
               Fechar
             </button>

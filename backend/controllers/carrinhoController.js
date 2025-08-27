@@ -6,7 +6,7 @@ exports.getItensCarrinho = async (req, res) => {
   const usuarioId = req.user.id; // Vem do token (middleware verifyToken)
   try {
     const sql = `
-      SELECT ci.produto_id, ci.quantidade, p.nome, p.valor, p.imagem_produto_url
+      SELECT ci.produto_id, ci.quantidade, p.nome, p.valor, p.imagem_produto_url, p.estoque
       FROM carrinho_itens ci
       JOIN produtos p ON ci.produto_id = p.id
       WHERE ci.usuario_id = ?

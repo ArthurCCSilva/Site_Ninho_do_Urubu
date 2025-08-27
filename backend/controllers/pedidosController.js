@@ -4,45 +4,30 @@ const db = require('../db');
 // POST /api/pedidos - Cria um novo pedido a partir do carrinho do usuário
 exports.criarPedido = async (req, res) => {
   const usuarioId = req.user.id;
+  const { forma_pagamento, local_entrega } = req.body;
   const connection = await db.getConnection();
-
   try {
     await connection.beginTransaction();
-
-    // ✅ CORREÇÃO AQUI: Adicionado 'p.nome' à seleção de colunas
-    const [itensCarrinho] = await connection.query(
-      `SELECT ci.produto_id, ci.quantidade, p.nome, p.valor, p.estoque 
-       FROM carrinho_itens ci 
-       JOIN produtos p ON ci.produto_id = p.id 
-       WHERE ci.usuario_id = ?`,
-      [usuarioId]
-    );
-
+    if (!local_entrega || !forma_pagamento) { throw new Error('Forma de pagamento e local de entrega são obrigatórios.'); }
+    const [itensCarrinho] = await connection.query(`SELECT ci.produto_id, ci.quantidade, p.nome, p.valor, p.estoque FROM carrinho_itens ci JOIN produtos p ON ci.produto_id = p.id WHERE ci.usuario_id = ?`, [usuarioId]);
     if (itensCarrinho.length === 0) {
       await connection.rollback();
       return res.status(400).json({ message: 'O carrinho está vazio.' });
     }
-
     let valorTotal = 0;
     for (const item of itensCarrinho) {
-      if (item.quantidade > item.estoque) {
-        throw new Error(`Estoque insuficiente para o produto: ${item.nome}`);
-      }
+      if (item.quantidade > item.estoque) { throw new Error(`Estoque insuficiente para o produto: ${item.nome}`); }
       valorTotal += item.quantidade * item.valor;
     }
-
-    const [resultadoPedido] = await connection.query('INSERT INTO pedidos (usuario_id, valor_total) VALUES (?, ?)', [usuarioId, valorTotal]);
+    const [resultadoPedido] = await connection.query('INSERT INTO pedidos (usuario_id, valor_total, forma_pagamento, local_entrega) VALUES (?, ?, ?, ?)', [usuarioId, valorTotal, forma_pagamento, local_entrega]);
     const pedidoId = resultadoPedido.insertId;
-
     for (const item of itensCarrinho) {
       await connection.query('INSERT INTO pedido_itens (pedido_id, produto_id, quantidade, preco_unitario) VALUES (?, ?, ?, ?)', [pedidoId, item.produto_id, item.quantidade, item.valor]);
       await connection.query('UPDATE produtos SET estoque = estoque - ? WHERE id = ?', [item.quantidade, item.produto_id]);
     }
-    
     await connection.query('DELETE FROM carrinho_itens WHERE usuario_id = ?', [usuarioId]);
     await connection.commit();
     res.status(201).json({ message: 'Pedido criado com sucesso!', pedidoId });
-
   } catch (error) {
     await connection.rollback();
     res.status(500).json({ message: `Erro ao criar pedido: ${error.message}` });

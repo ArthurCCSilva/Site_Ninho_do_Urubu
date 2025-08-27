@@ -1,34 +1,40 @@
 // src/pages/CustomerCartPage.jsx
 import { useCart } from '../context/CartContext';
 import { Link, useNavigate } from 'react-router-dom';
-import './CustomerCartPage.css'; // Importa nosso CSS customizado
+import { useState } from 'react';
+import './CustomerCartPage.css';
 
 function CustomerCartPage() {
-  // 1. Pega os itens e as funções do nosso CartContext
   const { cartItems, removeFromCart, checkout } = useCart();
-  const navigate = useNavigate(); // Hook para navegação
+  const navigate = useNavigate();
+  
+  const [formaPagamento, setFormaPagamento] = useState('Cartão de Crédito');
+  const [localEntrega, setLocalEntrega] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  // 2. Lógica para calcular o total do carrinho
-  // O método .reduce() soma os valores de um array.
-  // Para cada 'item', ele multiplica 'valor' pela 'quantidade' e soma ao total acumulado.
   const totalCarrinho = cartItems.reduce((total, item) => {
     return total + (item.valor * item.quantidade);
-  }, 0); // O '0' é o valor inicial do total.
+  }, 0);
 
-  // 3. Função para lidar com a finalização da compra
   const handleCheckout = async () => {
+    if (!localEntrega.trim()) {
+      alert('Por favor, preencha o local de entrega.');
+      return;
+    }
     if (window.confirm('Deseja confirmar a compra?')) {
+      setLoading(true);
       try {
-        const novoPedido = await checkout();
+        const novoPedido = await checkout(formaPagamento, localEntrega);
         alert(`Compra finalizada com sucesso! Pedido #${novoPedido.pedidoId}`);
-        navigate('/meus-pedidos'); // Redireciona para a nova página de pedidos
+        navigate('/meus-pedidos');
       } catch (err) {
-        alert(err.response?.data?.message || 'Não foi possível finalizar a compra. Verifique o estoque dos produtos.');
+        alert(err.response?.data?.message || 'Não foi possível finalizar a compra.');
+      } finally {
+        setLoading(false);
       }
     }
   };
 
-  // 4. Lógica para lidar com o carrinho vazio
   if (cartItems.length === 0) {
     return (
       <div className="text-center mt-5">
@@ -41,12 +47,10 @@ function CustomerCartPage() {
     );
   }
 
-  // 5. Se o carrinho não estiver vazio, mostra a tabela de itens e o resumo
   return (
     <div>
       <h1 className="mb-4">Meu Carrinho</h1>
       <div className="row">
-        {/* Coluna da esquerda com a lista de produtos */}
         <div className="col-lg-8 mb-4">
           <div className="card">
             <div className="card-body">
@@ -90,25 +94,44 @@ function CustomerCartPage() {
             </div>
           </div>
         </div>
-
-        {/* Coluna da direita com o resumo e o botão de finalizar */}
         <div className="col-lg-4">
           <div className="card">
             <div className="card-body">
-              <h5 className="card-title">Resumo da Compra</h5>
+              <h5 className="card-title">Finalizar Pedido</h5>
               <hr />
-              <div className="d-flex justify-content-between">
-                <span>Subtotal</span>
-                <span>R$ {totalCarrinho.toFixed(2).replace('.', ',')}</span>
+              <div className="mb-3">
+                <label htmlFor="local-entrega" className="form-label">Local de Entrega</label>
+                <textarea 
+                  id="local-entrega"
+                  className="form-control"
+                  rows="3"
+                  placeholder="Ex: Rua Exemplo, 123, Bairro, Cidade - RJ, CEP: 20000-000"
+                  value={localEntrega}
+                  onChange={(e) => setLocalEntrega(e.target.value)}
+                  required
+                ></textarea>
               </div>
-              {/* Espaço para futuras adições como frete ou descontos */}
-              <div className="d-flex justify-content-between fw-bold mt-3 border-top pt-3">
+              <div className="mb-3">
+                <label htmlFor="forma-pagamento" className="form-label">Forma de Pagamento</label>
+                <select 
+                  id="forma-pagamento" 
+                  className="form-select"
+                  value={formaPagamento}
+                  onChange={(e) => setFormaPagamento(e.target.value)}
+                >
+                  <option value="Cartão de Crédito">Cartão de Crédito</option>
+                  <option value="Cartão de Débito">Cartão de Débito</option>
+                  <option value="PIX">PIX</option>
+                </select>
+              </div>
+              <hr />
+              <div className="d-flex justify-content-between fw-bold mt-2 fs-5">
                 <span>Total</span>
                 <span>R$ {totalCarrinho.toFixed(2).replace('.', ',')}</span>
               </div>
               <div className="d-grid mt-4">
-                <button className="btn btn-success btn-lg" onClick={handleCheckout}>
-                  Finalizar Compra
+                <button className="btn btn-success btn-lg" onClick={handleCheckout} disabled={loading}>
+                  {loading ? 'Processando...' : 'Finalizar Compra'}
                 </button>
               </div>
             </div>
