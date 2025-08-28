@@ -84,9 +84,25 @@ function OrderDetailsModal({ show, onHide, pedidoId, onBack }) {
                     </li>
                   ))}
                 </ul>
-                <div className="text-end fw-bold fs-5 mt-3">
-                  Total: R$ {parseFloat(pedido.valor_total).toFixed(2).replace('.', ',')}
-                </div>
+
+                <hr className="my-3"/>
+                
+                {/* ✅ SEÇÃO DE TROCO (SÓ APARECE SE FOR PAGAMENTO EM DINHEIRO) */}
+                {pedido.forma_pagamento === 'Dinheiro' && pedido.valor_pago_cliente && (
+                  <div className="alert alert-info">
+                    <div className="d-flex justify-content-between">
+                      <span>Cliente pagará com:</span>
+                      <span>R$ {parseFloat(pedido.valor_pago_cliente).toFixed(2).replace('.', ',')}</span>
+                    </div>
+                    <hr/>
+                    <div className="d-flex justify-content-between fw-bold">
+                      <span>Levar troco de:</span>
+                      <span>R$ {(pedido.valor_pago_cliente - pedido.valor_total).toFixed(2).replace('.', ',')}</span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="text-end fw-bold fs-5 mt-3">Total do Pedido: R$ {parseFloat(pedido.valor_total).toFixed(2).replace('.', ',')}</div>
               </div>
             )}
           </div>

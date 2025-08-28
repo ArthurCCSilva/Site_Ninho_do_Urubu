@@ -7,7 +7,7 @@ exports.getItensCarrinho = async (req, res) => {
   try {
     // ✅ ADICIONADO 'p.estoque' à seleção
     const sql = `
-      SELECT ci.produto_id, ci.quantidade, p.nome, p.valor, p.imagem_produto_url, p.estoque
+      SELECT ci.produto_id, ci.quantidade, p.nome, p.valor, p.imagem_produto_url, p.estoque_total as estoque
       FROM carrinho_itens ci
       JOIN produtos p ON ci.produto_id = p.id
       WHERE ci.usuario_id = ?
@@ -29,18 +29,17 @@ exports.updateItemCarrinho = async (req, res) => {
   }
 
   try {
-    // Verifica o estoque disponível para o produto
-    const [produtos] = await db.query('SELECT estoque FROM produtos WHERE id = ?', [produto_id]);
+    // ✅ CORREÇÃO AQUI: Usa 'estoque_total' para verificar o estoque
+    const [produtos] = await db.query('SELECT estoque_total FROM produtos WHERE id = ?', [produto_id]);
     if (produtos.length === 0) {
       return res.status(404).json({ message: 'Produto não encontrado.' });
     }
     
-    const estoqueDisponivel = produtos[0].estoque;
+    const estoqueDisponivel = produtos[0].estoque_total;
     if (quantidade > estoqueDisponivel) {
       return res.status(400).json({ message: `Estoque insuficiente. Apenas ${estoqueDisponivel} unidades disponíveis.` });
     }
 
-    // Se passou nas verificações, atualiza a quantidade no carrinho
     await db.query(
       'UPDATE carrinho_itens SET quantidade = ? WHERE usuario_id = ? AND produto_id = ?',
       [quantidade, usuarioId, produto_id]

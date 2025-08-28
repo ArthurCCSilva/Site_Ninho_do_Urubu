@@ -4,27 +4,36 @@ const db = require('../db');
 // POST /api/pedidos - Cria um novo pedido a partir do carrinho do usuário
 exports.criarPedido = async (req, res) => {
   const usuarioId = req.user.id;
-  const { forma_pagamento, local_entrega } = req.body;
+  const { forma_pagamento, local_entrega, valor_pago_cliente } = req.body;
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
-    if (!local_entrega || !forma_pagamento) { throw new Error('Forma de pagamento e local de entrega são obrigatórios.'); }
-    const [itensCarrinho] = await connection.query(`SELECT ci.produto_id, ci.quantidade, p.nome, p.valor, p.estoque FROM carrinho_itens ci JOIN produtos p ON ci.produto_id = p.id WHERE ci.usuario_id = ?`, [usuarioId]);
-    if (itensCarrinho.length === 0) {
-      await connection.rollback();
-      return res.status(400).json({ message: 'O carrinho está vazio.' });
+
+    if (!local_entrega || !forma_pagamento) {
+      throw new Error('Forma de pagamento e local de entrega são obrigatórios.');
     }
+
+    const [itensCarrinho] = await connection.query(`SELECT ci.produto_id, ci.quantidade, p.nome, p.valor, p.estoque_total, p.custo_medio_ponderado FROM carrinho_itens ci JOIN produtos p ON ci.produto_id = p.id WHERE ci.usuario_id = ?`, [usuarioId]);
+    if (itensCarrinho.length === 0) { throw new Error('O carrinho está vazio.'); }
+
     let valorTotal = 0;
     for (const item of itensCarrinho) {
-      if (item.quantidade > item.estoque) { throw new Error(`Estoque insuficiente para o produto: ${item.nome}`); }
+      if (item.quantidade > item.estoque_total) { throw new Error(`Estoque insuficiente para o produto: ${item.nome}`); }
       valorTotal += item.quantidade * item.valor;
     }
-    const [resultadoPedido] = await connection.query('INSERT INTO pedidos (usuario_id, valor_total, forma_pagamento, local_entrega) VALUES (?, ?, ?, ?)', [usuarioId, valorTotal, forma_pagamento, local_entrega]);
+
+    const [resultadoPedido] = await connection.query(
+      'INSERT INTO pedidos (usuario_id, valor_total, forma_pagamento, local_entrega, valor_pago_cliente) VALUES (?, ?, ?, ?, ?)',
+      [usuarioId, valorTotal, forma_pagamento, local_entrega, valor_pago_cliente || null]
+    );
     const pedidoId = resultadoPedido.insertId;
+
     for (const item of itensCarrinho) {
-      await connection.query('INSERT INTO pedido_itens (pedido_id, produto_id, quantidade, preco_unitario) VALUES (?, ?, ?, ?)', [pedidoId, item.produto_id, item.quantidade, item.valor]);
-      await connection.query('UPDATE produtos SET estoque = estoque - ? WHERE id = ?', [item.quantidade, item.produto_id]);
+      const novoCustoTotalInventario = item.custo_medio_ponderado * (item.estoque_total - item.quantidade);
+      await connection.query('INSERT INTO pedido_itens (pedido_id, produto_id, quantidade, preco_unitario, custo_unitario) VALUES (?, ?, ?, ?, ?)', [pedidoId, item.produto_id, item.quantidade, item.valor, item.custo_medio_ponderado]);
+      await connection.query('UPDATE produtos SET estoque_total = estoque_total - ?, custo_total_inventario = ? WHERE id = ?', [item.quantidade, novoCustoTotalInventario, item.produto_id]);
     }
+    
     await connection.query('DELETE FROM carrinho_itens WHERE usuario_id = ?', [usuarioId]);
     await connection.commit();
     res.status(201).json({ message: 'Pedido criado com sucesso!', pedidoId });
@@ -77,19 +86,76 @@ exports.cancelarPedido = async (req, res) => {
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
+    
+    // 1. Busca os itens do pedido que será cancelado
     const [itensDoPedido] = await connection.query('SELECT produto_id, quantidade FROM pedido_itens WHERE pedido_id = ?', [pedidoId]);
+
+    // 2. Devolve cada item ao estoque
     for (const item of itensDoPedido) {
-      await connection.query('UPDATE produtos SET estoque = estoque + ? WHERE id = ?', [item.quantidade, item.produto_id]);
+      // ✅ CORREÇÃO AQUI: de 'estoque' para 'estoque_total'
+      await connection.query(
+        'UPDATE produtos SET estoque_total = estoque_total + ? WHERE id = ?',
+        [item.quantidade, item.produto_id]
+      );
     }
+
+    // 3. Atualiza o status do pedido
     const [result] = await connection.query("UPDATE pedidos SET status = 'Cancelado', cancelado_por = 'cliente' WHERE id = ? AND usuario_id = ? AND status = 'Processando'", [pedidoId, usuarioId]);
     if (result.affectedRows === 0) {
       throw new Error('Pedido não pode ser cancelado.');
     }
+    
     await connection.commit();
     res.status(200).json({ message: 'Pedido cancelado com sucesso e itens devolvidos ao estoque.' });
+
   } catch (error) {
     await connection.rollback();
     res.status(500).json({ message: 'Erro ao cancelar pedido.', error: error.message });
+  } finally {
+    connection.release();
+  }
+};
+
+// PATCH /api/pedidos/:id/cancelar-admin - Admin cancela um pedido
+exports.cancelarPedidoAdmin = async (req, res) => {
+  const { id: pedidoId } = req.params;
+  const { motivo } = req.body;
+  const connection = await db.getConnection();
+  if (!motivo) {
+    return res.status(400).json({ message: 'O motivo do cancelamento é obrigatório.' });
+  }
+  try {
+    await connection.beginTransaction();
+    
+    // 1. Busca o status atual e o telefone
+    const [pedidosAtuais] = await connection.query('SELECT status, u.telefone FROM pedidos p JOIN usuarios u ON p.usuario_id = u.id WHERE p.id = ?', [pedidoId]);
+    if (pedidosAtuais.length === 0) { throw new Error('Pedido não encontrado.'); }
+    if (pedidosAtuais[0].status === 'Cancelado') {
+      throw new Error('Este pedido já está cancelado.');
+    }
+    
+    // 2. Busca os itens do pedido
+    const [itensDoPedido] = await connection.query('SELECT produto_id, quantidade FROM pedido_itens WHERE pedido_id = ?', [pedidoId]);
+    
+    // 3. Devolve cada item ao estoque
+    for (const item of itensDoPedido) {
+      // ✅ CORREÇÃO AQUI: de 'estoque' para 'estoque_total'
+      await connection.query(
+        'UPDATE produtos SET estoque_total = estoque_total + ? WHERE id = ?', 
+        [item.quantidade, item.produto_id]
+      );
+    }
+
+    // 4. Atualiza o status do pedido
+    await connection.query("UPDATE pedidos SET status = 'Cancelado', cancelado_por = 'admin' WHERE id = ?", [pedidoId]);
+    
+    // Simulação de notificação via WhatsApp
+    console.log(`SIMULAÇÃO WHATSAPP para ${pedidosAtuais[0].telefone}: Pedido #${pedidoId} cancelado. Motivo: ${motivo}`);
+    await connection.commit();
+    res.status(200).json({ message: 'Pedido cancelado e itens devolvidos ao estoque.' });
+  } catch (error) {
+    await connection.rollback();
+    res.status(500).json({ message: `Erro ao cancelar pedido: ${error.message}` });
   } finally {
     connection.release();
   }
@@ -154,19 +220,25 @@ exports.updateStatusPedido = async (req, res) => {
         if (statusAtual === 'Cancelado') {
             const [itensDoPedido] = await connection.query('SELECT produto_id, quantidade FROM pedido_itens WHERE pedido_id = ?', [pedidoId]);
             for (const item of itensDoPedido) {
-                const [produto] = await connection.query('SELECT estoque FROM produtos WHERE id = ?', [item.produto_id]);
-                if (produto[0].estoque < item.quantidade) {
+                const [produto] = await connection.query('SELECT estoque_total FROM produtos WHERE id = ?', [item.produto_id]);
+                if (produto[0].estoque_total < item.quantidade) {
                     throw new Error(`Estoque insuficiente para reativar o pedido (produto ID: ${item.produto_id}).`);
                 }
             }
             for (const item of itensDoPedido) {
-                await connection.query('UPDATE produtos SET estoque = estoque - ? WHERE id = ?', [item.quantidade, item.produto_id]);
+                await connection.query('UPDATE produtos SET estoque_total = estoque_total - ? WHERE id = ?', [item.quantidade, item.produto_id]);
             }
         }
         let sql = 'UPDATE pedidos SET status = ?, cancelado_por = NULL';
         const params = [novoStatus];
-        if (novoStatus === 'Entregue') { sql += ', data_entrega = NOW()'; } 
-        else { sql += ', data_entrega = NULL'; }
+
+        // ✅ LÓGICA ATUALIZADA
+        if (novoStatus === 'Entregue') { 
+          sql += ', data_entrega = NOW()'; // Define a data de entrega
+        } else { 
+          sql += ', data_entrega = NULL'; // Limpa a data de entrega para outros status
+        }
+
         sql += ' WHERE id = ?';
         params.push(pedidoId);
         await connection.query(sql, params);
@@ -180,26 +252,25 @@ exports.updateStatusPedido = async (req, res) => {
     }
 };
 
-// PATCH /api/pedidos/:id/cancelar-admin - Admin cancela um pedido
+// --- ✅ FUNÇÃO DE CANCELAMENTO PELO ADMIN CORRIGIDA --- ✅
 exports.cancelarPedidoAdmin = async (req, res) => {
     const { id: pedidoId } = req.params;
     const { motivo } = req.body;
     const connection = await db.getConnection();
-    if (!motivo) {
-        return res.status(400).json({ message: 'O motivo do cancelamento é obrigatório.' });
-    }
+    if (!motivo) { return res.status(400).json({ message: 'O motivo do cancelamento é obrigatório.' }); }
     try {
         await connection.beginTransaction();
         const [pedidosAtuais] = await connection.query('SELECT status, u.telefone FROM pedidos p JOIN usuarios u ON p.usuario_id = u.id WHERE p.id = ?', [pedidoId]);
         if (pedidosAtuais.length === 0) { throw new Error('Pedido não encontrado.'); }
-        if (pedidosAtuais[0].status === 'Cancelado') {
-            throw new Error('Este pedido já está cancelado.');
-        }
+        if (pedidosAtuais[0].status === 'Cancelado') { throw new Error('Este pedido já está cancelado.'); }
         const [itensDoPedido] = await connection.query('SELECT produto_id, quantidade FROM pedido_itens WHERE pedido_id = ?', [pedidoId]);
         for (const item of itensDoPedido) {
-            await connection.query('UPDATE produtos SET estoque = estoque + ? WHERE id = ?', [item.quantidade, item.produto_id]);
+            await connection.query('UPDATE produtos SET estoque_total = estoque_total + ? WHERE id = ?', [item.quantidade, item.produto_id]);
         }
-        await connection.query("UPDATE pedidos SET status = 'Cancelado', cancelado_por = 'admin' WHERE id = ?", [pedidoId]);
+
+        // ✅ LÓGICA ATUALIZADA: Define status, quem cancelou E limpa a data de entrega
+        await connection.query("UPDATE pedidos SET status = 'Cancelado', cancelado_por = 'admin', data_entrega = NULL WHERE id = ?", [pedidoId]);
+        
         console.log(`SIMULAÇÃO WHATSAPP para ${pedidosAtuais[0].telefone}: Pedido #${pedidoId} cancelado. Motivo: ${motivo}`);
         await connection.commit();
         res.status(200).json({ message: 'Pedido cancelado e itens devolvidos ao estoque.' });
@@ -212,50 +283,52 @@ exports.cancelarPedidoAdmin = async (req, res) => {
 };
 
 exports.criarVendaFisica = async (req, res) => {
-  // O corpo da requisição enviará os itens e o ID do cliente 'Venda Balcão'
-  const { itens, usuario_id } = req.body;
+  const { itens, usuario_id, forma_pagamento } = req.body;
   const connection = await db.getConnection();
-
   try {
     await connection.beginTransaction();
 
     if (!itens || itens.length === 0) {
-      return res.status(400).json({ message: 'O carrinho local está vazio.' });
+      throw new Error('O carrinho local está vazio.');
     }
 
-    // Calcula o valor total e verifica o estoque
     let valorTotal = 0;
+    // 1. Verifica o estoque e calcula o valor total da venda
     for (const item of itens) {
-      const [produto] = await connection.query('SELECT valor, estoque FROM produtos WHERE id = ?', [item.produto_id]);
+      // Usa 'estoque_total' para a verificação
+      const [produto] = await connection.query('SELECT nome, valor, estoque_total FROM produtos WHERE id = ?', [item.produto_id]);
       if (produto.length === 0) throw new Error(`Produto com ID ${item.produto_id} não encontrado.`);
-      if (item.quantidade > produto[0].estoque) throw new Error(`Estoque insuficiente para o produto ID: ${item.produto_id}.`);
-      
+      if (item.quantidade > produto[0].estoque_total) throw new Error(`Estoque insuficiente para o produto ${produto[0].nome}.`);
       valorTotal += item.quantidade * produto[0].valor;
     }
-
-    // Cria o pedido já com o status 'Entregue'
+    
+    // 2. Cria o pedido na tabela 'pedidos'
     const [resultadoPedido] = await connection.query(
-      "INSERT INTO pedidos (usuario_id, valor_total, status, data_entrega) VALUES (?, ?, 'Entregue', NOW())",
-      [usuario_id, valorTotal]
+      "INSERT INTO pedidos (usuario_id, valor_total, status, data_entrega, forma_pagamento) VALUES (?, ?, 'Entregue', NOW(), ?)",
+      [usuario_id, valorTotal, forma_pagamento]
     );
     const pedidoId = resultadoPedido.insertId;
 
-    // Adiciona os itens ao pedido e atualiza o estoque
+    // 3. Adiciona os itens em 'pedido_itens' e atualiza o estoque/custo dos produtos
     for (const item of itens) {
-      const [produto] = await connection.query('SELECT valor FROM produtos WHERE id = ?', [item.produto_id]);
+      const [produto] = await connection.query('SELECT valor, estoque_total, custo_medio_ponderado FROM produtos WHERE id = ?', [item.produto_id]);
+      
+      // Adiciona o custo do item no momento da venda
       await connection.query(
-        'INSERT INTO pedido_itens (pedido_id, produto_id, quantidade, preco_unitario) VALUES (?, ?, ?, ?)',
-        [pedidoId, item.produto_id, item.quantidade, produto[0].valor]
+        'INSERT INTO pedido_itens (pedido_id, produto_id, quantidade, preco_unitario, custo_unitario) VALUES (?, ?, ?, ?, ?)',
+        [pedidoId, item.produto_id, item.quantidade, produto[0].valor, produto[0].custo_medio_ponderado]
       );
+      
+      // Recalcula o valor total do inventário e atualiza o estoque
+      const novoCustoTotalInventario = produto[0].custo_medio_ponderado * (produto[0].estoque_total - item.quantidade);
       await connection.query(
-        'UPDATE produtos SET estoque = estoque - ? WHERE id = ?',
-        [item.quantidade, item.produto_id]
+          'UPDATE produtos SET estoque_total = estoque_total - ?, custo_total_inventario = ? WHERE id = ?',
+          [item.quantidade, novoCustoTotalInventario, item.produto_id]
       );
     }
 
     await connection.commit();
     res.status(201).json({ message: 'Venda física registrada com sucesso!', pedidoId });
-
   } catch (error) {
     await connection.rollback();
     res.status(500).json({ message: `Erro ao registrar venda física: ${error.message}` });

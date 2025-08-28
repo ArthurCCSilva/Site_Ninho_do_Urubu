@@ -13,10 +13,11 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
     valor: '',
     categoria_id: null,
     estoque: '',
+    custo: '',
     destaque: false,
     promocao: false,
   };
-  
+
   const [formData, setFormData] = useState(initialState);
   const [imagemFile, setImagemFile] = useState(null); // Guarda o arquivo FINAL (já cortado)
   const [categories, setCategories] = useState([]);
@@ -52,12 +53,12 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
   useEffect(() => {
     if (show) {
       if (productToEdit) {
+        // MODO EDIÇÃO: Não inclui estoque ou custo, pois são gerenciados em outro lugar
         setFormData({
           nome: productToEdit.nome || '',
           descricao: productToEdit.descricao || '',
           valor: productToEdit.valor || '',
           categoria_id: productToEdit.categoria_id || null,
-          estoque: productToEdit.estoque || '',
           destaque: !!productToEdit.destaque,
           promocao: !!productToEdit.promocao,
         });
@@ -68,7 +69,7 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
       setError('');
     }
   }, [productToEdit, show]);
-  
+
   // Controla a exibição do modal do Bootstrap
   useEffect(() => {
     const modalElement = modalRef.current;
@@ -82,7 +83,7 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
   const handleCheckboxChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.checked });
   const handleCategoryChange = (selectedOption) => setFormData({ ...formData, categoria_id: selectedOption ? selectedOption.value : null });
-  
+
   // Abre o editor de imagem quando um arquivo é selecionado
   const handleFileSelect = (event) => {
     const file = event.target.files[0];
@@ -101,7 +102,7 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
     setImagemFile(croppedFile);
     setShowCropper(false);
     if (fileInputRef.current) {
-        fileInputRef.current.value = "";
+      fileInputRef.current.value = "";
     }
   };
 
@@ -145,8 +146,14 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
                 <div className="mb-3"><label className="form-label">Nome</label><input type="text" name="nome" value={formData.nome} onChange={handleChange} className="form-control" required /></div>
                 <div className="mb-3"><label className="form-label">Descrição</label><textarea rows="3" name="descricao" value={formData.descricao} onChange={handleChange} className="form-control" /></div>
                 <div className="row">
-                  <div className="col"><div className="mb-3"><label className="form-label">Valor</label><input type="number" step="0.01" name="valor" value={formData.valor} onChange={handleChange} className="form-control" required /></div></div>
-                  <div className="col"><div className="mb-3"><label className="form-label">Estoque</label><input type="number" name="estoque" value={formData.estoque} onChange={handleChange} className="form-control" required /></div></div>
+                  <div className="col"><div className="mb-3"><label className="form-label">Valor de Venda</label><input type="number" step="0.01" name="valor" value={formData.valor} onChange={handleChange} className="form-control" required /></div></div>
+                  {/* ✅ Estes campos só aparecem no modo "Adicionar Novo Produto" */}
+                  {!productToEdit && (
+                    <>
+                      <div className="col"><div className="mb-3"><label>Estoque Inicial</label><input type="number" name="estoque" value={formData.estoque} onChange={handleChange} required /></div></div>
+                      <div className="col"><div className="mb-3"><label>Custo/un. (R$)</label><input type="number" step="0.01" name="custo" value={formData.custo} onChange={handleChange} required /></div></div>
+                    </>
+                  )}
                 </div>
                 <div className="mb-3">
                   <label htmlFor="categoria_id" className="form-label">Categoria</label>
@@ -176,7 +183,7 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
         </div>
       </div>
 
-      <ImageCropperModal 
+      <ImageCropperModal
         show={showCropper}
         onHide={() => setShowCropper(false)}
         imageSrc={imageToCrop}

@@ -66,19 +66,17 @@ export function CartProvider({ children }) {
   };
   
   // Função de checkout (também envia o token diretamente)
-  const checkout = async (formaPagamento, localEntrega) => {
+  const checkout = async (formaPagamento, localEntrega, valorPago) => {
     if (!token) throw new Error("Usuário não autenticado.");
     try {
-      // Envia os novos dados no corpo da requisição
-      const response = await api.post('/api/pedidos', 
-        { 
-          forma_pagamento: formaPagamento,
-          local_entrega: localEntrega
-        }, 
-        {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }
-      );
+      const payload = { 
+        forma_pagamento: formaPagamento,
+        local_entrega: localEntrega,
+        valor_pago_cliente: valorPago 
+      };
+      const response = await api.post('/api/pedidos', payload, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       setCartItems([]);
       return response.data; 
     } catch (error) {

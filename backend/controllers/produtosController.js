@@ -3,16 +3,13 @@ const db = require('../db');
 const fs = require('fs').promises;
 const path = require('path');
 
-// --- Função Principal para buscar produtos (com filtros, join, ordenação e paginação) ---
+// getAllProdutos e getProdutoById não precisam de grandes alterações, apenas usar 'estoque_total'
 exports.getAllProdutos = async (req, res) => {
   try {
-    // ✅ CORREÇÃO: Adiciona 'destaque' à desestruturação para poder usá-lo
     const { search, category, sort, page = 1, limit = 12, destaque } = req.query;
-
     let baseSql = 'FROM produtos p LEFT JOIN categorias c ON p.categoria_id = c.id';
     let params = [];
     let conditions = [];
-
     if (search) {
       conditions.push('(p.nome LIKE ? OR p.descricao LIKE ?)');
       params.push(`%${search}%`, `%${search}%`);
@@ -21,27 +18,22 @@ exports.getAllProdutos = async (req, res) => {
       conditions.push('c.nome = ?');
       params.push(category);
     }
-    // Adiciona o filtro de destaque, se solicitado
     if (destaque === 'true') {
       conditions.push('p.destaque = TRUE');
     }
-    
     if (conditions.length > 0) {
       baseSql += ' WHERE ' + conditions.join(' AND ');
     }
-
     const countSql = `SELECT COUNT(p.id) as total ${baseSql}`;
     const [countRows] = await db.query(countSql, params);
     const totalItems = countRows[0].total;
-    // O limite para o cálculo deve ser um número
-    const numericLimit = parseInt(limit, 10);
+    const numericLimit = parseInt(limit) || 12;
     const totalPages = Math.ceil(totalItems / numericLimit);
-
     let sql = `SELECT p.*, c.nome AS categoria_nome ${baseSql}`;
     if (sort) {
       const allowedSorts = {
-        'price_asc': 'ORDER BY p.estoque ASC',
-        'price_desc': 'ORDER BY p.estoque DESC',
+        'stock_asc': 'ORDER BY p.estoque_total ASC',
+        'stock_desc': 'ORDER BY p.estoque_total DESC',
         'name_asc': 'ORDER BY p.nome ASC',
         'name_desc': 'ORDER BY p.nome DESC',
       };
@@ -51,20 +43,12 @@ exports.getAllProdutos = async (req, res) => {
     } else {
       sql += ' ORDER BY p.id DESC';
     }
-    
     const offset = (page - 1) * numericLimit;
     sql += ' LIMIT ? OFFSET ?';
     params.push(numericLimit, offset);
-    
     const [produtos] = await db.query(sql, params);
-
-    res.status(200).json({
-      produtos,
-      totalPages,
-      currentPage: parseInt(page)
-    });
+    res.status(200).json({ produtos, totalPages, currentPage: parseInt(page) });
   } catch (error) {
-    console.error('Erro ao buscar produtos com filtros:', error);
     res.status(500).json({ message: 'Erro ao buscar produtos.', error: error.message });
   }
 };
@@ -84,25 +68,31 @@ exports.getProdutoById = async (req, res) => {
   }
 };
 
-// --- Função para CRIAR um novo produto (usando categoria_id) ---
+// ✅ ATUALIZADO: Agora aceita estoque inicial e custo inicial
 exports.createProduto = async (req, res) => {
   try {
-    // ✅ CORREÇÃO: Remove a vírgula extra depois de 'estoque'
-    const { nome, descricao, valor, categoria_id, estoque, destaque, promocao } = req.body;
+    const { nome, descricao, valor, categoria_id, estoque, custo, destaque, promocao } = req.body;
     const imagem_produto_url = req.file ? req.file.filename : null;
-    if (!nome || !valor || !categoria_id || estoque === undefined) {
-      return res.status(400).json({ message: 'Nome, valor, ID da categoria e estoque são obrigatórios.' });
+
+    if (!nome || !valor || !categoria_id || estoque === undefined || custo === undefined) {
+      return res.status(400).json({ message: 'Todos os campos, incluindo estoque inicial e custo, são obrigatórios.' });
     }
 
+    const estoqueInicial = parseInt(estoque, 10);
+    const custoInicial = parseFloat(custo);
+
+    // Calcula os valores iniciais para o Custo Médio Ponderado
+    const custoTotalInventario = estoqueInicial * custoInicial;
+    const custoMedioPonderado = estoqueInicial > 0 ? custoInicial : 0;
+    
     const isDestaque = destaque === 'true' ? 1 : 0;
     const isPromocao = promocao === 'true' ? 1 : 0;
 
     const [result] = await db.query(
-      'INSERT INTO produtos (nome, descricao, valor, categoria_id, estoque, imagem_produto_url, destaque, promocao) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      // ✅ CORREÇÃO: Remove a vírgula extra do array de parâmetros
-      [nome, descricao, valor, categoria_id, estoque, imagem_produto_url, isDestaque, isPromocao]
+      'INSERT INTO produtos (nome, descricao, valor, categoria_id, estoque_total, custo_total_inventario, custo_medio_ponderado, imagem_produto_url, destaque, promocao) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [nome, descricao, valor, categoria_id, estoqueInicial, custoTotalInventario, custoMedioPonderado, imagem_produto_url, isDestaque, isPromocao]
     );
-    res.status(201).json({ message: 'Produto criado!', produtoId: result.insertId });
+    res.status(201).json({ message: 'Produto criado com sucesso!', produtoId: result.insertId });
   } catch (error) {
     res.status(500).json({ message: 'Erro ao criar produto.', error: error.message });
   }
@@ -112,7 +102,7 @@ exports.createProduto = async (req, res) => {
 exports.updateProduto = async (req, res) => {
   try {
     const { id } = req.params;
-    const { nome, descricao, valor, categoria_id, estoque, destaque, promocao } = req.body;
+    const { nome, descricao, valor, categoria_id, destaque, promocao } = req.body;
     
     const [produtosAtuais] = await db.query('SELECT imagem_produto_url FROM produtos WHERE id = ?', [id]);
     if (produtosAtuais.length === 0) {
@@ -125,8 +115,8 @@ exports.updateProduto = async (req, res) => {
     const isDestaque = destaque === 'true' ? 1 : 0;
     const isPromocao = promocao === 'true' ? 1 : 0;
 
-    const sql = `UPDATE produtos SET nome = ?, descricao = ?, valor = ?, categoria_id = ?, estoque = ?, destaque = ?, promocao = ?, imagem_produto_url = ? WHERE id = ?`;
-    const params = [nome, descricao, valor, categoria_id, estoque, isDestaque, isPromocao, imagem_produto_url, id];
+    const sql = `UPDATE produtos SET nome = ?, descricao = ?, valor = ?, categoria_id = ?, destaque = ?, promocao = ?, imagem_produto_url = ? WHERE id = ?`;
+    const params = [nome, descricao, valor, categoria_id, isDestaque, isPromocao, imagem_produto_url, id];
 
     await db.query(sql, params);
 
@@ -177,29 +167,49 @@ exports.deleteProduto = async (req, res) => {
   }
 };
 
-// ✅ NOVA FUNÇÃO para ADICIONAR (somar) ao estoque de um produto
+// ✅ ATUALIZADO: Agora aceita um 'novoValorVenda' opcional
 exports.adicionarEstoque = async (req, res) => {
+  const { id } = req.params;
+  const { quantidadeAdicional, custoUnitarioEntrada, novoValorVenda } = req.body;
+  const connection = await db.getConnection();
   try {
-    const { id } = req.params;
-    const { quantidadeAdicional } = req.body;
+    await connection.beginTransaction();
 
-    // Validação para garantir que a quantidade é um número inteiro positivo
     const quantidade = parseInt(quantidadeAdicional, 10);
-    if (isNaN(quantidade) || quantidade <= 0) {
-      return res.status(400).json({ message: 'A quantidade a ser adicionada deve ser um número inteiro positivo.' });
+    const custoEntrada = parseFloat(custoUnitarioEntrada);
+    if (isNaN(quantidade) || quantidade <= 0 || isNaN(custoEntrada) || custoEntrada < 0) {
+      throw new Error('Quantidade e valor de entrada devem ser números positivos.');
     }
 
-    // Query SQL que SOMA o valor ao estoque existente
-    const sql = 'UPDATE produtos SET estoque = estoque + ? WHERE id = ?';
-    const [result] = await db.query(sql, [quantidade, id]);
+    const [rows] = await connection.query('SELECT estoque_total, custo_total_inventario FROM produtos WHERE id = ? FOR UPDATE', [id]);
+    if (rows.length === 0) { throw new Error('Produto não encontrado.'); }
+    const produto = rows[0];
 
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: 'Produto não encontrado.' });
+    const custoTotalEntrada = quantidade * custoEntrada;
+    const novoEstoqueTotal = produto.estoque_total + quantidade;
+    const novoCustoTotalInventario = parseFloat(produto.custo_total_inventario) + custoTotalEntrada;
+    const novoCustoMedio = novoCustoTotalInventario / novoEstoqueTotal;
+    
+    // Constrói a query de atualização dinamicamente
+    let updateFields = ['estoque_total = ?', 'custo_total_inventario = ?', 'custo_medio_ponderado = ?'];
+    const params = [novoEstoqueTotal, novoCustoTotalInventario, novoCustoMedio];
+
+    // Se um novo valor de venda foi fornecido, adiciona à query
+    if (novoValorVenda && !isNaN(parseFloat(novoValorVenda))) {
+      updateFields.push('valor = ?');
+      params.push(parseFloat(novoValorVenda));
     }
+    
+    params.push(id);
+    const sql = `UPDATE produtos SET ${updateFields.join(', ')} WHERE id = ?`;
 
-    res.status(200).json({ message: 'Estoque atualizado com sucesso!' });
+    await connection.query(sql, params);
+    await connection.commit();
+    res.status(200).json({ message: 'Estoque e/ou valor atualizados com sucesso!' });
   } catch (error) {
-    console.error("Erro ao adicionar estoque:", error);
-    res.status(500).json({ message: 'Erro ao atualizar o estoque.', error: error.message });
+    await connection.rollback();
+    res.status(500).json({ message: `Erro ao adicionar estoque: ${error.message}` });
+  } finally {
+    connection.release();
   }
 };

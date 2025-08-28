@@ -11,8 +11,7 @@ import EditProfileModal from '../components/EditProfileModal';
 import Pagination from '../components/Pagination';
 
 function AdminDashboard() {
-  // --- Estados do Componente Principal ---
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -27,8 +26,6 @@ function AdminDashboard() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [limit, setLimit] = useState(7);
-
-  // --- Estados para a ferramenta de atualização de estoque ---
   const [stockSearchTerm, setStockSearchTerm] = useState('');
   const [stockFilterCategory, setStockFilterCategory] = useState('');
   const [stockProducts, setStockProducts] = useState([]);
@@ -37,7 +34,6 @@ function AdminDashboard() {
   const [stockCurrentPage, setStockCurrentPage] = useState(1);
   const [stockTotalPages, setStockTotalPages] = useState(0);
 
-  // --- Funções de Busca de Dados ---
   const fetchProducts = async (page = 1) => {
     try {
       setLoading(true);
@@ -57,21 +53,17 @@ function AdminDashboard() {
       setLoading(false);
     }
   };
-  
+
   const fetchCategories = async () => {
     try {
       const response = await api.get('/api/categorias?limit=all');
-      const formattedCategories = response.data.categorias.map(cat => ({
-        value: cat.nome,
-        label: cat.nome
-      }));
+      const formattedCategories = response.data.categorias.map(cat => ({ value: cat.nome, label: cat.nome }));
       setCategories(formattedCategories);
     } catch (err) {
       console.error("Falha ao buscar categorias para o filtro", err);
     }
   };
 
-  // --- Efeitos (useEffect Hooks) ---
   useEffect(() => {
     const debounceFetch = setTimeout(() => {
       if (currentPage !== 1) { setCurrentPage(1); } 
@@ -83,13 +75,11 @@ function AdminDashboard() {
   useEffect(() => {
     fetchProducts(currentPage);
   }, [currentPage]);
-  
-  useEffect(() => {
-    fetchCategories();
-  }, []); // Busca categorias apenas uma vez
 
-  
-  // --- Funções e Efeitos para a ferramenta de estoque ---
+  useEffect(() => { 
+    fetchCategories(); 
+  }, []);
+
   const fetchStockProducts = async (page = 1) => {
     if (!stockSearchTerm && !stockFilterCategory) {
       setStockProducts([]);
@@ -114,7 +104,7 @@ function AdminDashboard() {
 
   useEffect(() => {
     const debounceFetch = setTimeout(() => {
-      if (stockCurrentPage !== 1) { setStockCurrentPage(1); }
+      if (stockCurrentPage !== 1) { setStockCurrentPage(1); } 
       else { fetchStockProducts(1); }
     }, 500);
     return () => clearTimeout(debounceFetch);
@@ -124,21 +114,26 @@ function AdminDashboard() {
     fetchStockProducts(stockCurrentPage);
   }, [stockCurrentPage]);
 
-  
-  // --- Funções de Manipulação de Eventos (Handlers) ---
-  const handleStockValueChange = (productId, value) => {
-    setStockUpdateValues(prev => ({ ...prev, [productId]: value }));
+  const handleStockValueChange = (productId, field, value) => {
+    setStockUpdateValues(prev => ({
+      ...prev,
+      [productId]: { ...prev[productId], [field]: value }
+    }));
   };
 
   const handleStockUpdate = async (productId) => {
-    const quantityToAdd = stockUpdateValues[productId];
-    if (!quantityToAdd || parseInt(quantityToAdd) <= 0) {
-      return alert("Por favor, insira um valor inteiro positivo.");
+    const values = stockUpdateValues[productId];
+    if (!values || !values.qtd || !values.custo) {
+      return alert("Preencha a Quantidade a Adicionar e o Custo de Entrada.");
     }
     try {
-      await api.patch(`/api/produtos/${productId}/adicionar-estoque`, { quantidadeAdicional: quantityToAdd });
-      alert('Estoque atualizado com sucesso!');
-      setStockUpdateValues(prev => ({ ...prev, [productId]: '' }));
+      await api.patch(`/api/produtos/${productId}/adicionar-estoque`, {
+        quantidadeAdicional: values.qtd,
+        custoUnitarioEntrada: values.custo,
+        novoValorVenda: values.valorVenda || null
+      });
+      alert('Estoque atualizado!');
+      setStockUpdateValues(prev => ({ ...prev, [productId]: { qtd: '', custo: '', valorVenda: '' } }));
       fetchStockProducts(stockCurrentPage);
       fetchProducts(currentPage);
     } catch (err) {
@@ -210,27 +205,15 @@ function AdminDashboard() {
       <div className="card card-body mb-4">
         <div className="row g-3 align-items-center">
           <div className="col-lg-5">
-            <input
-              type="text"
-              className="form-control"
-              placeholder="Buscar por nome ou descrição..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+            <input type="text" className="form-control" placeholder="Buscar por nome ou descrição..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
           </div>
           <div className="col-lg-3">
-            <Select
-              options={categories}
-              isClearable
-              placeholder="Filtrar por Categoria..."
-              onChange={(selectedOption) => setFilterCategory(selectedOption ? selectedOption.value : '')}
-              noOptionsMessage={() => "Nenhuma categoria"}
-            />
+            <Select options={categories} isClearable placeholder="Filtrar por Categoria..." onChange={(selectedOption) => setFilterCategory(selectedOption ? selectedOption.value : '')} />
           </div>
           <div className="col-lg-4">
             <div className="btn-group w-100" role="group">
-              <button type="button" className={`btn btn-outline-secondary ${sortOrder === 'price_asc' ? 'active' : ''}`} onClick={() => setSortOrder('price_asc')}>- ESTOQUE</button>
-              <button type="button" className={`btn btn-outline-secondary ${sortOrder === 'price_desc' ? 'active' : ''}`} onClick={() => setSortOrder('price_desc')}>+ ESTOQUE</button>
+              <button type="button" className={`btn btn-outline-secondary ${sortOrder === 'stock_asc' ? 'active' : ''}`} onClick={() => setSortOrder('stock_asc')}>Menor Estoque</button>
+              <button type="button" className={`btn btn-outline-secondary ${sortOrder === 'stock_desc' ? 'active' : ''}`} onClick={() => setSortOrder('stock_desc')}>Maior Estoque</button>
               <button type="button" className={`btn btn-outline-secondary ${!sortOrder ? 'active' : ''}`} onClick={() => setSortOrder('')}>Padrão</button>
             </div>
           </div>
@@ -244,13 +227,8 @@ function AdminDashboard() {
             : ( <ProductAdminList products={products} onEdit={handleShowEditModal} onDelete={handleDelete} /> )
           }
         </div>
-        
         <div className="card-footer d-flex justify-content-center">
-          <Pagination 
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={(page) => setCurrentPage(page)}
-          />
+          <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={(page) => setCurrentPage(page)} />
         </div>
       </div>
       
@@ -260,45 +238,27 @@ function AdminDashboard() {
           <p className="text-muted">Busque por nome ou filtre por categoria para ver os produtos e adicionar ao estoque.</p>
           <div className="row g-3 mb-4">
             <div className="col-md-6">
-              <input 
-                type="text" 
-                className="form-control" 
-                placeholder="Pesquisar produto por nome..."
-                value={stockSearchTerm}
-                onChange={(e) => setStockSearchTerm(e.target.value)}
-              />
+              <input type="text" className="form-control" placeholder="Pesquisar produto por nome..." value={stockSearchTerm} onChange={(e) => setStockSearchTerm(e.target.value)} />
             </div>
             <div className="col-md-6">
-              <Select
-                options={categories}
-                isClearable
-                placeholder="Filtrar por Categoria..."
-                onChange={(selectedOption) => setStockFilterCategory(selectedOption ? selectedOption.value : '')}
-                noOptionsMessage={() => "Nenhuma categoria"}
-              />
+              <Select options={categories} isClearable placeholder="Filtrar por Categoria..." onChange={(selectedOption) => setStockFilterCategory(selectedOption ? selectedOption.value : '')} noOptionsMessage={() => "Nenhuma categoria"} />
             </div>
           </div>
-
           {stockLoading ? (
             <div className="text-center"><div className="spinner-border" /></div>
           ) : (
             <div>
               {stockProducts.length > 0 ? stockProducts.map(product => (
-                <div key={`stock-${product.id}`} className="d-flex align-items-center border-bottom py-2">
+                <div key={`stock-${product.id}`} className="d-flex align-items-center border-bottom py-2 flex-wrap">
                   <img src={product.imagem_produto_url ? `http://localhost:3001/uploads/${product.imagem_produto_url}` : 'https://placehold.co/60'} alt={product.nome} className="rounded" style={{ width: '60px', height: '60px', objectFit: 'cover' }} />
                   <div className="flex-grow-1 mx-3">
                     <strong>{product.nome}</strong>
-                    <div className="text-muted">Estoque Atual: {product.estoque}</div>
+                    <div className="text-muted">Estoque Atual: {product.estoque_total} | Venda: R$ {parseFloat(product.valor).toFixed(2)}</div>
                   </div>
-                  <div className="d-flex" style={{ width: '200px' }}>
-                    <input 
-                      type="number"
-                      className="form-control me-2"
-                      placeholder="Adicionar"
-                      value={stockUpdateValues[product.id] || ''}
-                      onChange={(e) => handleStockValueChange(product.id, e.target.value)}
-                      min="1"
-                    />
+                  <div className="d-flex" style={{ minWidth: '400px' }}>
+                    <input type="number" className="form-control me-2" placeholder="+ Qtd." value={stockUpdateValues[product.id]?.qtd || ''} onChange={(e) => handleStockValueChange(product.id, 'qtd', e.target.value)} />
+                    <input type="number" step="0.01" className="form-control me-2" placeholder="Custo/un. (R$)" value={stockUpdateValues[product.id]?.custo || ''} onChange={(e) => handleStockValueChange(product.id, 'custo', e.target.value)} />
+                    <input type="number" step="0.01" className="form-control me-2" placeholder="Novo Valor Venda (Opc.)" value={stockUpdateValues[product.id]?.valorVenda || ''} onChange={(e) => handleStockValueChange(product.id, 'valorVenda', e.target.value)} />
                     <button className="btn btn-success" onClick={() => handleStockUpdate(product.id)}>Atualizar</button>
                   </div>
                 </div>
@@ -308,13 +268,8 @@ function AdminDashboard() {
             </div>
           )}
         </div>
-        
         <div className="card-footer d-flex justify-content-center">
-            <Pagination
-                currentPage={stockCurrentPage}
-                totalPages={stockTotalPages}
-                onPageChange={(page) => setStockCurrentPage(page)}
-            />
+            <Pagination currentPage={stockCurrentPage} totalPages={stockTotalPages} onPageChange={(page) => setStockCurrentPage(page)} />
         </div>
       </div>
 
@@ -323,6 +278,6 @@ function AdminDashboard() {
       <EditProfileModal show={showEditProfileModal} onHide={() => setShowEditProfileModal(false)} />
     </div>
   );
-}
+} // ✅ GARANTA QUE ESTA CHAVE DE FECHAMENTO ESTEJA AQUI
 
 export default AdminDashboard;

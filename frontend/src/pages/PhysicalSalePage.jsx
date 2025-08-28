@@ -96,12 +96,14 @@ function PhysicalSalePage() {
   };
 
   const handleUpdateQuantity = (productId, newQuantity) => {
+    // Se a nova quantidade for zero ou menos, remove o item
     if (newQuantity <= 0) {
       handleRemoveItem(productId);
       return;
     }
+    // Atualiza o carrinho, garantindo que a nova quantidade não ultrapasse o estoque
     setLocalCart(prevCart => prevCart.map(item => 
-      item.id === productId && newQuantity <= item.estoque 
+      item.id === productId && newQuantity <= item.estoque_total
         ? { ...item, quantidade: newQuantity } 
         : item
     ));

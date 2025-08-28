@@ -1,19 +1,15 @@
 // src/components/OrderList.jsx
-
-// ✅ 1. RECEBA a nova prop 'onCancelarPedido' na lista de argumentos
 function OrderList({ pedidos, onShowDetails, onCancelarPedido }) {
-  // Se a lista de pedidos estiver vazia, mostra uma mensagem
   if (pedidos.length === 0) {
     return <p className="text-muted">Nenhum pedido encontrado nesta categoria.</p>;
   }
 
-  // Função para definir a cor do "badge" de status
   const getStatusClass = (status) => {
     switch (status) {
       case 'Entregue': return 'success';
       case 'Cancelado': return 'danger';
       case 'Enviado': return 'info';
-      default: return 'warning'; // Processando
+      default: return 'warning';
     }
   };
 
@@ -35,27 +31,11 @@ function OrderList({ pedidos, onShowDetails, onCancelarPedido }) {
               <td>{pedido.id}</td>
               <td>{new Date(pedido.data_pedido).toLocaleDateString('pt-BR')}</td>
               <td>R$ {parseFloat(pedido.valor_total).toFixed(2).replace('.', ',')}</td>
+              <td><span className={`badge bg-${getStatusClass(pedido.status)}`}>{pedido.status}</span></td>
               <td>
-                <span className={`badge bg-${getStatusClass(pedido.status)}`}>
-                  {pedido.status}
-                </span>
-              </td>
-              <td>
-                <button
-                  className="btn btn-primary btn-sm"
-                  onClick={() => onShowDetails(pedido.id)}>
-                    Ver Detalhes
-                </button>
-                
-                {/* ✅ 2. RENDERIZAÇÃO CONDICIONAL do botão de cancelar */}
-                {/* Este botão só aparecerá na tela se o status do pedido for 'Processando' */}
+                <button className="btn btn-primary btn-sm" onClick={() => onShowDetails(pedido.id)}>Ver Detalhes</button>
                 {pedido.status === 'Processando' && (
-                  <button 
-                    className="btn btn-danger btn-sm ms-2"
-                    onClick={() => onCancelarPedido(pedido.id)}
-                  >
-                    Cancelar
-                  </button>
+                  <button className="btn btn-danger btn-sm ms-2" onClick={() => onCancelarPedido(pedido.id)}>Cancelar</button>
                 )}
               </td>
             </tr>
