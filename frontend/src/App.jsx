@@ -16,6 +16,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import CustomerDashboard from './pages/CustomerDashboard';
 import ProductDetailPage from './pages/ProductDetailPage';
 import PhysicalSalePage from './pages/PhysicalSalePage';
+import FinancialDashboardPage from './pages/FinancialDashboardPage';
 
 function App() {
   return (
@@ -53,6 +54,12 @@ function App() {
               <Route 
                 path="/admin/venda-fisica" 
                 element={<ProtectedRoute role="admin"><PhysicalSalePage /></ProtectedRoute>} 
+              />
+
+              {/* ✅ 2. ADICIONE A NOVA ROTA FINANCEIRA AQUI */}
+              <Route 
+                path="/admin/financeiro" 
+                element={<ProtectedRoute role="admin"><FinancialDashboardPage /></ProtectedRoute>} 
               />
 
               {/* --- Rota Protegida para Usuários Logados (Qualquer Role) --- */}

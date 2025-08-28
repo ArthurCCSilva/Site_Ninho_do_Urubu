@@ -191,6 +191,7 @@ function AdminDashboard() {
             <div className="card-body d-flex flex-column justify-content-center align-items-start">
               <Link to="/admin/pedidos" className="btn btn-primary mb-3 w-100">Gerenciar Pedidos</Link>
               <Link to="/admin/venda-fisica" className="btn btn-success mb-3 w-100">Registrar Venda Física</Link>
+              <Link to="/admin/financeiro" className="btn btn-warning mb-3 w-100">Gerenciamento Financeiro</Link>
               <button className="btn btn-info w-100" onClick={() => setShowCategoryModal(true)}>Gerenciar Categorias</button>
             </div>
           </div>

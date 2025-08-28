@@ -24,6 +24,8 @@ app.use('/api/categorias', categoriasRoutes);
 app.use('/api/carrinho', require('./routes/carrinhoRoutes'));//carrinho rota
 app.use('/api/pedidos', require('./routes/pedidosRoutes'));
 app.use('/api/usuarios', require('./routes/usuariosRoutes'));
+app.use('/api/despesas', require('./routes/despesasRoutes'));
+app.use('/api/financials', require('./routes/financialsRoutes'));
 app.use('/uploads', express.static('uploads'));//adicionado depois para as imagens
 
 const PORT = process.env.PORT || 3001;
