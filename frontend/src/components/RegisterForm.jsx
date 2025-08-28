@@ -1,17 +1,16 @@
 // src/components/RegisterForm.jsx
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import PhoneInput from 'react-phone-number-input'; // 1. Importa o componente de telefone
+import PhoneInput from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
 
 function RegisterForm() {
   const [formData, setFormData] = useState({
     nome: '',
-    email: '',
+    email: '', // O email ainda existe no estado
     senha: '',
   });
-  // 2. Cria um estado separado para o telefone
   const [telefone, setTelefone] = useState('');
-  
   const [confirmSenha, setConfirmSenha] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [imagemFile, setImagemFile] = useState(null);
@@ -28,14 +27,12 @@ function RegisterForm() {
     setSuccess('');
     
     if (formData.senha !== confirmSenha) {
-      setError('As senhas não coincidem.');
-      return;
+      return setError('As senhas não coincidem.');
     }
 
-    // 3. Inclui o 'telefone' na validação e nos dados a serem enviados
-    if (!formData.nome || !formData.email || !formData.senha || !telefone) {
-      setError('Por favor, preencha todos os campos obrigatórios.');
-      return;
+    // ✅ VALIDAÇÃO ATUALIZADA: Não exige mais o 'email'
+    if (!formData.nome || !formData.senha || !telefone) {
+      return setError('Nome, senha e WhatsApp são obrigatórios.');
     }
     
     try {
@@ -56,19 +53,26 @@ function RegisterForm() {
         <label className="form-label">Nome Completo</label>
         <input type="text" name="nome" className="form-control" placeholder="Seu nome" onChange={handleChange} required />
       </div>
+      
+      {/* ✅ CAMPO DE EMAIL ATUALIZADO */}
       <div className="mb-3">
-        <label className="form-label">Email</label>
-        <input type="email" name="email" className="form-control" placeholder="seu@email.com" onChange={handleChange} required />
+        <label className="form-label">Email (Opcional)</label>
+        <input 
+            type="email" 
+            name="email" 
+            className="form-control" 
+            placeholder="seu@email.com" 
+            onChange={handleChange} 
+        />
       </div>
       
-      {/* 4. SUBSTITUI o input de telefone antigo pelo novo componente */}
       <div className="mb-3">
-          <label className="form-label">telefone - WhatsApp</label>
+          <label className="form-label">WhatsApp</label>
           <PhoneInput
             placeholder="(00) 0 0000-0000"
             value={telefone}
             onChange={setTelefone}
-            defaultCountry="BR" // País padrão
+            defaultCountry="BR"
             className="form-control"
             required
           />

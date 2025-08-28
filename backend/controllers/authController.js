@@ -8,39 +8,33 @@ const db = require('../db');// Importa nossa conexão com o banco
 exports.register = async (req, res) => {
   try {
     const { nome, email, senha, telefone } = req.body;
+    let imagem_perfil_url = req.file ? req.file.filename : null;
 
-    //parte da imagem
-    let imagem_perfil_url = null; //Declaramos a variável com um valor padrão 'null'
-    if (req.file) {
-      // 2. Se um arquivo existir, atualizamos o valor da variável
-      imagem_perfil_url = req.file.filename;
-    }
-    //fim da parte imagem
-
-    // 1. Validação simples
-    if (!nome || !email || !senha || !telefone) {
-      return res.status(400).json({ message: 'Por favor, preencha todos os campos.' });
+    // ✅ 1. VALIDAÇÃO ATUALIZADA: O email não é mais obrigatório
+    if (!nome || !senha || !telefone) {
+      return res.status(400).json({ message: 'Nome, senha e telefone são obrigatórios.' });
     }
 
-    // Isso limpa o '+', parênteses, traços, etc., deixando apenas os números.
     const telefoneSanitizado = telefone.replace(/\D/g, '');
-    // 2. Criptografar a senha
-    const senhaHash = await bcrypt.hash(senha, 10); // O 10 é o "salt rounds"
+    const senhaHash = await bcrypt.hash(senha, 10);
 
-    // 3. Salvar no banco de dados
-    // Por padrão, todo novo registro é um 'cliente'
+    // ✅ 2. LÓGICA PARA LIDAR COM EMAIL VAZIO
+    // Se o email vier como uma string vazia, salvamos NULL no banco.
+    const emailParaSalvar = email || null;
+
     const [result] = await db.query(
       'INSERT INTO usuarios (nome, email, senha_hash, role, telefone, imagem_perfil_url) VALUES (?, ?, ?, ?, ?, ?)',
-      [nome, email, senhaHash, 'cliente', telefoneSanitizado, imagem_perfil_url]
+      // ✅ 3. Usa a nova variável para o email
+      [nome, emailParaSalvar, senhaHash, 'cliente', telefoneSanitizado, imagem_perfil_url]
     );
 
     res.status(201).json({ message: 'Usuário criado com Sucesso!', userId: result.insertId });
   } catch (error) {
-    //erro do email duplicado
     if (error.code === 'ER_DUP_ENTRY') {
-      return res.status(409).json({ message: 'Este e-mail já está cadastrado.' })
+      // A mensagem de erro agora precisa ser mais genérica
+      return res.status(409).json({ message: 'Este e-mail ou telefone já está cadastrado.' })
     }
-
+    console.error("Erro no registro:", error);
     res.status(500).json({ message: 'Erro no servidor', error: error.message });
   }
 };

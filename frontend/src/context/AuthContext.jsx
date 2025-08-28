@@ -64,7 +64,7 @@ export function AuthProvider({ children }) {
         data.append('imagem_perfil', formData.imagem_perfil);
       }
       await api.post('/api/auth/register', data);
-      await login(formData.email, formData.senha);
+      await login(formData.telefone, formData.senha);
     } catch (error) {
       console.error("Falha no cadastro", error);
       throw error;
