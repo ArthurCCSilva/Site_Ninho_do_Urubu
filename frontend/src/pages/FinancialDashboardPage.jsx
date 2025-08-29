@@ -33,31 +33,50 @@ function FinancialDashboardPage() {
   const [despesaTotalPages, setDespesaTotalPages] = useState(0);
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [showExpenseCatModal, setShowExpenseCatModal] = useState(false);
-  
   const [availableMonths, setAvailableMonths] = useState([]);
   const [selectedMonths, setSelectedMonths] = useState([]);
-  const [selectedMetric, setSelectedMetric] = useState({ value: 'receitaBruta', label: 'Receita Bruta' });
+  const [selectedMetric, setSelectedMetric] = useState({ value: 'lucroLiquido', label: 'Lucro Líquido' });
   const [comparisonLoading, setComparisonLoading] = useState(false);
   const [comparisonChartData, setComparisonChartData] = useState({ labels: [], datasets: [] });
+  const [allProducts, setAllProducts] = useState([]);
+  const [comparisonProducts, setComparisonProducts] = useState([]);
+  const [comparisonStartDate, setComparisonStartDate] = useState(new Date(new Date().setMonth(new Date().getMonth() - 1)));
+  const [comparisonEndDate, setComparisonEndDate] = useState(new Date());
+  const [comparisonGroupBy, setComparisonGroupBy] = useState('day');
+  const [comparisonProdLoading, setComparisonProdLoading] = useState(false);
+  const [comparisonProdChartData, setComparisonProdChartData] = useState({ labels: [], datasets: [] });
 
   const metricOptions = [
     { value: 'receitaBruta', label: 'Receita Bruta' },
     { value: 'custoProdutos', label: 'Custo dos Produtos' },
     { value: 'despesasOperacionais', label: 'Despesas Operacionais' },
+    { value: 'lucroLiquido', label: 'Lucro Líquido' },
   ];
+
+  // ✅ 1. NOVOS ESTADOS para a nova funcionalidade
+  const [comparisonMetric, setComparisonMetric] = useState({ value: 'receita', label: 'Receita' });
+  const comparisonMetricOptions = [
+    { value: 'receita', label: 'Receita' },
+    { value: 'lucro', label: 'Lucro' },
+    { value: 'unidades', label: 'Unidades Vendidas' },
+  ];
+
+
+  const customSelectStyles = {
+    menu: (provided) => ({ ...provided, maxHeight: '220px' }),
+    menuList: (provided) => ({ ...provided, maxHeight: '200px' }),
+  };
 
   const fetchMainData = async () => {
     if (!startDate || !endDate) return;
     setLoading(true);
     setError('');
-
     const adjustedEndDate = new Date(endDate);
     adjustedEndDate.setHours(23, 59, 59, 999);
     const formattedStartDate = startDate.toISOString().split('T')[0];
     const formattedEndDate = adjustedEndDate.toISOString().split('T')[0];
     const params = new URLSearchParams({ data_inicio: formattedStartDate, data_fim: formattedEndDate });
     const queryString = params.toString();
-
     try {
       const [summaryRes, salesOverTimeRes, customersRes, productsRes, paymentRes] = await Promise.all([
         api.get(`/api/financials/summary?${queryString}`),
@@ -117,31 +136,35 @@ function FinancialDashboardPage() {
   
   useEffect(() => {
     const debounceFetch = setTimeout(() => {
-      if (despesaCurrentPage !== 1) { setDespesaCurrentPage(1); } 
-      else { fetchDespesas(1); }
+      if (despesaCurrentPage !== 1) {
+        setDespesaCurrentPage(1);
+      } else {
+        fetchDespesas(1);
+      }
     }, 500);
     return () => clearTimeout(debounceFetch);
   }, [despesaSearchTerm]);
 
   useEffect(() => {
-    fetchDespesas(despesaCurrentPage);
+    fetchDespesas();
   }, [despesaCurrentPage]);
 
   useEffect(() => {
-    const fetchMonths = async () => {
+    const fetchInitialSelects = async () => {
       try {
-        const response = await api.get('/api/financials/available-months');
-        const monthOptions = response.data.map(item => {
+        const [monthsRes, productsRes] = await Promise.all([
+          api.get('/api/financials/available-months'),
+          api.get('/api/produtos?limit=1000')
+        ]);
+        const monthOptions = monthsRes.data.map(item => {
           const monthName = new Date(item.ano, item.mes - 1).toLocaleString('pt-BR', { month: 'long' });
-          return {
-            value: `${item.ano}-${String(item.mes).padStart(2, '0')}`,
-            label: `${monthName.charAt(0).toUpperCase() + monthName.slice(1)}/${item.ano}`
-          };
+          return { value: `${item.ano}-${String(item.mes).padStart(2, '0')}`, label: `${monthName.charAt(0).toUpperCase() + monthName.slice(1)}/${item.ano}` };
         });
         setAvailableMonths(monthOptions);
-      } catch (err) { console.error("Erro ao buscar meses disponíveis", err); }
+        setAllProducts(productsRes.data.produtos.map(p => ({ value: p.id, label: p.nome })));
+      } catch (err) { console.error("Erro ao buscar dados para seletores", err); }
     };
-    fetchMonths();
+    fetchInitialSelects();
   }, []);
 
   useEffect(() => {
@@ -159,17 +182,68 @@ function FinancialDashboardPage() {
         const data = response.data.map(d => d.valor);
         setComparisonChartData({
           labels,
-          datasets: [{
-            label: selectedMetric.label,
-            data,
-            backgroundColor: 'rgba(255, 99, 132, 0.5)',
-          }]
+          datasets: [{ label: selectedMetric.label, data, backgroundColor: 'rgba(255, 99, 132, 0.5)' }]
         });
       } catch (err) { console.error("Erro ao buscar dados de comparação", err); } 
       finally { setComparisonLoading(false); }
     };
     fetchComparisonData();
   }, [selectedMonths, selectedMetric]);
+
+  useEffect(() => {
+    const fetchProductComparisonData = async () => {
+      if (comparisonProducts.length === 0 || !comparisonStartDate || !comparisonEndDate) {
+        setComparisonProdChartData({ labels: [], datasets: [] });
+        return;
+      }
+      try {
+        setComparisonProdLoading(true);
+        const params = new URLSearchParams({
+          productIds: comparisonProducts.map(p => p.value).join(','),
+          data_inicio: comparisonStartDate.toISOString().split('T')[0],
+          data_fim: new Date(comparisonEndDate.getTime() + 86400000).toISOString().split('T')[0],
+          groupBy: comparisonGroupBy,
+          metrica: comparisonMetric.value, // Envia a métrica selecionada
+        });
+
+        const response = await api.get(`/api/financials/product-sales-comparison?${params.toString()}`);
+        const data = response.data;
+        
+        const allDates = new Set();
+        Object.values(data).forEach(productData => {
+          productData.forEach(d => allDates.add(d.date));
+        });
+
+        const sortedDates = Array.from(allDates).sort();
+        
+        const labels = sortedDates.map(d => {
+          const date = new Date(d);
+          return comparisonGroupBy === 'day' 
+            ? date.toLocaleDateString('pt-BR', { timeZone: 'UTC' })
+            : new Date(date.getTime() + date.getTimezoneOffset() * 60000).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+        });
+        
+        const datasets = Object.keys(data).map((productName, index) => {
+          const productData = data[productName];
+          const color = `hsl(${(index * 70) % 360}, 70%, 50%)`;
+          return {
+            label: productName,
+            data: sortedDates.map(dateStr => {
+              const dayData = productData.find(d => d.date.startsWith(dateStr));
+              return dayData ? dayData.valor : 0; // Usa a propriedade genérica 'valor'
+            }),
+            borderColor: color, backgroundColor: `${color}B3`, tension: 0.1,
+          };
+        });
+        setComparisonProdChartData({ labels, datasets });
+      } catch (err) {
+        console.error("Erro ao buscar dados de comparação de produtos", err);
+      } finally {
+        setComparisonProdLoading(false);
+      }
+    };
+    fetchProductComparisonData();
+  }, [comparisonProducts, comparisonStartDate, comparisonEndDate, comparisonGroupBy, comparisonMetric]);
 
   const formatCurrency = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -178,7 +252,7 @@ function FinancialDashboardPage() {
       <h1 className="mb-4">Painel Financeiro</h1>
       <div className="card card-body mb-4">
         <div className="row g-3 align-items-center">
-          <div className="col-md-auto"><label className="form-label mb-0 me-2">Período:</label></div>
+          <div className="col-md-auto"><label className="form-label mb-0 me-2">Período Geral:</label></div>
           <div className="col-md-auto"><DatePicker selected={startDate} onChange={(date) => setStartDate(date)} className="form-control" dateFormat="dd/MM/yyyy" locale="pt-BR" selectsStart startDate={startDate} endDate={endDate} /></div>
           <div className="col-md-auto"><label className="form-label mb-0 me-2">até</label></div>
           <div className="col-md-auto"><DatePicker selected={endDate} onChange={(date) => setEndDate(date)} className="form-control" dateFormat="dd/MM/yyyy" locale="pt-BR" selectsEnd startDate={startDate} endDate={endDate} minDate={startDate} /></div>
@@ -195,71 +269,37 @@ function FinancialDashboardPage() {
             <div className="col-lg-3 col-md-6 mb-4"><div className="card text-white bg-danger h-100"><div className="card-body"><h6 className="card-title text-uppercase">Despesas Operacionais</h6><p className="card-text fs-4 fw-bold">{formatCurrency(summaryData.despesasOperacionais)}</p></div></div></div>
             <div className="col-lg-3 col-md-6 mb-4"><div className="card text-white bg-primary h-100"><div className="card-body"><h6 className="card-title text-uppercase">Lucro Líquido</h6><p className="card-text fs-4 fw-bold">{formatCurrency(summaryData.lucroLiquido)}</p></div></div></div>
           </div>
-          <div className="card mt-4">
-            <div className="card-header"><h5>Vendas ao Longo do Tempo</h5></div>
-            <div className="card-body"><Line data={chartData} options={{ responsive: true, plugins: { legend: { position: 'top' }, title: { display: true, text: 'Receita Bruta Diária' }}}} /></div>
-          </div>
-          <div className="row mt-4">
-            <div className="col-lg-6 mb-4"><div className="card h-100"><div className="card-header"><h5>Top 10 Clientes Mais Lucrativos</h5></div><div className="card-body table-responsive"><table className="table table-sm table-striped"><thead><tr><th>Cliente</th><th className="text-end">Lucro Gerado</th></tr></thead><tbody>{topCustomers.map(c => <tr key={c.id}><td>{c.nome}</td><td className="text-end">{formatCurrency(c.lucro_total)}</td></tr>)}</tbody></table></div></div></div>
-            <div className="col-lg-6 mb-4"><div className="card h-100"><div className="card-header"><h5>Top 10 Produtos Mais Lucrativos</h5></div><div className="card-body table-responsive"><table className="table table-sm table-striped"><thead><tr><th>Produto</th><th className="text-end">Lucro Gerado</th></tr></thead><tbody>{topProducts.map(p => <tr key={p.id}><td>{p.nome}</td><td className="text-end">{formatCurrency(p.lucro_total)}</td></tr>)}</tbody></table></div></div></div>
-          </div>
-          <div className="card mt-4">
-            <div className="card-header"><h5>Análise por Forma de Pagamento</h5></div>
-            <div className="card-body"><div className="table-responsive"><table className="table table-sm table-striped"><thead><tr><th>Forma de Pagamento</th><th className="text-center">Nº de Vendas</th><th className="text-end">Receita Total</th><th className="text-end">Lucro Total</th></tr></thead><tbody>{paymentStats.length > 0 ? paymentStats.map(p => (<tr key={p.forma_pagamento}><td>{p.forma_pagamento}</td><td className="text-center">{p.numero_de_vendas}</td><td className="text-end">{formatCurrency(p.receita_total)}</td><td className="text-end">{formatCurrency(p.lucro_total)}</td></tr>)) : (<tr><td colSpan="4" className="text-center text-muted">Nenhum dado neste período.</td></tr>)}</tbody></table></div></div>
-          </div>
-          <div className="card mt-4">
-            <div className="card-header d-flex justify-content-between align-items-center flex-wrap">
-              <h5 className="mb-2 me-3">Gerenciamento de Despesas</h5>
-              <div>
-                <button className="btn btn-outline-secondary me-2" onClick={() => setShowExpenseCatModal(true)}>Gerenciar Categorias</button>
-                <button className="btn btn-primary" onClick={() => setShowExpenseModal(true)}>+ Adicionar Despesa</button>
-              </div>
-            </div>
-            <div className="card-body">
-              <input type="text" className="form-control mb-3" placeholder="Pesquisar despesa por descrição..." value={despesaSearchTerm} onChange={(e) => { setDespesaSearchTerm(e.target.value); setDespesaCurrentPage(1); }} />
-              <div className="table-responsive">
-                <table className="table table-sm table-striped">
-                  <thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th className="text-end">Valor</th></tr></thead>
-                  <tbody>
-                    {despesasLoading ? (
-                      <tr><td colSpan="4" className="text-center"><div className="spinner-border spinner-border-sm"/></td></tr>
-                    ) : despesas.length > 0 ? despesas.map(d => (
-                      <tr key={d.id}>
-                        <td>{new Date(d.data).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</td>
-                        <td>{d.descricao}{d.produto_nome && <small className="d-block text-muted">Produto: {d.produto_nome}</small>}</td>
-                        <td>{d.categoria_nome || '--'}</td>
-                        <td className="text-end text-danger">-{formatCurrency(d.valor)}</td>
-                      </tr>
-                    )) : (
-                      <tr><td colSpan="4" className="text-center text-muted">Nenhuma despesa registrada neste período.</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            <div className="card-footer d-flex justify-content-center">
-              <Pagination currentPage={despesaCurrentPage} totalPages={despesaTotalPages} onPageChange={(page) => setDespesaCurrentPage(page)} />
-            </div>
-          </div>
+          <div className="card mt-4"><div className="card-header"><h5>Vendas ao Longo do Tempo</h5></div><div className="card-body"><Line data={chartData} options={{ responsive: true, plugins: { legend: { position: 'top' }, title: { display: true, text: 'Receita Bruta Diária' }}}} /></div></div>
+          <div className="card mt-4"><div className="card-header"><h5>Análise por Forma de Pagamento</h5></div><div className="card-body"><div className="table-responsive"><table className="table table-sm table-striped"><thead><tr><th>Forma de Pagamento</th><th className="text-center">Nº de Vendas</th><th className="text-end">Receita Total</th><th className="text-end">Lucro Total</th></tr></thead><tbody>{paymentStats.length > 0 ? paymentStats.map(p => (<tr key={p.forma_pagamento}><td>{p.forma_pagamento}</td><td className="text-center">{p.numero_de_vendas}</td><td className="text-end">{formatCurrency(p.receita_total)}</td><td className="text-end">{formatCurrency(p.lucro_total)}</td></tr>)) : (<tr><td colSpan="4" className="text-center text-muted">Nenhum dado neste período.</td></tr>)}</tbody></table></div></div></div>
+          <div className="card mt-4"><div className="card-header d-flex justify-content-between align-items-center flex-wrap"><h5 className="mb-2 me-3">Gerenciamento de Despesas</h5><div><button className="btn btn-outline-secondary me-2" onClick={() => setShowExpenseCatModal(true)}>Gerenciar Categorias</button><button className="btn btn-primary" onClick={() => setShowExpenseModal(true)}>+ Adicionar Despesa</button></div></div><div className="card-body"><input type="text" className="form-control mb-3" placeholder="Pesquisar despesa..." value={despesaSearchTerm} onChange={(e) => { setDespesaSearchTerm(e.target.value); setDespesaCurrentPage(1); }} /><div className="table-responsive"><table className="table table-sm table-striped"><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th className="text-end">Valor</th></tr></thead><tbody>{despesasLoading ? (<tr><td colSpan="4" className="text-center"><div className="spinner-border spinner-border-sm"/></td></tr>) : despesas.length > 0 ? despesas.map(d => (<tr key={d.id}><td>{new Date(d.data).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</td><td>{d.descricao}{d.produto_nome && <small className="d-block text-muted">Produto: {d.produto_nome}</small>}</td><td>{d.categoria_nome || '--'}</td><td className="text-end text-danger">-{formatCurrency(d.valor)}</td></tr>)) : (<tr><td colSpan="4" className="text-center text-muted">Nenhuma despesa neste período.</td></tr>)}</tbody></table></div></div><div className="card-footer d-flex justify-content-center"><Pagination currentPage={despesaCurrentPage} totalPages={despesaTotalPages} onPageChange={(page) => setDespesaCurrentPage(page)} /></div></div>
           <div className="card mt-4">
             <div className="card-header"><h5>Comparativo Mensal</h5></div>
             <div className="card-body">
               <div className="row g-3 mb-3">
-                <div className="col-md-7">
-                  <label className="form-label">Selecione 2 ou mais meses para comparar</label>
-                  <Select isMulti options={availableMonths} value={selectedMonths} onChange={setSelectedMonths} placeholder="Escolha os meses..." noOptionsMessage={() => "Nenhum mês com vendas"} />
-                </div>
-                <div className="col-md-5">
-                  <label className="form-label">Selecione a Métrica</label>
-                  <Select options={metricOptions} value={selectedMetric} onChange={setSelectedMetric} />
-                </div>
+                <div className="col-md-7"><label className="form-label">Selecione 2+ meses para comparar</label><Select isMulti options={availableMonths} value={selectedMonths} onChange={setSelectedMonths} placeholder="Escolha os meses..." noOptionsMessage={() => "Nenhum mês com vendas"} styles={customSelectStyles} /></div>
+                <div className="col-md-5"><label className="form-label">Selecione a Métrica</label><Select options={metricOptions} value={selectedMetric} onChange={setSelectedMetric} /></div>
               </div>
-              {comparisonLoading ? (
-                <div className="text-center"><div className="spinner-border spinner-border-sm" /></div>
-              ) : selectedMonths.length >= 2 && (
-                <Bar data={comparisonChartData} options={{ responsive: true, plugins: { legend: { display: false }, title: { display: true, text: `Comparativo de ${selectedMetric.label}` } } }} />
-              )}
+              {comparisonLoading ? ( <div className="text-center"><div className="spinner-border spinner-border-sm" /></div> ) : selectedMonths.length >= 2 && ( <Bar data={comparisonChartData} options={{ responsive: true, plugins: { legend: { display: false }, title: { display: true, text: `Comparativo de ${selectedMetric.label}` }}}} /> )}
             </div>
+          </div>
+          <div className="card mt-4">
+            <div className="card-header"><h5>Comparativo de Vendas por Produto</h5></div>
+            <div className="card-body">
+              <p className="text-muted">Compare o desempenho de produtos específicos em um período.</p>
+              <div className="row g-3 mb-3">
+                <div className="col-md-12"><label className="form-label">Selecione 1 ou mais produtos</label><Select isMulti options={allProducts} value={comparisonProducts} onChange={setComparisonProducts} placeholder="Escolha os produtos..." styles={customSelectStyles}/></div>
+                <div className="col-md-4"><label>Data Inicial</label><DatePicker selected={comparisonStartDate} onChange={date => setComparisonStartDate(date)} className="form-control" /></div>
+                <div className="col-md-4"><label>Data Final</label><DatePicker selected={comparisonEndDate} onChange={date => setComparisonEndDate(date)} className="form-control" minDate={comparisonStartDate}/></div>
+                <div className="col-md-4"><label>Agrupar por</label><select className="form-select" value={comparisonGroupBy} onChange={e => setComparisonGroupBy(e.target.value)}><option value="day">Dia</option><option value="month">Mês</option></select></div>
+                <div className="col-md-12"><label>Mostrar dados de:</label><Select options={comparisonMetricOptions} value={comparisonMetric} onChange={setComparisonMetric} /></div>
+              </div>
+              {comparisonProdLoading ? ( <div className="text-center"><div className="spinner-border spinner-border-sm" /></div> ) 
+              : comparisonProducts.length > 0 && ( <Line data={comparisonProdChartData} /> )}
+            </div>
+          </div>
+          <div className="row mt-4">
+            <div className="col-lg-6 mb-4"><div className="card h-100"><div className="card-header"><h5>Top 10 Clientes Mais Lucrativos</h5></div><div className="card-body table-responsive"><table className="table table-sm table-striped"><thead><tr><th>Cliente</th><th className="text-end">Lucro Gerado</th></tr></thead><tbody>{topCustomers.map(c => <tr key={c.id}><td>{c.nome}</td><td className="text-end">{formatCurrency(c.lucro_total)}</td></tr>)}</tbody></table></div></div></div>
+            <div className="col-lg-6 mb-4"><div className="card h-100"><div className="card-header"><h5>Top 10 Produtos Mais Lucrativos</h5></div><div className="card-body table-responsive"><table className="table table-sm table-striped"><thead><tr><th>Produto</th><th className="text-end">Lucro Gerado</th></tr></thead><tbody>{topProducts.map(p => <tr key={p.id}><td>{p.nome}</td><td className="text-end">{formatCurrency(p.lucro_total)}</td></tr>)}</tbody></table></div></div></div>
           </div>
         </>
       )}

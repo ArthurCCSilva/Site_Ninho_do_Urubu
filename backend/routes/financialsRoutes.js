@@ -12,5 +12,6 @@ router.get('/product-profitability', financialsController.getProductProfitabilit
 router.get('/payment-method-stats', financialsController.getPaymentMethodStats);
 router.get('/available-months', financialsController.getAvailableMonths);
 router.get('/monthly-comparison', financialsController.getMonthlyComparison);
+router.get('/product-sales-comparison', financialsController.getProductSalesComparison);
 
 module.exports = router;

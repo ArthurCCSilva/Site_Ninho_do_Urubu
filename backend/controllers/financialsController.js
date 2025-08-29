@@ -193,7 +193,7 @@ exports.getAvailableMonths = async (req, res) => {
 // ✅ NOVA FUNÇÃO: Busca os dados para o gráfico de comparação
 exports.getMonthlyComparison = async (req, res) => {
   try {
-    const { meses, metrica } = req.query; // meses será "2025-08,2025-07"
+    const { meses, metrica } = req.query;
     if (!meses || !metrica) {
       return res.status(400).json({ message: 'Meses e métrica são obrigatórios.' });
     }
@@ -203,8 +203,8 @@ exports.getMonthlyComparison = async (req, res) => {
 
     for (const mesAno of mesesArray) {
       const [ano, mes] = mesAno.split('-');
-
       let valor = 0;
+
       if (metrica === 'receitaBruta') {
         const [rows] = await db.query("SELECT SUM(valor_total) as total FROM pedidos WHERE status = 'Entregue' AND YEAR(data_pedido) = ? AND MONTH(data_pedido) = ?", [ano, mes]);
         valor = rows[0].total || 0;
@@ -214,6 +214,18 @@ exports.getMonthlyComparison = async (req, res) => {
       } else if (metrica === 'despesasOperacionais') {
         const [rows] = await db.query("SELECT SUM(valor) as total FROM despesas WHERE YEAR(data) = ? AND MONTH(data) = ?", [ano, mes]);
         valor = rows[0].total || 0;
+      } else if (metrica === 'lucroLiquido') {
+        // Para o lucro líquido, precisamos calcular as 3 partes
+        const [receitaRows] = await db.query("SELECT SUM(valor_total) as total FROM pedidos WHERE status = 'Entregue' AND YEAR(data_pedido) = ? AND MONTH(data_pedido) = ?", [ano, mes]);
+        const receitaBruta = receitaRows[0].total || 0;
+
+        const [custoRows] = await db.query("SELECT SUM(pi.custo_unitario * pi.quantidade) as total FROM pedido_itens pi JOIN pedidos p ON pi.pedido_id = p.id WHERE p.status = 'Entregue' AND YEAR(p.data_pedido) = ? AND MONTH(p.data_pedido) = ?", [ano, mes]);
+        const custoProdutos = custoRows[0].total || 0;
+
+        const [despesasRows] = await db.query("SELECT SUM(valor) as total FROM despesas WHERE YEAR(data) = ? AND MONTH(data) = ?", [ano, mes]);
+        const despesasOperacionais = despesasRows[0].total || 0;
+        
+        valor = (receitaBruta - custoProdutos) - despesasOperacionais;
       }
       
       results.push({ mesAno: `${mes}/${ano}`, valor });
@@ -222,5 +234,68 @@ exports.getMonthlyComparison = async (req, res) => {
     res.status(200).json(results);
   } catch (error) {
     res.status(500).json({ message: 'Erro ao buscar dados de comparação mensal.', error: error.message });
+  }
+};
+
+// ✅ NOVA FUNÇÃO para o gráfico de comparação de vendas de produtos
+exports.getProductSalesComparison = async (req, res) => {
+  try {
+    // 1. Recebe a nova 'metrica' da requisição
+    const { productIds, data_inicio, data_fim, groupBy, metrica } = req.query;
+    if (!productIds || !data_inicio || !data_fim || !groupBy || !metrica) {
+      return res.status(400).json({ message: 'Todos os parâmetros são obrigatórios.' });
+    }
+
+    const idsArray = productIds.split(',');
+    const dateFormat = groupBy === 'day' ? '%Y-%m-%d' : '%Y-%m-01';
+
+    // 2. Define dinamicamente o que será calculado com base na métrica
+    let selectClause = '';
+    switch (metrica) {
+      case 'unidades':
+        selectClause = 'SUM(pi.quantidade) as valor';
+        break;
+      case 'lucro':
+        selectClause = '(SUM(pi.quantidade * pi.preco_unitario) - SUM(pi.quantidade * pi.custo_unitario)) as valor';
+        break;
+      default: // 'receita' é o padrão
+        selectClause = 'SUM(pi.quantidade * pi.preco_unitario) as valor';
+    }
+
+    // 3. Monta a query final
+    const sql = `
+      SELECT 
+        pi.produto_id,
+        p.nome as produto_nome,
+        DATE_FORMAT(ped.data_pedido, ?) as data_agrupada,
+        ${selectClause}
+      FROM pedido_itens pi
+      JOIN pedidos ped ON pi.pedido_id = ped.id
+      JOIN produtos p ON pi.produto_id = p.id
+      WHERE ped.status = 'Entregue'
+      AND ped.data_pedido BETWEEN ? AND ?
+      AND pi.produto_id IN (?)
+      GROUP BY pi.produto_id, p.nome, data_agrupada
+      ORDER BY data_agrupada ASC
+    `;
+    
+    const [rows] = await db.query(sql, [dateFormat, data_inicio, data_fim, idsArray]);
+
+    // 4. Processa os dados (sem alteração)
+    const result = {};
+    rows.forEach(row => {
+      if (!result[row.produto_nome]) {
+        result[row.produto_nome] = [];
+      }
+      result[row.produto_nome].push({
+        date: row.data_agrupada,
+        valor: row.valor // O nome 'valor' é genérico e funciona para todas as métricas
+      });
+    });
+
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Erro ao buscar comparação de vendas de produtos:", error);
+    res.status(500).json({ message: 'Erro ao buscar dados de comparação.', error: error.message });
   }
 };
