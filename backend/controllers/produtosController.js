@@ -32,6 +32,8 @@ exports.getAllProdutos = async (req, res) => {
     let sql = `SELECT p.*, c.nome AS categoria_nome ${baseSql}`;
     if (sort) {
       const allowedSorts = {
+        'price_asc': 'ORDER BY p.valor ASC',
+        'price_desc': 'ORDER BY p.valor DESC',
         'stock_asc': 'ORDER BY p.estoque_total ASC',
         'stock_desc': 'ORDER BY p.estoque_total DESC',
         'name_asc': 'ORDER BY p.nome ASC',
