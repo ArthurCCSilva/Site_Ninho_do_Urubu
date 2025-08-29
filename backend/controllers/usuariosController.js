@@ -92,3 +92,14 @@ exports.updateProfile = async (req, res) => {
     connection.release(); // Sempre libera a conexão no final
   }
 };
+
+exports.getAllClientes = async (req, res) => {
+  try {
+    const [clientes] = await db.query(
+      "SELECT id, nome, email FROM usuarios WHERE role = 'cliente' ORDER BY nome ASC"
+    );
+    res.status(200).json(clientes);
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao buscar clientes.', error: error.message });
+  }
+};
