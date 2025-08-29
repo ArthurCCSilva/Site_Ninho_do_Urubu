@@ -1,57 +1,23 @@
 // backend/routes/produtosRoutes.js
-
 const express = require('express');
 const router = express.Router();
-
-// Importamos o controller que contém toda a lógica
 const produtosController = require('../controllers/produtosController');
-
-// Importamos os middlewares que fazem a proteção das rotas
 const { verifyToken, isAdmin } = require('../middleware/authMiddleware');
+const upload = require('../config/multerConfig');
 
-const upload = require('../config/multerConfig');//integrar multer das imagens
-
-/*
- * =========================================
- * ROTAS PÚBLICAS
- * (Qualquer usuário ou visitante pode acessar)
- * =========================================
- */
-
-// Rota principal para LISTAR TODOS os produtos (agora também lida com busca, filtro e ordenação)
-// GET -> http://localhost:3001/api/produtos/
+// --- ROTAS PÚBLICAS ---
 router.get('/', produtosController.getAllProdutos);
-
-// A rota '/pesquisar' foi removida, pois sua funcionalidade foi integrada à rota '/' acima.
-
-// Rota para buscar UM ÚNICO produto pelo seu ID
-// GET -> http://localhost:3001/api/produtos/123
 router.get('/:id', produtosController.getProdutoById);
 
-
-/*
- * =========================================
- * ROTAS PRIVADAS / PROTEGIDAS
- * (Apenas administradores logados podem acessar)
- * =========================================
- */
-
-// Rota para CRIAR um novo produto
-// POST -> http://localhost:3001/api/produtos/
+// --- ROTAS PRIVADAS / PROTEGIDAS (ADMIN) ---
 router.post('/', [verifyToken, isAdmin, upload.single('imagem_produto')], produtosController.createProduto);
-
-// Rota para ATUALIZAR um produto existente
-// PUT -> http://localhost:3001/api/produtos/123
 router.put('/:id', [verifyToken, isAdmin, upload.single('imagem_produto')], produtosController.updateProduto);
+router.delete('/:id', [verifyToken, isAdmin], produtosController.deleteProduto);
 
-// Rota para DELETAR um produto
-// DELETE -> http://localhost:3001/api/produtos/123
-router.delete('/:id', [verifyToken, isAdmin], produtosController.deleteProduto); // Vírgula extra removida daqui
-
-// ✅ NOVA ROTA para adicionar estoque
-// PATCH -> http://localhost:3001/api/produtos/123/adicionar-estoque
+// --- ROTAS DE GERENCIAMENTO DE ESTOQUE ---
 router.patch('/:id/adicionar-estoque', [verifyToken, isAdmin], produtosController.adicionarEstoque);
-router.patch('/:id/baixa-estoque', [verifyToken, isAdmin], produtosController.darBaixaEstoque);
 router.patch('/:id/corrigir-estoque', [verifyToken, isAdmin], produtosController.corrigirEstoque);
+router.patch('/:id/baixa-estoque', [verifyToken, isAdmin], produtosController.darBaixaEstoque);
+router.post('/:id/desmembrar', [verifyToken, isAdmin], produtosController.desmembrarProduto);
 
 module.exports = router;

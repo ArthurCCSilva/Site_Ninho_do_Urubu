@@ -68,73 +68,44 @@ exports.getProdutoById = async (req, res) => {
   }
 };
 
-// ✅ ATUALIZADO: Agora aceita estoque inicial e custo inicial
 exports.createProduto = async (req, res) => {
   try {
-    const { nome, descricao, valor, categoria_id, estoque, custo, destaque, promocao } = req.body;
+    const { nome, descricao, valor, categoria_id, estoque, custo, destaque, promocao, produto_pai_id, unidades_por_pai } = req.body;
     const imagem_produto_url = req.file ? req.file.filename : null;
-
-    if (!nome || !valor || !categoria_id || estoque === undefined || custo === undefined) {
-      return res.status(400).json({ message: 'Todos os campos, incluindo estoque inicial e custo, são obrigatórios.' });
-    }
-
-    const estoqueInicial = parseInt(estoque, 10);
-    const custoInicial = parseFloat(custo);
-
-    // Calcula os valores iniciais para o Custo Médio Ponderado
+    if (!nome || !valor || !categoria_id) { return res.status(400).json({ message: 'Nome, valor e categoria são obrigatórios.' }); }
+    const estoqueInicial = parseInt(estoque, 10) || 0;
+    const custoInicial = parseFloat(custo) || 0;
     const custoTotalInventario = estoqueInicial * custoInicial;
     const custoMedioPonderado = estoqueInicial > 0 ? custoInicial : 0;
-    
     const isDestaque = destaque === 'true' ? 1 : 0;
     const isPromocao = promocao === 'true' ? 1 : 0;
-
     const [result] = await db.query(
-      'INSERT INTO produtos (nome, descricao, valor, categoria_id, estoque_total, custo_total_inventario, custo_medio_ponderado, imagem_produto_url, destaque, promocao) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [nome, descricao, valor, categoria_id, estoqueInicial, custoTotalInventario, custoMedioPonderado, imagem_produto_url, isDestaque, isPromocao]
+      'INSERT INTO produtos (nome, descricao, valor, categoria_id, estoque_total, custo_total_inventario, custo_medio_ponderado, imagem_produto_url, destaque, promocao, produto_pai_id, unidades_por_pai) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [nome, descricao, valor, categoria_id, estoqueInicial, custoTotalInventario, custoMedioPonderado, imagem_produto_url, isDestaque, isPromocao, produto_pai_id || null, unidades_por_pai || null]
     );
     res.status(201).json({ message: 'Produto criado com sucesso!', produtoId: result.insertId });
-  } catch (error) {
-    res.status(500).json({ message: 'Erro ao criar produto.', error: error.message });
-  }
+  } catch (error) { res.status(500).json({ message: 'Erro ao criar produto.', error: error.message }); }
 };
 
-// --- Função para ATUALIZAR um produto (usando categoria_id) ---
+// ✅ FUNÇÃO ATUALIZADA: Agora salva a relação pai-filho
 exports.updateProduto = async (req, res) => {
   try {
     const { id } = req.params;
-    const { nome, descricao, valor, categoria_id, destaque, promocao } = req.body;
-    
-    const [produtosAtuais] = await db.query('SELECT imagem_produto_url FROM produtos WHERE id = ?', [id]);
-    if (produtosAtuais.length === 0) {
-      return res.status(404).json({ message: 'Produto não encontrado.' });
-    }
-    const imagemAntiga = produtosAtuais[0].imagem_produto_url;
-    
+    const { nome, descricao, valor, categoria_id, destaque, promocao, produto_pai_id, unidades_por_pai } = req.body;
+    const [produtoAtual] = await db.query('SELECT imagem_produto_url FROM produtos WHERE id = ?', [id]);
+    const imagemAntiga = produtoAtual[0]?.imagem_produto_url;
     const imagem_produto_url = req.file ? req.file.filename : imagemAntiga;
-    
     const isDestaque = destaque === 'true' ? 1 : 0;
     const isPromocao = promocao === 'true' ? 1 : 0;
-
-    const sql = `UPDATE produtos SET nome = ?, descricao = ?, valor = ?, categoria_id = ?, destaque = ?, promocao = ?, imagem_produto_url = ? WHERE id = ?`;
-    const params = [nome, descricao, valor, categoria_id, isDestaque, isPromocao, imagem_produto_url, id];
-
+    const sql = `UPDATE produtos SET nome = ?, descricao = ?, valor = ?, categoria_id = ?, destaque = ?, promocao = ?, produto_pai_id = ?, unidades_por_pai = ?, imagem_produto_url = ? WHERE id = ?`;
+    const params = [nome, descricao, valor, categoria_id, isDestaque, isPromocao, produto_pai_id || null, unidades_por_pai || null, imagem_produto_url, id];
     await db.query(sql, params);
-
     if (req.file && imagemAntiga) {
-      // ✅ CORREÇÃO DO CAMINHO AQUI
       const caminhoImagemAntiga = path.join(__dirname, '..', 'uploads', imagemAntiga);
-      try {
-        await fs.unlink(caminhoImagemAntiga);
-        console.log(`Imagem antiga de produto ${imagemAntiga} deletada.`);
-      } catch (fileErr) {
-        console.error("Erro ao deletar a imagem antiga do produto:", fileErr.code);
-      }
+      try { await fs.unlink(caminhoImagemAntiga); } catch (fileErr) { console.error("Erro ao deletar imagem antiga:", fileErr.code); }
     }
-
     res.status(200).json({ message: 'Produto atualizado com sucesso!' });
-  } catch (error) {
-    res.status(500).json({ message: 'Erro ao atualizar produto.', error: error.message });
-  }
+  } catch (error) { res.status(500).json({ message: 'Erro ao atualizar produto.', error: error.message }); }
 };
 
 // --- Função para DELETAR um produto ---
@@ -298,6 +269,42 @@ exports.corrigirEstoque = async (req, res) => {
   } catch (error) {
     await connection.rollback();
     res.status(500).json({ message: `Erro ao corrigir o estoque: ${error.message}` });
+  } finally {
+    connection.release();
+  }
+};
+
+exports.desmembrarProduto = async (req, res) => {
+  const { id: produtoPaiId } = req.params;
+  const { quantidadeFardos } = req.body;
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [pais] = await connection.query('SELECT * FROM produtos WHERE id = ? FOR UPDATE', [produtoPaiId]);
+    if (pais.length === 0) throw new Error('Produto "pai" (fardo) não encontrado.');
+    const pai = pais[0];
+    if (!pai.unidades_por_pai || pai.unidades_por_pai <= 0) throw new Error('Este produto não está configurado para ser desmembrado (defina "Unidades por Fardo" no cadastro do produto).');
+    const [filhos] = await connection.query('SELECT * FROM produtos WHERE produto_pai_id = ? FOR UPDATE', [produtoPaiId]);
+    if (filhos.length === 0) throw new Error('Nenhum produto "filho" (unidade) está associado a este fardo.');
+    const filho = filhos[0];
+    const qtdFardos = parseInt(quantidadeFardos, 10);
+    if (qtdFardos > pai.estoque_total) throw new Error('Estoque insuficiente do fardo para desmembrar.');
+    const custoPorFardo = pai.custo_medio_ponderado;
+    const custoPorUnidadeFilho = custoPorFardo / pai.unidades_por_pai;
+    const quantidadeUnidadesAdicionar = qtdFardos * pai.unidades_por_pai;
+    const custoTotalAdicionar = quantidadeUnidadesAdicionar * custoPorUnidadeFilho;
+    const novoEstoquePai = pai.estoque_total - qtdFardos;
+    const novoCustoTotalPai = novoEstoquePai * custoPorFardo;
+    await connection.query('UPDATE produtos SET estoque_total = ?, custo_total_inventario = ? WHERE id = ?', [novoEstoquePai, novoCustoTotalPai, produtoPaiId]);
+    const novoEstoqueFilho = filho.estoque_total + quantidadeUnidadesAdicionar;
+    const novoCustoTotalFilho = parseFloat(filho.custo_total_inventario) + custoTotalAdicionar;
+    const novoCustoMedioFilho = novoCustoTotalFilho > 0 ? novoCustoTotalFilho / novoEstoqueFilho : 0;
+    await connection.query('UPDATE produtos SET estoque_total = ?, custo_total_inventario = ?, custo_medio_ponderado = ? WHERE id = ?', [novoEstoqueFilho, novoCustoTotalFilho, novoCustoMedioFilho, filho.id]);
+    await connection.commit();
+    res.status(200).json({ message: `${qtdFardos} fardo(s) de ${pai.nome} desmembrados em ${quantidadeUnidadesAdicionar} unidades de ${filho.nome}.` });
+  } catch (error) {
+    await connection.rollback();
+    res.status(500).json({ message: `Erro ao desmembrar produto: ${error.message}` });
   } finally {
     connection.release();
   }
