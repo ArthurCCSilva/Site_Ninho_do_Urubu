@@ -13,7 +13,7 @@ function ProductCard({ product }) {
     ? `http://localhost:3001/uploads/${product.imagem_produto_url}`
     : 'https://placehold.co/200x200';
   
-  const isOutOfStock = product.estoque <= 0;
+  const isOutOfStock = product.estoque_total <= 0;
 
   const handleAddToCart = () => {
     if (!user) {
@@ -23,6 +23,17 @@ function ProductCard({ product }) {
       addToCart(product.id, 1);
       alert(`"${product.nome}" foi adicionado ao carrinho!`);
     }
+  };
+
+  const renderStockMessage = () => {
+    // Não mostra nada se o estoque for alto ou se já estiver esgotado (o botão já avisa)
+    if (product.estoque_total > 10 || isOutOfStock) {
+      return null;
+    }
+    if (product.estoque_total === 1) {
+      return <p className="text-warning small mb-1 fw-bold">Última unidade!</p>;
+    }
+    return <p className="text-warning small mb-1 fw-bold">Últimas {product.estoque_total} unidades!</p>;
   };
 
   return (
@@ -47,6 +58,7 @@ function ProductCard({ product }) {
       </div>
 
       <div className="card-footer">
+        {renderStockMessage()}
         <p className="card-text fw-bold fs-5 mb-2">
           R$ {parseFloat(product.valor).toFixed(2).replace('.', ',')}
         </p>

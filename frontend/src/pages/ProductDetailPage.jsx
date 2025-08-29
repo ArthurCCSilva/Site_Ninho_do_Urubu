@@ -86,17 +86,17 @@ function ProductDetailPage() {
     ? `http://localhost:3001/uploads/${product.imagem_produto_url}`
     : 'https://placehold.co/600x400';
 
-  const isOutOfStock = product.estoque <= 0;
+  const isOutOfStock = product.estoque_total <= 0;
 
   const renderStockMessage = () => {
     if (isOutOfStock) {
       return <p className="text-danger fw-bold mt-3">Produto indisponível</p>;
     }
-    if (product.estoque === 1) {
+    if (product.estoque_total === 1) {
       return <p className="text-warning fw-bold mt-3">Última unidade!</p>;
     }
-    if (product.estoque <= 10) {
-      return <p className="text-warning fw-bold mt-3">Últimas {product.estoque} unidades!</p>;
+    if (product.estoque_total <= 10) {
+      return <p className="text-warning fw-bold mt-3">Últimas {product.estoque_total} unidades!</p>;
     }
     return null; 
   };

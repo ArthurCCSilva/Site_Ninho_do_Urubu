@@ -11,6 +11,7 @@ import EditProfileModal from '../components/EditProfileModal';
 import Pagination from '../components/Pagination';
 
 function AdminDashboard() {
+  // --- Estados do Componente Principal ---
   const { user } = useAuth();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -26,6 +27,8 @@ function AdminDashboard() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [limit, setLimit] = useState(7);
+
+  // --- Estados para a ferramenta de ADICIONAR estoque ---
   const [stockSearchTerm, setStockSearchTerm] = useState('');
   const [stockFilterCategory, setStockFilterCategory] = useState('');
   const [stockProducts, setStockProducts] = useState([]);
@@ -33,6 +36,8 @@ function AdminDashboard() {
   const [stockUpdateValues, setStockUpdateValues] = useState({});
   const [stockCurrentPage, setStockCurrentPage] = useState(1);
   const [stockTotalPages, setStockTotalPages] = useState(0);
+
+  // --- Estados para a ferramenta de CORREÇÃO de estoque ---
   const [correctionSearchTerm, setCorrectionSearchTerm] = useState('');
   const [correctionFilterCategory, setCorrectionFilterCategory] = useState('');
   const [correctionProducts, setCorrectionProducts] = useState([]);
@@ -40,10 +45,13 @@ function AdminDashboard() {
   const [correctionValues, setCorrectionValues] = useState({});
   const [correctionCurrentPage, setCorrectionCurrentPage] = useState(1);
   const [correctionTotalPages, setCorrectionTotalPages] = useState(0);
+  
+  // --- Estados para a ferramenta de DESMEMBRAR ---
   const [unbundleProduct, setUnbundleProduct] = useState(null);
   const [unbundleQty, setUnbundleQty] = useState(1);
   const [allProductsForSelect, setAllProductsForSelect] = useState([]);
 
+  // --- Funções e Efeitos ---
   const fetchProducts = async (page = 1) => {
     try {
       setLoading(true);
@@ -73,17 +81,11 @@ function AdminDashboard() {
   const fetchAllProductsForSelect = async () => {
     try {
       const response = await api.get('/api/produtos?limit=1000');
-      const allProds = response.data.produtos || [];
-      
-      // ✅ --- LÓGICA DE FILTRO DEFINITIVAMENTE CORRIGIDA --- ✅
-      // 1. Encontra todos os IDs que são referenciados como "pai".
-      const parentIds = new Set(allProds.map(p => p.produto_pai_id).filter(id => id !== null));
-      
-      // 2. Filtra a lista de produtos para incluir apenas aqueles cujos IDs estão na lista de pais.
-      const parentProducts = allProds
-        .filter(p => parentIds.has(p.id))
+      // ✅ CORREÇÃO DEFINITIVA AQUI:
+      // Mostra apenas produtos que ESTÃO configurados para serem desmembrados (fardos)
+      const parentProducts = response.data.produtos
+        .filter(p => p.unidades_por_pai > 0)
         .map(p => ({ value: p.id, label: p.nome }));
-
       setAllProductsForSelect(parentProducts);
     } catch (err) {
       console.error("Erro ao buscar todos os produtos para o seletor", err);
@@ -156,6 +158,7 @@ function AdminDashboard() {
   useEffect(() => { if (correctionSearchTerm || correctionFilterCategory) { fetchCorrectionProducts(correctionCurrentPage); } }, [correctionCurrentPage]);
   
   const handleStockValueChange = (productId, field, value) => { setStockUpdateValues(prev => ({ ...prev, [productId]: { ...prev[productId], [field]: value } })); };
+  
   const handleStockUpdate = async (productId) => {
     const values = stockUpdateValues[productId];
     if (!values || !values.qtd || !values.custo) { return alert("Preencha a Quantidade a Adicionar e o Custo de Entrada."); }
@@ -171,7 +174,9 @@ function AdminDashboard() {
       fetchProducts(currentPage);
     } catch (err) { alert(err.response?.data?.message || "Falha ao atualizar estoque."); }
   };
+  
   const handleCorrectionValueChange = (productId, value) => { setCorrectionValues(prev => ({ ...prev, [productId]: value })); };
+  
   const handleStockCorrection = async (productId, currentStock) => {
     const quantityToRemove = correctionValues[productId];
     if (!quantityToRemove || parseInt(quantityToRemove) <= 0) { return alert("Insira um valor positivo."); }
@@ -186,6 +191,7 @@ function AdminDashboard() {
       } catch (err) { alert(err.response?.data?.message || "Falha ao corrigir estoque."); }
     }
   };
+  
   const handleUnbundle = async () => {
     if (!unbundleProduct || !unbundleQty || parseInt(unbundleQty) <= 0) {
       return alert("Selecione um fardo e uma quantidade válida para desmembrar.");
@@ -202,10 +208,12 @@ function AdminDashboard() {
       } catch (err) { alert(err.response?.data?.message || "Falha ao desmembrar produto."); }
     }
   };
+
   const handleShowAddModal = () => { setProductToEdit(null); setShowModal(true); };
   const handleShowEditModal = (product) => { setProductToEdit(product); setShowModal(true); };
   const handleCloseModal = () => setShowModal(false);
   const handleSaveProduct = () => { setShowModal(false); fetchProducts(currentPage); fetchAllProductsForSelect(); };
+  
   const handleDelete = async (productId) => {
     if (window.confirm('Tem certeza que deseja excluir este produto?')) {
       try {
@@ -250,6 +258,7 @@ function AdminDashboard() {
           </div>
         </div>
       </div>
+      
       <div className="d-flex justify-content-between align-items-center my-4"><h2>Gerenciamento de Produtos</h2><button className="btn btn-primary" onClick={handleShowAddModal}>Adicionar Novo Produto</button></div>
       <div className="card card-body mb-4">
         <div className="row g-3 align-items-center">
@@ -258,10 +267,12 @@ function AdminDashboard() {
           <div className="col-lg-4"><div className="btn-group w-100" role="group"><button type="button" className={`btn btn-outline-secondary ${sortOrder === 'stock_asc' ? 'active' : ''}`} onClick={() => setSortOrder('stock_asc')}>Menor Estoque</button><button type="button" className={`btn btn-outline-secondary ${sortOrder === 'stock_desc' ? 'active' : ''}`} onClick={() => setSortOrder('stock_desc')}>Maior Estoque</button><button type="button" className={`btn btn-outline-secondary ${!sortOrder ? 'active' : ''}`} onClick={() => setSortOrder('')}>Padrão</button></div></div>
         </div>
       </div>
+      
       <div className="card">
         <div className="card-body">{loading ? ( <div className="text-center my-5"><div className="spinner-border" /></div> ) : error ? ( <div className="alert alert-danger">{error}</div> ) : ( <ProductAdminList products={products} onEdit={handleShowEditModal} onDelete={handleDelete} /> )}</div>
         <div className="card-footer d-flex justify-content-center"><Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={(page) => setCurrentPage(page)} /></div>
       </div>
+      
       <div className="card mt-5">
         <div className="card-header"><h3 className="mb-0">Atualização Rápida de Estoque</h3></div>
         <div className="card-body">
@@ -274,6 +285,7 @@ function AdminDashboard() {
         </div>
         <div className="card-footer d-flex justify-content-center"><Pagination currentPage={stockCurrentPage} totalPages={stockTotalPages} onPageChange={(page) => setStockCurrentPage(page)} /></div>
       </div>
+
       <div className="card mt-5">
         <div className="card-header"><h3 className="mb-0">Correção de Estoque</h3></div>
         <div className="card-body">
@@ -286,6 +298,7 @@ function AdminDashboard() {
         </div>
         <div className="card-footer d-flex justify-content-center"><Pagination currentPage={correctionCurrentPage} totalPages={correctionTotalPages} onPageChange={(page) => setCorrectionCurrentPage(page)} /></div>
       </div>
+
       <div className="card mt-5">
         <div className="card-header"><h3 className="mb-0">Desmembrar Produto (Fardo em Unidades)</h3></div>
         <div className="card-body">
@@ -305,6 +318,7 @@ function AdminDashboard() {
           </div>
         </div>
       </div>
+
       <ProductModal show={showModal} onHide={handleCloseModal} productToEdit={productToEdit} onSave={handleSaveProduct} />
       <CategoryModal show={showCategoryModal} onHide={() => setShowCategoryModal(false)} onUpdate={() => { fetchCategories(); fetchProducts(currentPage); }} />
       <EditProfileModal show={showEditProfileModal} onHide={() => setShowEditProfileModal(false)} />

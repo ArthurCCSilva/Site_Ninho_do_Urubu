@@ -23,6 +23,7 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
   const [imagemFile, setImagemFile] = useState(null);
   const [categories, setCategories] = useState([]);
   const [allProducts, setAllProducts] = useState([]);
+  const [productType, setProductType] = useState('simples'); // 'simples', 'pai', ou 'filho'
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const modalRef = useRef();
@@ -31,22 +32,18 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
   const [showCropper, setShowCropper] = useState(false);
   const fileInputRef = useRef(null);
 
-  // Busca categorias E a lista de todos os produtos para os seletores
   useEffect(() => {
     const fetchData = async () => {
       try {
         const [catRes, prodRes] = await Promise.all([
           api.get('/api/categorias?limit=all'),
-          api.get('/api/produtos?limit=1000') // Pega uma lista grande de produtos
+          api.get('/api/produtos?limit=1000')
         ]);
         setCategories(catRes.data.categorias.map(c => ({ value: c.id, label: c.nome })));
-        
-        // Filtra o produto que está sendo editado da lista de pais para evitar auto-referência
         const productList = prodRes.data.produtos
           .filter(p => !productToEdit || p.id !== productToEdit.id)
           .map(p => ({ value: p.id, label: p.nome }));
         setAllProducts(productList);
-
       } catch (err) {
         console.error("Erro ao carregar dados para o modal", err);
       }
@@ -56,7 +53,6 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
     }
   }, [show, productToEdit]);
 
-  // Preenche/limpa o formulário quando o modal é aberto
   useEffect(() => {
     if (show) {
       if (productToEdit) {
@@ -72,15 +68,19 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
           produto_pai_id: productToEdit.produto_pai_id || null,
           unidades_por_pai: productToEdit.unidades_por_pai || '',
         });
+        // Determina o tipo do produto ao editar
+        if (productToEdit.unidades_por_pai > 0) setProductType('pai');
+        else if (productToEdit.produto_pai_id) setProductType('filho');
+        else setProductType('simples');
       } else {
         setFormData(initialState);
+        setProductType('simples'); // Reseta para 'simples' ao adicionar novo
       }
       setImagemFile(null);
       setError('');
     }
   }, [productToEdit, show]);
   
-  // Controla a exibição do modal do Bootstrap
   useEffect(() => {
     const modalElement = modalRef.current;
     if (!modalElement) return;
@@ -89,7 +89,6 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
     else bsModal.hide();
   }, [show]);
 
-  // Handlers para os inputs
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
   const handleCheckboxChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.checked });
   const handleCategoryChange = (selectedOption) => setFormData({ ...formData, categoria_id: selectedOption ? selectedOption.value : null });
@@ -99,10 +98,7 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
     const file = event.target.files[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setImageToCrop(reader.result);
-        setShowCropper(true);
-      };
+      reader.onloadend = () => { setImageToCrop(reader.result); setShowCropper(true); };
       reader.readAsDataURL(file);
     }
   };
@@ -110,17 +106,27 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
   const handleCropComplete = (croppedFile) => {
     setImagemFile(croppedFile);
     setShowCropper(false);
-    if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-    }
+    if (fileInputRef.current) { fileInputRef.current.value = ""; }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+
+    // Limpa os campos não utilizados com base no tipo de produto antes de enviar
+    const dataToSend = { ...formData };
+    if (productType === 'simples') {
+      dataToSend.produto_pai_id = null;
+      dataToSend.unidades_por_pai = null;
+    } else if (productType === 'pai') {
+      dataToSend.produto_pai_id = null;
+    } else if (productType === 'filho') {
+      dataToSend.unidades_por_pai = null;
+    }
+
     const data = new FormData();
-    Object.keys(formData).forEach(key => data.append(key, formData[key]));
+    Object.keys(dataToSend).forEach(key => data.append(key, dataToSend[key]));
     if (imagemFile) {
       data.append('imagem_produto', imagemFile);
     }
@@ -155,7 +161,6 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
                 <div className="mb-3"><label className="form-label">Descrição</label><textarea rows="3" name="descricao" value={formData.descricao} onChange={handleChange} className="form-control" /></div>
                 <div className="row">
                   <div className="col"><div className="mb-3"><label className="form-label">Valor de Venda (R$)</label><input type="number" step="0.01" name="valor" value={formData.valor} onChange={handleChange} className="form-control" required /></div></div>
-                  
                   {!productToEdit && (
                     <>
                       <div className="col"><div className="mb-3"><label className="form-label">Estoque Inicial</label><input type="number" name="estoque" value={formData.estoque} onChange={handleChange} className="form-control" required /></div></div>
@@ -166,24 +171,27 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
                 <div className="mb-3"><label htmlFor="categoria_id" className="form-label">Categoria</label><Select id="categoria_id" name="categoria_id" options={categories} placeholder="Selecione..." value={categories.find(option => option.value === formData.categoria_id) || null} onChange={handleCategoryChange} isClearable noOptionsMessage={() => "Nenhuma categoria"} /></div>
                 <div className="mb-3"><label className="form-label">Imagem (Opcional)</label><input type="file" ref={fileInputRef} name="imagem_produto" onChange={handleFileSelect} className="form-control" accept="image/*" />{imagemFile && <img src={URL.createObjectURL(imagemFile)} alt="Preview" width="100" className="mt-2 rounded"/>}</div>
                 <hr />
-
-                <h5>Relação de Produto (Opcional)</h5>
-                <p className="small text-muted">Use para relacionar um fardo a uma unidade, ou um produto a um fardo.</p>
-                <div className="row">
-                  <div className="col-md-8">
-                    <div className="mb-3">
-                      <label className="form-label">Este produto é uma unidade de (Produto Pai)</label>
-                      <Select options={allProducts} placeholder="Selecione o fardo..." isClearable value={allProducts.find(option => option.value === formData.produto_pai_id) || null} onChange={handleParentProductChange} />
-                    </div>
-                  </div>
-                  <div className="col-md-4">
-                    <div className="mb-3">
-                      <label className="form-label">Unidades por Fardo</label>
-                      <input type="number" name="unidades_por_pai" value={formData.unidades_por_pai} onChange={handleChange} className="form-control" placeholder="Se este for um fardo, ex: 6" />
-                    </div>
-                  </div>
+                <h5>Relação de Produto</h5>
+                <div className="mb-3">
+                  <label className="form-label">Tipo de Produto</label>
+                  <select className="form-select" value={productType} onChange={(e) => setProductType(e.target.value)}>
+                    <option value="simples">Produto Simples (sem relação)</option>
+                    <option value="pai">Fardo / Pacote (Produto Pai)</option>
+                    <option value="filho">Unidade Avulsa (Produto Filho)</option>
+                  </select>
                 </div>
-
+                {productType === 'pai' && (
+                  <div className="mb-3">
+                    <label className="form-label">Unidades contidas neste Fardo</label>
+                    <input type="number" name="unidades_por_pai" value={formData.unidades_por_pai} onChange={handleChange} className="form-control" placeholder="Ex: 6" />
+                  </div>
+                )}
+                {productType === 'filho' && (
+                  <div className="mb-3">
+                    <label className="form-label">Este produto é uma unidade de qual Fardo (Pai)?</label>
+                    <Select options={allProducts} placeholder="Selecione o fardo..." isClearable value={allProducts.find(o => o.value === formData.produto_pai_id) || null} onChange={handleParentProductChange} />
+                  </div>
+                )}
                 <hr />
                 <div className="form-check form-switch mb-3"><input className="form-check-input" type="checkbox" role="switch" id="destaqueCheck" name="destaque" checked={formData.destaque} onChange={handleCheckboxChange} /><label className="form-check-label" htmlFor="destaqueCheck">Marcar como Produto Destaque</label></div>
                 <div className="form-check form-switch"><input className="form-check-input" type="checkbox" role="switch" id="promocaoCheck" name="promocao" checked={formData.promocao} onChange={handleCheckboxChange} /><label className="form-check-label" htmlFor="promocaoCheck">Marcar como Produto em Promoção</label></div>
@@ -196,7 +204,6 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
           </div>
         </div>
       </div>
-
       <ImageCropperModal 
         show={showCropper}
         onHide={() => setShowCropper(false)}

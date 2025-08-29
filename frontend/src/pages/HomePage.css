@@ -8,3 +8,7 @@
   padding-bottom: 0.5rem;
   display: inline-block;
 }
+
+.product-carousel .swiper-wrapper {
+  align-items: stretch;
+}
