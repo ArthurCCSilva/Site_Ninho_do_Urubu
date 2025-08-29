@@ -4,24 +4,43 @@ const db = require('../db');
 // GET / - Busca as despesas de um determinado período
 exports.getDespesas = async (req, res) => {
   try {
-    const { data_inicio, data_fim } = req.query;
+    const { data_inicio, data_fim, search, page = 1, limit = 10 } = req.query;
     if (!data_inicio || !data_fim) {
-      return res.status(400).json({ message: 'Datas de início e fim são obrigatórias.' });
+      return res.status(400).json({ message: 'Datas são obrigatórias.' });
     }
-    const [despesas] = await db.query(
-      `SELECT 
-         d.*, 
-         dc.nome as categoria_nome,
-         p.nome as produto_nome
-       FROM despesas d 
-       LEFT JOIN despesa_categorias dc ON d.categoria_id = dc.id
-       LEFT JOIN produtos p ON d.produto_id = p.id
-       WHERE d.data BETWEEN ? AND ? ORDER BY d.data DESC`,
-      [data_inicio, data_fim]
-    );
-    res.status(200).json(despesas);
+
+    let params = [data_inicio, data_fim];
+    let whereConditions = 'd.data BETWEEN ? AND ?';
+
+    // Adiciona a condição de busca, se houver
+    if (search) {
+      whereConditions += ' AND d.descricao LIKE ?';
+      params.push(`%${search}%`);
+    }
+
+    // Query para contar o total de itens
+    const countSql = `SELECT COUNT(d.id) as total FROM despesas d WHERE ${whereConditions}`;
+    const [countRows] = await db.query(countSql, params);
+    const totalItems = countRows[0].total;
+    const totalPages = Math.ceil(totalItems / limit);
+
+    // Query principal para buscar os dados da página
+    const offset = (page - 1) * limit;
+    const finalParams = [...params, parseInt(limit), parseInt(offset)];
+    const sql = `
+      SELECT d.*, dc.nome as categoria_nome, p.nome as produto_nome 
+      FROM despesas d 
+      LEFT JOIN despesa_categorias dc ON d.categoria_id = dc.id
+      LEFT JOIN produtos p ON d.produto_id = p.id
+      WHERE ${whereConditions} 
+      ORDER BY d.id DESC
+      LIMIT ? OFFSET ?
+    `;
+    
+    const [despesas] = await db.query(sql, finalParams);
+    res.status(200).json({ despesas, totalPages, currentPage: parseInt(page) });
+
   } catch (error) {
-    console.error("Erro ao buscar despesas:", error);
     res.status(500).json({ message: 'Erro ao buscar despesas.', error: error.message });
   }
 };

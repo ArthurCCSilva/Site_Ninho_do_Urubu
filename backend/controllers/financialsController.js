@@ -140,3 +140,87 @@ exports.getProductProfitability = async (req, res) => {
     res.status(500).json({ message: 'Erro ao buscar lucratividade por produto.', error: error.message });
   }
 };
+
+exports.getPaymentMethodStats = async (req, res) => {
+  try {
+    const { data_inicio, data_fim } = req.query;
+    if (!data_inicio || !data_fim) {
+      return res.status(400).json({ message: 'Datas são obrigatórias.' });
+    }
+
+    // Query complexa que agrupa por forma de pagamento e calcula os totais
+    const sql = `
+      SELECT 
+        p.forma_pagamento,
+        COUNT(p.id) as numero_de_vendas,
+        SUM(p.valor_total) as receita_total,
+        SUM(pi.quantidade * pi.custo_unitario) as custo_total,
+        (SUM(p.valor_total) - SUM(pi.quantidade * pi.custo_unitario)) as lucro_total
+      FROM pedidos p
+      JOIN pedido_itens pi ON p.id = pi.pedido_id
+      WHERE p.status IN ('Entregue', 'Enviado', 'Processando') 
+      AND p.data_pedido BETWEEN ? AND ?
+      GROUP BY p.forma_pagamento
+      ORDER BY lucro_total DESC;
+    `;
+    
+    const [stats] = await db.query(sql, [data_inicio, data_fim]);
+    res.status(200).json(stats);
+
+  } catch (error) {
+    console.error("Erro ao buscar estatísticas de pagamento:", error);
+    res.status(500).json({ message: 'Erro ao buscar estatísticas de pagamento.', error: error.message });
+  }
+};
+
+exports.getAvailableMonths = async (req, res) => {
+  try {
+    const sql = `
+      SELECT DISTINCT 
+        YEAR(data_pedido) as ano, 
+        MONTH(data_pedido) as mes 
+      FROM pedidos 
+      WHERE status = 'Entregue' 
+      ORDER BY ano DESC, mes DESC
+    `;
+    const [rows] = await db.query(sql);
+    res.status(200).json(rows);
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao buscar meses disponíveis.', error: error.message });
+  }
+};
+
+// ✅ NOVA FUNÇÃO: Busca os dados para o gráfico de comparação
+exports.getMonthlyComparison = async (req, res) => {
+  try {
+    const { meses, metrica } = req.query; // meses será "2025-08,2025-07"
+    if (!meses || !metrica) {
+      return res.status(400).json({ message: 'Meses e métrica são obrigatórios.' });
+    }
+
+    const mesesArray = meses.split(',');
+    const results = [];
+
+    for (const mesAno of mesesArray) {
+      const [ano, mes] = mesAno.split('-');
+
+      let valor = 0;
+      if (metrica === 'receitaBruta') {
+        const [rows] = await db.query("SELECT SUM(valor_total) as total FROM pedidos WHERE status = 'Entregue' AND YEAR(data_pedido) = ? AND MONTH(data_pedido) = ?", [ano, mes]);
+        valor = rows[0].total || 0;
+      } else if (metrica === 'custoProdutos') {
+        const [rows] = await db.query("SELECT SUM(pi.custo_unitario * pi.quantidade) as total FROM pedido_itens pi JOIN pedidos p ON pi.pedido_id = p.id WHERE p.status = 'Entregue' AND YEAR(p.data_pedido) = ? AND MONTH(p.data_pedido) = ?", [ano, mes]);
+        valor = rows[0].total || 0;
+      } else if (metrica === 'despesasOperacionais') {
+        const [rows] = await db.query("SELECT SUM(valor) as total FROM despesas WHERE YEAR(data) = ? AND MONTH(data) = ?", [ano, mes]);
+        valor = rows[0].total || 0;
+      }
+      
+      results.push({ mesAno: `${mes}/${ano}`, valor });
+    }
+
+    res.status(200).json(results);
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao buscar dados de comparação mensal.', error: error.message });
+  }
+};
