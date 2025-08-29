@@ -18,5 +18,6 @@ router.get('/admin/todos', isAdmin, pedidosController.getTodosPedidosAdmin);
 router.post('/admin/venda-fisica', isAdmin, pedidosController.criarVendaFisica);
 router.patch('/:id/status', isAdmin, pedidosController.updateStatusPedido);
 router.patch('/:id/cancelar-admin', isAdmin, pedidosController.cancelarPedidoAdmin);
+router.patch('/itens/:itemId', isAdmin, pedidosController.updateItemPedido);
 
 module.exports = router;

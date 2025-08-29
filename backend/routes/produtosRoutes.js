@@ -52,5 +52,6 @@ router.delete('/:id', [verifyToken, isAdmin], produtosController.deleteProduto);
 // PATCH -> http://localhost:3001/api/produtos/123/adicionar-estoque
 router.patch('/:id/adicionar-estoque', [verifyToken, isAdmin], produtosController.adicionarEstoque);
 router.patch('/:id/baixa-estoque', [verifyToken, isAdmin], produtosController.darBaixaEstoque);
+router.patch('/:id/corrigir-estoque', [verifyToken, isAdmin], produtosController.corrigirEstoque);
 
 module.exports = router;

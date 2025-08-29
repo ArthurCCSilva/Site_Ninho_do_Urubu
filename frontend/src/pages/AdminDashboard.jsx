@@ -11,7 +11,8 @@ import EditProfileModal from '../components/EditProfileModal';
 import Pagination from '../components/Pagination';
 
 function AdminDashboard() {
-  const { user } = useAuth();
+  // --- Estados do Componente Principal ---
+  const { user, logout } = useAuth();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -26,6 +27,8 @@ function AdminDashboard() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [limit, setLimit] = useState(7);
+
+  // --- Estados para a ferramenta de ADICIONAR estoque ---
   const [stockSearchTerm, setStockSearchTerm] = useState('');
   const [stockFilterCategory, setStockFilterCategory] = useState('');
   const [stockProducts, setStockProducts] = useState([]);
@@ -33,6 +36,18 @@ function AdminDashboard() {
   const [stockUpdateValues, setStockUpdateValues] = useState({});
   const [stockCurrentPage, setStockCurrentPage] = useState(1);
   const [stockTotalPages, setStockTotalPages] = useState(0);
+
+  // --- Estados para a ferramenta de CORREÇÃO de estoque ---
+  const [correctionSearchTerm, setCorrectionSearchTerm] = useState('');
+  const [correctionFilterCategory, setCorrectionFilterCategory] = useState('');
+  const [correctionProducts, setCorrectionProducts] = useState([]);
+  const [correctionLoading, setCorrectionLoading] = useState(false);
+  const [correctionValues, setCorrectionValues] = useState({});
+  const [correctionCurrentPage, setCorrectionCurrentPage] = useState(1);
+  const [correctionTotalPages, setCorrectionTotalPages] = useState(0);
+
+  
+  // --- Funções e Efeitos do Componente ---
 
   const fetchProducts = async (page = 1) => {
     try {
@@ -53,7 +68,7 @@ function AdminDashboard() {
       setLoading(false);
     }
   };
-
+  
   const fetchCategories = async () => {
     try {
       const response = await api.get('/api/categorias?limit=all');
@@ -63,7 +78,8 @@ function AdminDashboard() {
       console.error("Falha ao buscar categorias para o filtro", err);
     }
   };
-
+  
+  // Efeitos para a lista principal
   useEffect(() => {
     const debounceFetch = setTimeout(() => {
       if (currentPage !== 1) { setCurrentPage(1); } 
@@ -75,16 +91,15 @@ function AdminDashboard() {
   useEffect(() => {
     fetchProducts(currentPage);
   }, [currentPage]);
-
+  
   useEffect(() => { 
     fetchCategories(); 
   }, []);
 
+  // Funções e Efeitos para ADICIONAR estoque
   const fetchStockProducts = async (page = 1) => {
     if (!stockSearchTerm && !stockFilterCategory) {
-      setStockProducts([]);
-      setStockTotalPages(0);
-      return;
+      setStockProducts([]); setStockTotalPages(0); return;
     }
     try {
       setStockLoading(true);
@@ -104,21 +119,55 @@ function AdminDashboard() {
 
   useEffect(() => {
     const debounceFetch = setTimeout(() => {
-      if (stockCurrentPage !== 1) { setStockCurrentPage(1); } 
+      if (stockCurrentPage !== 1) { setStockCurrentPage(1); }
       else { fetchStockProducts(1); }
     }, 500);
     return () => clearTimeout(debounceFetch);
   }, [stockSearchTerm, stockFilterCategory]);
 
   useEffect(() => {
-    fetchStockProducts(stockCurrentPage);
+    if (stockSearchTerm || stockFilterCategory) {
+      fetchStockProducts(stockCurrentPage);
+    }
   }, [stockCurrentPage]);
+  
+  // ✅ --- LÓGICA CORRIGIDA E COMPLETA para a ferramenta de CORREÇÃO de estoque ---
+  const fetchCorrectionProducts = async (page = 1) => {
+    if (!correctionSearchTerm && !correctionFilterCategory) {
+      setCorrectionProducts([]); setCorrectionTotalPages(0); return;
+    }
+    try {
+      setCorrectionLoading(true);
+      const params = new URLSearchParams({ page, limit: 5 });
+      if (correctionSearchTerm) params.append('search', correctionSearchTerm);
+      if (correctionFilterCategory) params.append('category', correctionFilterCategory);
+      const response = await api.get(`/api/produtos?${params.toString()}`);
+      setCorrectionProducts(response.data.produtos || []);
+      setCorrectionTotalPages(response.data.totalPages);
+      setCorrectionCurrentPage(response.data.currentPage);
+    } catch (err) { 
+      console.error("Erro ao buscar produtos para correção", err);
+    } finally { 
+      setCorrectionLoading(false);
+    }
+  };
 
+  useEffect(() => {
+    const debounceFetch = setTimeout(() => {
+      if (correctionCurrentPage !== 1) { setCorrectionCurrentPage(1); }
+      else { fetchCorrectionProducts(1); }
+    }, 500);
+    return () => clearTimeout(debounceFetch);
+  }, [correctionSearchTerm, correctionFilterCategory]);
+
+  useEffect(() => { 
+    if (correctionSearchTerm || correctionFilterCategory) {
+      fetchCorrectionProducts(correctionCurrentPage);
+    }
+  }, [correctionCurrentPage]);
+  
   const handleStockValueChange = (productId, field, value) => {
-    setStockUpdateValues(prev => ({
-      ...prev,
-      [productId]: { ...prev[productId], [field]: value }
-    }));
+    setStockUpdateValues(prev => ({ ...prev, [productId]: { ...prev[productId], [field]: value } }));
   };
 
   const handleStockUpdate = async (productId) => {
@@ -138,6 +187,23 @@ function AdminDashboard() {
       fetchProducts(currentPage);
     } catch (err) {
       alert(err.response?.data?.message || "Falha ao atualizar estoque.");
+    }
+  };
+  
+  const handleCorrectionValueChange = (productId, value) => { setCorrectionValues(prev => ({ ...prev, [productId]: value })); };
+
+  const handleStockCorrection = async (productId, currentStock) => {
+    const quantityToRemove = correctionValues[productId];
+    if (!quantityToRemove || parseInt(quantityToRemove) <= 0) { return alert("Insira um valor positivo."); }
+    if (parseInt(quantityToRemove) > currentStock) { return alert("A correção não pode ser maior que o estoque atual."); }
+    if (window.confirm(`Confirmar a remoção de ${quantityToRemove} unidade(s) do estoque?`)) {
+      try {
+        await api.patch(`/api/produtos/${productId}/corrigir-estoque`, { quantidadeParaRemover: quantityToRemove });
+        alert('Estoque corrigido!');
+        setCorrectionValues(prev => ({ ...prev, [productId]: '' }));
+        fetchCorrectionProducts(correctionCurrentPage);
+        fetchProducts(currentPage);
+      } catch (err) { alert(err.response?.data?.message || "Falha ao corrigir estoque."); }
     }
   };
   
@@ -165,9 +231,7 @@ function AdminDashboard() {
       <div className="row">
         <div className="col-lg-7 mb-4">
           <div className="card h-100">
-            <div className="card-header d-flex justify-content-between align-items-center">
-              <h4>Informações do Admin</h4>
-            </div>
+            <div className="card-header d-flex justify-content-between align-items-center"><h4>Informações do Admin</h4></div>
             <div className="card-body">
               <div className="row align-items-center">
                 <div className="col-md-3 text-center">
@@ -175,11 +239,9 @@ function AdminDashboard() {
                 </div>
                 <div className="col-md-9">
                   <h5 className="card-title">{user?.nome}</h5>
-                  <p className="card-text mb-0"><strong>Email:</strong> {user?.email}</p>
+                  <p className="card-text mb-0"><strong>Email:</strong> {user?.email || 'Não informado'}</p>
                   <p className="card-text"><strong>Status:</strong> <span className="badge bg-success text-uppercase">{user?.role}</span></p>
-                  <button className="btn btn-secondary btn-sm mt-2" onClick={() => setShowEditProfileModal(true)}>
-                    Editar Perfil
-                  </button>
+                  <button className="btn btn-secondary btn-sm mt-2" onClick={() => setShowEditProfileModal(true)}>Editar Perfil</button>
                 </div>
               </div>
             </div>
@@ -191,7 +253,7 @@ function AdminDashboard() {
             <div className="card-body d-flex flex-column justify-content-center align-items-start">
               <Link to="/admin/pedidos" className="btn btn-primary mb-3 w-100">Gerenciar Pedidos</Link>
               <Link to="/admin/venda-fisica" className="btn btn-success mb-3 w-100">Registrar Venda Física</Link>
-              <Link to="/admin/financeiro" className="btn btn-warning mb-3 w-100">Gerenciamento Financeiro</Link>
+              <Link to="/admin/financeiro" className="btn btn-warning mb-3 w-100">Painel Financeiro</Link>
               <button className="btn btn-info w-100" onClick={() => setShowCategoryModal(true)}>Gerenciar Categorias</button>
             </div>
           </div>
@@ -205,12 +267,8 @@ function AdminDashboard() {
       
       <div className="card card-body mb-4">
         <div className="row g-3 align-items-center">
-          <div className="col-lg-5">
-            <input type="text" className="form-control" placeholder="Buscar por nome ou descrição..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-          </div>
-          <div className="col-lg-3">
-            <Select options={categories} isClearable placeholder="Filtrar por Categoria..." onChange={(selectedOption) => setFilterCategory(selectedOption ? selectedOption.value : '')} />
-          </div>
+          <div className="col-lg-5"><input type="text" className="form-control" placeholder="Buscar por nome ou descrição..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
+          <div className="col-lg-3"><Select options={categories} isClearable placeholder="Filtrar por Categoria..." onChange={(selectedOption) => setFilterCategory(selectedOption ? selectedOption.value : '')} /></div>
           <div className="col-lg-4">
             <div className="btn-group w-100" role="group">
               <button type="button" className={`btn btn-outline-secondary ${sortOrder === 'stock_asc' ? 'active' : ''}`} onClick={() => setSortOrder('stock_asc')}>Menor Estoque</button>
@@ -238,24 +296,15 @@ function AdminDashboard() {
         <div className="card-body">
           <p className="text-muted">Busque por nome ou filtre por categoria para ver os produtos e adicionar ao estoque.</p>
           <div className="row g-3 mb-4">
-            <div className="col-md-6">
-              <input type="text" className="form-control" placeholder="Pesquisar produto por nome..." value={stockSearchTerm} onChange={(e) => setStockSearchTerm(e.target.value)} />
-            </div>
-            <div className="col-md-6">
-              <Select options={categories} isClearable placeholder="Filtrar por Categoria..." onChange={(selectedOption) => setStockFilterCategory(selectedOption ? selectedOption.value : '')} noOptionsMessage={() => "Nenhuma categoria"} />
-            </div>
+            <div className="col-md-6"><input type="text" className="form-control" placeholder="Pesquisar produto..." value={stockSearchTerm} onChange={(e) => setStockSearchTerm(e.target.value)} /></div>
+            <div className="col-md-6"><Select options={categories} isClearable placeholder="Filtrar por Categoria..." onChange={(selectedOption) => setStockFilterCategory(selectedOption ? selectedOption.value : '')} noOptionsMessage={() => "Nenhuma categoria"} /></div>
           </div>
-          {stockLoading ? (
-            <div className="text-center"><div className="spinner-border" /></div>
-          ) : (
+          {stockLoading ? ( <div className="text-center"><div className="spinner-border" /></div> ) : (
             <div>
-              {stockProducts.length > 0 ? stockProducts.map(product => (
+              {stockProducts.map(product => (
                 <div key={`stock-${product.id}`} className="d-flex align-items-center border-bottom py-2 flex-wrap">
                   <img src={product.imagem_produto_url ? `http://localhost:3001/uploads/${product.imagem_produto_url}` : 'https://placehold.co/60'} alt={product.nome} className="rounded" style={{ width: '60px', height: '60px', objectFit: 'cover' }} />
-                  <div className="flex-grow-1 mx-3">
-                    <strong>{product.nome}</strong>
-                    <div className="text-muted">Estoque Atual: {product.estoque_total} | Venda: R$ {parseFloat(product.valor).toFixed(2)}</div>
-                  </div>
+                  <div className="flex-grow-1 mx-3"><strong>{product.nome}</strong><div className="text-muted">Estoque: {product.estoque_total} | Venda: R$ {parseFloat(product.valor).toFixed(2)}</div></div>
                   <div className="d-flex" style={{ minWidth: '400px' }}>
                     <input type="number" className="form-control me-2" placeholder="+ Qtd." value={stockUpdateValues[product.id]?.qtd || ''} onChange={(e) => handleStockValueChange(product.id, 'qtd', e.target.value)} />
                     <input type="number" step="0.01" className="form-control me-2" placeholder="Custo/un. (R$)" value={stockUpdateValues[product.id]?.custo || ''} onChange={(e) => handleStockValueChange(product.id, 'custo', e.target.value)} />
@@ -263,15 +312,37 @@ function AdminDashboard() {
                     <button className="btn btn-success" onClick={() => handleStockUpdate(product.id)}>Atualizar</button>
                   </div>
                 </div>
-              )) : (
-                <p className="text-center text-muted mt-3">Nenhum produto encontrado. Inicie uma busca ou filtro.</p>
-              )}
+              ))}
             </div>
           )}
         </div>
-        <div className="card-footer d-flex justify-content-center">
-            <Pagination currentPage={stockCurrentPage} totalPages={stockTotalPages} onPageChange={(page) => setStockCurrentPage(page)} />
+        <div className="card-footer d-flex justify-content-center"><Pagination currentPage={stockCurrentPage} totalPages={stockTotalPages} onPageChange={(page) => setStockCurrentPage(page)} /></div>
+      </div>
+
+      <div className="card mt-5">
+        <div className="card-header"><h3 className="mb-0">Correção de Estoque</h3></div>
+        <div className="card-body">
+          <p className="text-muted">Use esta ferramenta para corrigir erros de contagem, removendo unidades do inventário. Esta ação não gera uma despesa financeira.</p>
+          <div className="row g-3 mb-4">
+            <div className="col-md-8"><input type="text" className="form-control" placeholder="Pesquisar produto..." value={correctionSearchTerm} onChange={(e) => setCorrectionSearchTerm(e.target.value)} /></div>
+            <div className="col-md-4"><Select options={categories} isClearable placeholder="Filtrar por Categoria..." onChange={(option) => setCorrectionFilterCategory(option ? option.value : '')} /></div>
+          </div>
+          {correctionLoading ? ( <div className="text-center"><div className="spinner-border" /></div> ) : (
+            <div>
+              {correctionProducts.map(product => (
+                <div key={`corr-${product.id}`} className="d-flex align-items-center border-bottom py-2 flex-wrap">
+                  <img src={product.imagem_produto_url ? `http://localhost:3001/uploads/${product.imagem_produto_url}` : 'https://placehold.co/60'} alt={product.nome} className="rounded" style={{ width: '60px', height: '60px', objectFit: 'cover' }} />
+                  <div className="flex-grow-1 mx-3"><strong>{product.nome}</strong><div className="text-muted">Estoque Atual: {product.estoque_total}</div></div>
+                  <div className="d-flex" style={{ minWidth: '250px' }}>
+                    <input type="number" className="form-control me-2" placeholder="Qtd. a remover" value={correctionValues[product.id] || ''} onChange={(e) => handleCorrectionValueChange(product.id, e.target.value)} />
+                    <button className="btn btn-warning" onClick={() => handleStockCorrection(product.id, product.estoque_total)}>Corrigir</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
+        <div className="card-footer d-flex justify-content-center"><Pagination currentPage={correctionCurrentPage} totalPages={correctionTotalPages} onPageChange={(page) => setCorrectionCurrentPage(page)} /></div>
       </div>
 
       <ProductModal show={showModal} onHide={handleCloseModal} productToEdit={productToEdit} onSave={handleSaveProduct} />
@@ -279,6 +350,6 @@ function AdminDashboard() {
       <EditProfileModal show={showEditProfileModal} onHide={() => setShowEditProfileModal(false)} />
     </div>
   );
-} // ✅ GARANTA QUE ESTA CHAVE DE FECHAMENTO ESTEJA AQUI
+}
 
 export default AdminDashboard;

@@ -70,7 +70,15 @@ exports.getPedidoDetalhes = async (req, res) => {
     if (pedidos.length === 0) {
       return res.status(404).json({ message: 'Pedido não encontrado ou acesso negado.' });
     }
-    const sqlItens = `SELECT pi.quantidade, pi.preco_unitario, p.nome, p.imagem_produto_url FROM pedido_itens pi JOIN produtos p ON pi.produto_id = p.id WHERE pi.pedido_id = ?`;
+
+    // ✅ CORREÇÃO AQUI: Adicionamos 'pi.id' à seleção da query
+    const sqlItens = `
+      SELECT pi.id, pi.quantidade, pi.preco_unitario, p.nome, p.imagem_produto_url 
+      FROM pedido_itens pi 
+      JOIN produtos p ON pi.produto_id = p.id 
+      WHERE pi.pedido_id = ?
+    `;
+    
     const [itens] = await db.query(sqlItens, [pedidoId]);
     const detalhesPedido = { ...pedidos[0], itens: itens };
     res.status(200).json(detalhesPedido);
@@ -332,6 +340,65 @@ exports.criarVendaFisica = async (req, res) => {
   } catch (error) {
     await connection.rollback();
     res.status(500).json({ message: `Erro ao registrar venda física: ${error.message}` });
+  } finally {
+    connection.release();
+  }
+};
+
+exports.updateItemPedido = async (req, res) => {
+  const { itemId } = req.params; // ID do item específico em pedido_itens
+  const { novaQuantidade } = req.body;
+  const connection = await db.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const quantidadeFinal = parseInt(novaQuantidade, 10);
+    if (isNaN(quantidadeFinal) || quantidadeFinal < 0) {
+      throw new Error('Quantidade inválida.');
+    }
+
+    // 1. Busca o item atual para saber a quantidade antiga e o ID do produto/pedido
+    const [itensAtuais] = await connection.query('SELECT * FROM pedido_itens WHERE id = ? FOR UPDATE', [itemId]);
+    if (itensAtuais.length === 0) { throw new Error('Item do pedido не encontrado.'); }
+    const item = itensAtuais[0];
+    const { quantidade: quantidadeAntiga, produto_id, pedido_id } = item;
+
+    // 2. Calcula a diferença para ajustar o estoque
+    const diferencaEstoque = quantidadeAntiga - quantidadeFinal;
+
+    // 3. Atualiza o estoque do produto
+    if (diferencaEstoque !== 0) {
+      await connection.query(
+        'UPDATE produtos SET estoque_total = estoque_total + ? WHERE id = ?',
+        [diferencaEstoque, produto_id]
+      );
+    }
+    
+    // 4. Atualiza ou deleta o item do pedido
+    if (quantidadeFinal > 0) {
+      await connection.query('UPDATE pedido_itens SET quantidade = ? WHERE id = ?', [quantidadeFinal, itemId]);
+    } else {
+      // Se a quantidade for zerada, remove o item do pedido
+      await connection.query('DELETE FROM pedido_itens WHERE id = ?', [itemId]);
+    }
+
+    // 5. Recalcula o valor_total do pedido principal
+    const [totalRows] = await connection.query(
+      'SELECT SUM(preco_unitario * quantidade) as novoTotal FROM pedido_itens WHERE pedido_id = ?',
+      [pedido_id]
+    );
+    const novoTotalPedido = totalRows[0].novoTotal || 0;
+
+    // 6. Atualiza a tabela 'pedidos' com o novo valor total
+    await connection.query('UPDATE pedidos SET valor_total = ? WHERE id = ?', [novoTotalPedido, pedido_id]);
+    
+    await connection.commit();
+    res.status(200).json({ message: 'Item do pedido atualizado com sucesso!' });
+
+  } catch (error) {
+    await connection.rollback();
+    res.status(500).json({ message: `Erro ao atualizar item do pedido: ${error.message}` });
   } finally {
     connection.release();
   }

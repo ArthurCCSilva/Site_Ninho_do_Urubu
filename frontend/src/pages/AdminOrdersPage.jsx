@@ -236,6 +236,7 @@ function AdminOrdersPage() {
         onHide={() => setShowDetailsModal(false)}
         pedidoId={selectedPedidoId}
         onBack={handleBackToActions}
+        onOrderUpdate={fetchPedidos}
       />
       <AdminCancelOrderModal 
         show={showCancelModal}

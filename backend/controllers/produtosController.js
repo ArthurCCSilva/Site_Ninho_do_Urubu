@@ -221,7 +221,6 @@ exports.darBaixaEstoque = async (req, res) => {
   
   try {
     await connection.beginTransaction();
-
     const qtdPerdida = parseInt(quantidade, 10);
     if (isNaN(qtdPerdida) || qtdPerdida <= 0) {
       throw new Error('A quantidade para baixa deve ser um número positivo.');
@@ -247,8 +246,8 @@ exports.darBaixaEstoque = async (req, res) => {
 
     // Registra como uma despesa
     await connection.query(
-      'INSERT INTO despesas (descricao, valor, data, categoria) VALUES (?, ?, CURDATE(), ?)',
-      [`Baixa de estoque: ${qtdPerdida}x ${produto.nome}. Motivo: ${motivo}`, custoDaPerda, 'Perda de Inventário']
+      'INSERT INTO despesas (descricao, valor, data, categoria_id) VALUES (?, ?, CURDATE(), (SELECT id FROM despesa_categorias WHERE nome = "Perda de Inventário"))',
+      [`Baixa de estoque: ${qtdPerdida}x ${produto.nome}. Motivo: ${motivo}`, custoDaPerda]
     );
 
     await connection.commit();
@@ -256,6 +255,49 @@ exports.darBaixaEstoque = async (req, res) => {
   } catch (error) {
     await connection.rollback();
     res.status(500).json({ message: `Erro ao dar baixa no estoque: ${error.message}` });
+  } finally {
+    connection.release();
+  }
+};
+
+exports.corrigirEstoque = async (req, res) => {
+  const { id } = req.params;
+  const { quantidadeParaRemover } = req.body;
+  const connection = await db.getConnection();
+  
+  try {
+    await connection.beginTransaction();
+
+    const qtdRemover = parseInt(quantidadeParaRemover, 10);
+    if (isNaN(qtdRemover) || qtdRemover <= 0) {
+      throw new Error('A quantidade para correção deve ser um número positivo.');
+    }
+    
+    const [rows] = await connection.query('SELECT estoque_total, custo_medio_ponderado FROM produtos WHERE id = ? FOR UPDATE', [id]);
+    if (rows.length === 0) { throw new Error('Produto não encontrado.'); }
+    const produto = rows[0];
+    
+    if (qtdRemover > produto.estoque_total) {
+      throw new Error(`Correção excede o estoque. Disponível: ${produto.estoque_total}.`);
+    }
+
+    // Apenas recalcula o estoque e o valor total do inventário
+    const novoEstoque = produto.estoque_total - qtdRemover;
+    const novoCustoTotalInventario = novoEstoque * produto.custo_medio_ponderado;
+
+    // Atualiza o produto
+    await connection.query(
+      'UPDATE produtos SET estoque_total = ?, custo_total_inventario = ? WHERE id = ?',
+      [novoEstoque, novoCustoTotalInventario, id]
+    );
+    
+    // NENHUMA despesa é criada aqui.
+    
+    await connection.commit();
+    res.status(200).json({ message: 'Estoque corrigido com sucesso!' });
+  } catch (error) {
+    await connection.rollback();
+    res.status(500).json({ message: `Erro ao corrigir o estoque: ${error.message}` });
   } finally {
     connection.release();
   }

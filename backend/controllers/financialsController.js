@@ -75,3 +75,68 @@ exports.getSalesOverTime = async (req, res) => {
     res.status(500).json({ message: 'Erro ao buscar dados de vendas.', error: error.message });
   }
 };
+
+// ✅ NOVA FUNÇÃO: Calcula a lucratividade por cliente
+exports.getCustomerProfitability = async (req, res) => {
+  try {
+    const { data_inicio, data_fim } = req.query;
+    if (!data_inicio || !data_fim) {
+      return res.status(400).json({ message: 'Datas são obrigatórias.' });
+    }
+
+    const sql = `
+      SELECT 
+        u.id, 
+        u.nome, 
+        SUM(pi.quantidade * pi.preco_unitario) as receita_total,
+        SUM(pi.quantidade * pi.custo_unitario) as custo_total,
+        (SUM(pi.quantidade * pi.preco_unitario) - SUM(pi.quantidade * pi.custo_unitario)) as lucro_total
+      FROM pedidos p
+      JOIN usuarios u ON p.usuario_id = u.id
+      JOIN pedido_itens pi ON p.id = pi.pedido_id
+      WHERE p.status = 'Entregue' AND p.data_pedido BETWEEN ? AND ?
+      GROUP BY u.id, u.nome
+      ORDER BY lucro_total DESC
+      LIMIT 10; 
+    `;
+    
+    const [clientes] = await db.query(sql, [data_inicio, data_fim]);
+    res.status(200).json(clientes);
+
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao buscar lucratividade por cliente.', error: error.message });
+  }
+};
+
+// ✅ NOVA FUNÇÃO: Calcula a lucratividade por produto
+exports.getProductProfitability = async (req, res) => {
+  try {
+    const { data_inicio, data_fim } = req.query;
+    if (!data_inicio || !data_fim) {
+      return res.status(400).json({ message: 'Datas são obrigatórias.' });
+    }
+
+    const sql = `
+      SELECT 
+        prod.id, 
+        prod.nome,
+        SUM(pi.quantidade) as quantidade_vendida,
+        SUM(pi.quantidade * pi.preco_unitario) as receita_total,
+        SUM(pi.quantidade * pi.custo_unitario) as custo_total,
+        (SUM(pi.quantidade * pi.preco_unitario) - SUM(pi.quantidade * pi.custo_unitario)) as lucro_total
+      FROM produtos prod
+      JOIN pedido_itens pi ON prod.id = pi.produto_id
+      JOIN pedidos p ON pi.pedido_id = p.id
+      WHERE p.status = 'Entregue' AND p.data_pedido BETWEEN ? AND ?
+      GROUP BY prod.id, prod.nome
+      ORDER BY lucro_total DESC
+      LIMIT 10;
+    `;
+    
+    const [produtos] = await db.query(sql, [data_inicio, data_fim]);
+    res.status(200).json(produtos);
+
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao buscar lucratividade por produto.', error: error.message });
+  }
+};

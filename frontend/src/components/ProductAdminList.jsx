@@ -1,11 +1,10 @@
 // src/components/ProductAdminList.jsx
 
 function ProductAdminList({ products, onEdit, onDelete }) {
-  // Função auxiliar para dar cor ao estoque
   const getStockBadgeClass = (stock) => {
-    if (stock <= 0) return 'bg-danger';   // Esgotado
-    if (stock <= 10) return 'bg-warning'; // Estoque baixo
-    return 'bg-success';                   // Estoque saudável
+    if (stock <= 0) return 'bg-danger';   
+    if (stock <= 10) return 'bg-warning'; 
+    return 'bg-success';                   
   };
 
   return (
@@ -17,7 +16,7 @@ function ProductAdminList({ products, onEdit, onDelete }) {
             <th>Nome</th>
             <th>Categoria</th>
             <th>Valor</th>
-            <th>Estoque</th> {/* ✅ 1. ADICIONA o cabeçalho da coluna */}
+            <th>Estoque</th>
             <th className="text-end">Ações</th>
           </tr>
         </thead>
@@ -35,8 +34,6 @@ function ProductAdminList({ products, onEdit, onDelete }) {
               <td>{product.nome}</td>
               <td>{product.categoria_nome || <span className="text-muted">N/A</span>}</td>
               <td>R$ {parseFloat(product.valor).toFixed(2).replace('.', ',')}</td>
-              
-              {/* ✅ 2. ADICIONA a célula que exibe o estoque */}
               <td>
                 <span className={`badge ${getStockBadgeClass(product.estoque_total)}`}>
                   {product.estoque_total}

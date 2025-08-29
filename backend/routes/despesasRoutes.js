@@ -8,5 +8,6 @@ const { verifyToken, isAdmin } = require('../middleware/authMiddleware');
 router.use(verifyToken, isAdmin);
 
 router.post('/', despesasController.adicionarDespesa);
+router.get('/', despesasController.getDespesas);
 
 module.exports = router;
