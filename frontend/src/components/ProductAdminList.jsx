@@ -1,10 +1,10 @@
 // src/components/ProductAdminList.jsx
 
-function ProductAdminList({ products, onEdit, onDelete }) {
+function ProductAdminList({ products, onEdit, onDelete, onReactivate }) {
   const getStockBadgeClass = (stock) => {
-    if (stock <= 0) return 'bg-danger';   
-    if (stock <= 10) return 'bg-warning'; 
-    return 'bg-success';                   
+    if (stock <= 0) return 'bg-danger';
+    if (stock <= 10) return 'bg-warning';
+    return 'bg-success';
   };
 
   return (
@@ -17,12 +17,13 @@ function ProductAdminList({ products, onEdit, onDelete }) {
             <th>Categoria</th>
             <th>Valor</th>
             <th>Estoque</th>
+            <th>Status</th>
             <th className="text-end">Ações</th>
           </tr>
         </thead>
         <tbody>
           {products.map(product => (
-            <tr key={product.id}>
+            <tr key={product.id} className={product.status === 'inativo' ? 'table-secondary text-muted' : ''}>
               <td>
                 <img 
                   src={product.imagem_produto_url ? `http://localhost:3001/uploads/${product.imagem_produto_url}` : 'https://placehold.co/80'} 
@@ -39,14 +40,24 @@ function ProductAdminList({ products, onEdit, onDelete }) {
                   {product.estoque_total}
                 </span>
               </td>
-
+              <td>
+                <span className={`badge ${product.status === 'ativo' ? 'bg-success' : 'bg-danger'}`}>
+                  {product.status}
+                </span>
+              </td>
               <td className="text-end">
                 <button className="btn btn-warning btn-sm me-2" onClick={() => onEdit(product)}>
                   Editar
                 </button>
-                <button className="btn btn-danger btn-sm" onClick={() => onDelete(product.id)}>
-                  Excluir
-                </button>
+                {product.status === 'ativo' ? (
+                  <button className="btn btn-danger btn-sm" onClick={() => onDelete(product.id)}>
+                    Desativar
+                  </button>
+                ) : (
+                  <button className="btn btn-success btn-sm" onClick={() => onReactivate(product.id)}>
+                    Reativar
+                  </button>
+                )}
               </td>
             </tr>
           ))}

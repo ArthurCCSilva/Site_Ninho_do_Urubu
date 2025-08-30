@@ -6,10 +6,19 @@ const path = require('path');
 // getAllProdutos e getProdutoById não precisam de grandes alterações, apenas usar 'estoque_total'
 exports.getAllProdutos = async (req, res) => {
   try {
-    const { search, category, sort, page = 1, limit = 12, destaque } = req.query;
+    const { search, category, sort, page = 1, limit = 12, destaque, adminView, showInactive } = req.query;
     let baseSql = 'FROM produtos p LEFT JOIN categorias c ON p.categoria_id = c.id';
     let params = [];
     let conditions = [];
+
+    if (adminView === 'true') {
+      if (showInactive !== 'true') {
+        conditions.push("p.status = 'ativo'");
+      }
+    } else {
+      conditions.push("p.status = 'ativo'");
+    }
+
     if (search) {
       conditions.push('(p.nome LIKE ? OR p.descricao LIKE ?)');
       params.push(`%${search}%`, `%${search}%`);
@@ -21,14 +30,17 @@ exports.getAllProdutos = async (req, res) => {
     if (destaque === 'true') {
       conditions.push('p.destaque = TRUE');
     }
+    
     if (conditions.length > 0) {
       baseSql += ' WHERE ' + conditions.join(' AND ');
     }
+
     const countSql = `SELECT COUNT(p.id) as total ${baseSql}`;
     const [countRows] = await db.query(countSql, params);
     const totalItems = countRows[0].total;
-    const numericLimit = parseInt(limit) || 12;
+    const numericLimit = parseInt(limit, 10) || 12;
     const totalPages = Math.ceil(totalItems / numericLimit);
+
     let sql = `SELECT p.*, c.nome AS categoria_nome ${baseSql}`;
     if (sort) {
       const allowedSorts = {
@@ -36,24 +48,28 @@ exports.getAllProdutos = async (req, res) => {
         'price_desc': 'ORDER BY p.valor DESC',
         'stock_asc': 'ORDER BY p.estoque_total ASC',
         'stock_desc': 'ORDER BY p.estoque_total DESC',
-        'name_asc': 'ORDER BY p.nome ASC',
-        'name_desc': 'ORDER BY p.nome DESC',
       };
       if (allowedSorts[sort]) {
         sql += ` ${allowedSorts[sort]}`;
+      } else {
+        sql += ' ORDER BY p.id DESC';
       }
     } else {
       sql += ' ORDER BY p.id DESC';
     }
+    
     const offset = (page - 1) * numericLimit;
     sql += ' LIMIT ? OFFSET ?';
     params.push(numericLimit, offset);
+    
     const [produtos] = await db.query(sql, params);
     res.status(200).json({ produtos, totalPages, currentPage: parseInt(page) });
   } catch (error) {
+    console.error("Erro ao buscar produtos:", error);
     res.status(500).json({ message: 'Erro ao buscar produtos.', error: error.message });
   }
 };
+
 
 // --- Função para buscar um produto pelo seu ID (com JOIN) ---
 exports.getProdutoById = async (req, res) => {
@@ -119,29 +135,19 @@ exports.updateProduto = async (req, res) => {
 exports.deleteProduto = async (req, res) => {
   try {
     const { id } = req.params;
+    // Em vez de DELETE, usamos UPDATE para mudar o status para 'inativo'
+    const [result] = await db.query(
+      "UPDATE produtos SET status = 'inativo' WHERE id = ?",
+      [id]
+    );
 
-    const [produtos] = await db.query('SELECT imagem_produto_url FROM produtos WHERE id = ?', [id]);
-    if (produtos.length === 0) {
+    if (result.affectedRows === 0) {
       return res.status(404).json({ message: 'Produto não encontrado.' });
     }
-    const imagemUrl = produtos[0].imagem_produto_url;
-
-    await db.query('DELETE FROM produtos WHERE id = ?', [id]);
-
-    if (imagemUrl) {
-      // ✅ CORREÇÃO DO CAMINHO AQUI
-      const caminhoImagem = path.join(__dirname, '..', 'uploads', imagemUrl);
-      try {
-        await fs.unlink(caminhoImagem);
-        console.log(`Arquivo de imagem ${imagemUrl} deletado com sucesso.`);
-      } catch (fileErr) {
-        console.error("Erro ao deletar o arquivo de imagem do produto:", fileErr.code);
-      }
-    }
-
-    res.status(200).json({ message: 'Produto deletado com sucesso.' });
+    res.status(200).json({ message: 'Produto desativado com sucesso.' });
   } catch (error) {
-    res.status(500).json({ message: 'Erro ao deletar produto.', error: error.message });
+    console.error("Erro ao desativar produto:", error);
+    res.status(500).json({ message: 'Erro ao desativar produto.', error: error.message });
   }
 };
 
@@ -317,5 +323,52 @@ exports.desmembrarProduto = async (req, res) => {
     res.status(500).json({ message: `Erro ao desmembrar produto: ${error.message}` });
   } finally {
     connection.release();
+  }
+};
+
+exports.reactivateProduto = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const [result] = await db.query(
+            "UPDATE produtos SET status = 'ativo' WHERE id = ?",
+            [id]
+        );
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Produto não encontrado.' });
+        }
+        res.status(200).json({ message: 'Produto reativado com sucesso.' });
+    } catch (error) {
+        console.error("Erro ao reativar produto:", error);
+        res.status(500).json({ message: 'Erro ao reativar produto.', error: error.message });
+    }
+};
+
+exports.getInactiveProdutos = async (req, res) => {
+  try {
+    const { search, category, page = 1, limit = 10 } = req.query;
+    let baseSql = "FROM produtos p LEFT JOIN categorias c ON p.categoria_id = c.id";
+    let params = [];
+    let conditions = ["p.status = 'inativo'"];
+    if (search) {
+      conditions.push('(p.nome LIKE ?)');
+      params.push(`%${search}%`);
+    }
+    if (category) {
+      conditions.push('c.nome = ?');
+      params.push(category);
+    }
+    baseSql += ' WHERE ' + conditions.join(' AND ');
+    const countSql = `SELECT COUNT(p.id) as total ${baseSql}`;
+    const [countRows] = await db.query(countSql, params);
+    const totalItems = countRows[0].total;
+    const totalPages = Math.ceil(totalItems / limit);
+    let sql = `SELECT p.id, p.nome, p.imagem_produto_url, c.nome AS categoria_nome ${baseSql} ORDER BY p.id DESC`;
+    const offset = (page - 1) * limit;
+    sql += ' LIMIT ? OFFSET ?';
+    const finalParams = [...params, parseInt(limit), parseInt(offset)];
+    const [produtos] = await db.query(sql, finalParams);
+    res.status(200).json({ produtos, totalPages, currentPage: parseInt(page) });
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao buscar produtos inativos.', error: error.message });
   }
 };
