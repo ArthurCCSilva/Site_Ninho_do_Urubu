@@ -4,6 +4,7 @@ import api from '../services/api';
 import { Modal } from 'bootstrap';
 import Select from 'react-select';
 import ImageCropperModal from './ImageCropperModal';
+import CurrencyInput from 'react-currency-input-field';
 
 function ProductModal({ show, onHide, productToEdit, onSave }) {
   const initialState = {
@@ -23,7 +24,7 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
   const [imagemFile, setImagemFile] = useState(null);
   const [categories, setCategories] = useState([]);
   const [allProducts, setAllProducts] = useState([]);
-  const [productType, setProductType] = useState('simples'); // 'simples', 'pai', ou 'filho'
+  const [productType, setProductType] = useState('simples');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const modalRef = useRef();
@@ -68,13 +69,12 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
           produto_pai_id: productToEdit.produto_pai_id || null,
           unidades_por_pai: productToEdit.unidades_por_pai || '',
         });
-        // Determina o tipo do produto ao editar
         if (productToEdit.unidades_por_pai > 0) setProductType('pai');
         else if (productToEdit.produto_pai_id) setProductType('filho');
         else setProductType('simples');
       } else {
         setFormData(initialState);
-        setProductType('simples'); // Reseta para 'simples' ao adicionar novo
+        setProductType('simples');
       }
       setImagemFile(null);
       setError('');
@@ -93,6 +93,9 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
   const handleCheckboxChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.checked });
   const handleCategoryChange = (selectedOption) => setFormData({ ...formData, categoria_id: selectedOption ? selectedOption.value : null });
   const handleParentProductChange = (selectedOption) => setFormData({ ...formData, produto_pai_id: selectedOption ? selectedOption.value : null });
+  const handleCurrencyChange = (value, name) => {
+    setFormData(prev => ({ ...prev, [name]: value || '' }));
+  };
   
   const handleFileSelect = (event) => {
     const file = event.target.files[0];
@@ -113,8 +116,6 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
     e.preventDefault();
     setLoading(true);
     setError('');
-
-    // Limpa os campos não utilizados com base no tipo de produto antes de enviar
     const dataToSend = { ...formData };
     if (productType === 'simples') {
       dataToSend.produto_pai_id = null;
@@ -124,7 +125,6 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
     } else if (productType === 'filho') {
       dataToSend.unidades_por_pai = null;
     }
-
     const data = new FormData();
     Object.keys(dataToSend).forEach(key => data.append(key, dataToSend[key]));
     if (imagemFile) {
@@ -160,11 +160,21 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
                 <div className="mb-3"><label className="form-label">Nome</label><input type="text" name="nome" value={formData.nome} onChange={handleChange} className="form-control" required /></div>
                 <div className="mb-3"><label className="form-label">Descrição</label><textarea rows="3" name="descricao" value={formData.descricao} onChange={handleChange} className="form-control" /></div>
                 <div className="row">
-                  <div className="col"><div className="mb-3"><label className="form-label">Valor de Venda (R$)</label><input type="number" step="0.01" name="valor" value={formData.valor} onChange={handleChange} className="form-control" required /></div></div>
+                  <div className="col">
+                    <div className="mb-3">
+                      <label className="form-label">Valor de Venda (R$)</label>
+                      <CurrencyInput id="valor" name="valor" className="form-control" value={formData.valor} onValueChange={handleCurrencyChange} intlConfig={{ locale: 'pt-BR', currency: 'BRL' }} decimalScale={2} placeholder="R$ 0,00" required />
+                    </div>
+                  </div>
                   {!productToEdit && (
                     <>
                       <div className="col"><div className="mb-3"><label className="form-label">Estoque Inicial</label><input type="number" name="estoque" value={formData.estoque} onChange={handleChange} className="form-control" required /></div></div>
-                      <div className="col"><div className="mb-3"><label className="form-label">Custo/un. (R$)</label><input type="number" step="0.01" name="custo" value={formData.custo} onChange={handleChange} className="form-control" required /></div></div>
+                      <div className="col">
+                        <div className="mb-3">
+                          <label className="form-label">Custo/un. (R$)</label>
+                          <CurrencyInput id="custo" name="custo" className="form-control" value={formData.custo} onValueChange={handleCurrencyChange} intlConfig={{ locale: 'pt-BR', currency: 'BRL' }} decimalScale={2} placeholder="R$ 0,00" required />
+                        </div>
+                      </div>
                     </>
                   )}
                 </div>

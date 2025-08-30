@@ -3,38 +3,38 @@ import { useState, useEffect, useRef } from 'react';
 import { Modal } from 'bootstrap';
 import api from '../services/api';
 import DatePicker from 'react-datepicker';
-import Select from 'react-select'; // Usamos para a busca de produtos
+import Select from 'react-select';
+import CurrencyInput from 'react-currency-input-field';
 
 function AddExpenseModal({ show, onHide, onSave }) {
-  const initialState = { 
-    descricao: '', 
-    valor: '', 
-    data: new Date(), 
-    categoria_id: '', 
-    produto_id: null 
+  const initialState = {
+    descricao: '',
+    valor: '',
+    data: new Date(),
+    categoria_id: '',
+    produto_id: null,
+    quantidadeBaixa: 1
   };
   const [formData, setFormData] = useState(initialState);
   const [error, setError] = useState('');
   const modalRef = useRef();
 
-  // Estados para os seletores
   const [categorias, setCategorias] = useState([]);
   const [produtos, setProdutos] = useState([]);
   const [selectedProduto, setSelectedProduto] = useState(null);
 
-  // Busca as categorias de despesa e a lista de produtos quando o modal abre
   useEffect(() => {
     const fetchData = async () => {
       try {
         const [catRes, prodRes] = await Promise.all([
           api.get('/api/despesa-categorias'),
-          api.get('/api/produtos')
+          api.get('/api/produtos?limit=1000')
         ]);
         setCategorias(catRes.data.map(c => ({ value: c.id, label: c.nome })));
-        setProdutos(prodRes.data.produtos.map(p => ({ 
-            value: p.id, 
-            label: p.nome, 
-            custo: p.custo_medio_ponderado 
+        setProdutos(prodRes.data.produtos.map(p => ({
+            value: p.id,
+            label: p.nome,
+            custo: p.custo_medio_ponderado
         })));
       } catch (err) {
         console.error("Erro ao carregar dados para o modal", err);
@@ -48,29 +48,32 @@ function AddExpenseModal({ show, onHide, onSave }) {
     }
   }, [show]);
   
-  // Efeito para auto-preencher o formulário quando um produto é selecionado
   useEffect(() => {
     if (selectedProduto) {
       const categoriaPerda = categorias.find(c => c.label === 'Perda de Inventário');
+      const quantidade = parseInt(formData.quantidadeBaixa, 10) || 0;
+      const custoTotal = quantidade * (selectedProduto.custo || 0);
+
       setFormData(prev => ({
         ...prev,
-        valor: selectedProduto.custo || '',
-        descricao: `Perda de estoque: ${selectedProduto.label}`,
+        // ✅ CORREÇÃO: Salva o valor com PONTO no estado
+        valor: custoTotal.toFixed(2),
+        descricao: `Perda de estoque: ${quantidade}x ${selectedProduto.label}`,
         categoria_id: categoriaPerda ? categoriaPerda.value : '',
         produto_id: selectedProduto.value
       }));
     } else {
-      // Limpa os campos se o produto for desmarcado
       if (formData.produto_id !== null) {
           setFormData(prev => ({
             ...initialState,
-            data: prev.data // Mantém a data selecionada
+            data: prev.data,
+            categoria_id: prev.categoria_id,
           }));
       }
     }
-  }, [selectedProduto, categorias]);
+  }, [selectedProduto, formData.quantidadeBaixa, categorias]);
 
-  // Efeito para controlar a exibição do modal
+
   useEffect(() => {
     const modalElement = modalRef.current;
     if (!modalElement) return;
@@ -79,17 +82,24 @@ function AddExpenseModal({ show, onHide, onSave }) {
     else bsModal.hide();
   }, [show]);
 
-  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+  
+  const handleCurrencyChange = (value, name) => {
+    // O 'value' do onValueChange já vem no formato "123.45"
+    setFormData(prev => ({ ...prev, [name]: value === undefined ? '' : value }));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     try {
-      // Formata a data para YYYY-MM-DD antes de enviar
       const dataFormatada = formData.data.toISOString().split('T')[0];
+      // O formData.valor já está no formato correto ("12.34"), não precisa de replace
       await api.post('/api/despesas', { ...formData, data: dataFormatada });
       alert('Despesa adicionada com sucesso!');
-      onSave(); // Avisa o componente pai para recarregar os dados
+      onSave();
       onHide();
     } catch (err) {
       setError(err.response?.data?.message || 'Erro ao adicionar despesa.');
@@ -107,56 +117,40 @@ function AddExpenseModal({ show, onHide, onSave }) {
             </div>
             <div className="modal-body">
               {error && <div className="alert alert-danger">{error}</div>}
-
               <div className="mb-3">
-                <label className="form-label">Associar a um Produto (Opcional)</label>
+                <label className="form-label">Associar a Produto (para Baixa de Estoque)</label>
                 <Select
-                  options={produtos}
-                  isClearable
+                  options={produtos} isClearable
                   placeholder="Selecione um produto..."
                   value={selectedProduto}
                   onChange={setSelectedProduto}
                   noOptionsMessage={() => "Nenhum produto encontrado"}
                 />
               </div>
-
-              {/* ✅ CAMPO CONDICIONAL DE QUANTIDADE */}
               {selectedProduto && (
                 <div className="mb-3">
-                  <label className="form-label">Quantidade para Baixa no Estoque</label>
+                  <label className="form-label fw-bold">Quantidade para Baixa no Estoque</label>
                   <input type="number" name="quantidadeBaixa" value={formData.quantidadeBaixa} onChange={handleChange} className="form-control" min="1" required />
                 </div>
               )}
-              
               <hr/>
-
+              <div className="mb-3"><label>Descrição</label><input type="text" name="descricao" value={formData.descricao} onChange={handleChange} className="form-control" required /></div>
               <div className="mb-3">
-                <label className="form-label">Descrição</label>
-                <input type="text" name="descricao" value={formData.descricao} onChange={handleChange} className="form-control" required />
-              </div>
-              <div className="mb-3">
-                <label className="form-label">Valor (R$)</label>
-                <input type="number" step="0.01" name="valor" value={formData.valor} onChange={handleChange} className="form-control" required />
-              </div>
-              <div className="mb-3">
-                <label className="form-label">Categoria</label>
-                <select className="form-select" name="categoria_id" value={formData.categoria_id} onChange={handleChange}>
-                  <option value="">Selecione...</option>
-                  {categorias.map(cat => (
-                    <option key={cat.value} value={cat.value}>{cat.label}</option>
-                  ))}
-                </select>
-              </div>
-               <div className="mb-3">
-                <label className="form-label d-block">Data da Despesa</label>
-                <DatePicker 
-                    selected={formData.data} 
-                    onChange={(date) => setFormData({...formData, data: date})} 
-                    className="form-control" 
-                    dateFormat="dd/MM/yyyy" 
-                    locale="pt-BR"
+                <label>Valor (R$)</label>
+                <CurrencyInput
+                  name="valor"
+                  className="form-control"
+                  value={formData.valor}
+                  onValueChange={handleCurrencyChange}
+                  disabled={!!selectedProduto}
+                  intlConfig={{ locale: 'pt-BR', currency: 'BRL' }}
+                  decimalScale={2}
+                  placeholder="R$ 0,00"
+                  required
                 />
               </div>
+              <div className="mb-3"><label>Categoria</label><select className="form-select" name="categoria_id" value={formData.categoria_id} onChange={handleChange}><option value="">Selecione...</option>{categorias.map(cat => (<option key={cat.value} value={cat.value}>{cat.label}</option>))}</select></div>
+              <div className="mb-3"><label className="form-label d-block">Data da Despesa</label><DatePicker selected={formData.data} onChange={(date) => setFormData({...formData, data: date})} className="form-control" dateFormat="dd/MM/yyyy" locale="pt-BR" /></div>
             </div>
             <div className="modal-footer">
               <button type="button" className="btn btn-secondary" onClick={onHide}>Cancelar</button>
@@ -168,5 +162,4 @@ function AddExpenseModal({ show, onHide, onSave }) {
     </div>
   );
 }
-
 export default AddExpenseModal;

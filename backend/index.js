@@ -27,6 +27,7 @@ app.use('/api/usuarios', require('./routes/usuariosRoutes'));
 app.use('/api/despesas', require('./routes/despesasRoutes'));
 app.use('/api/financials', require('./routes/financialsRoutes'));
 app.use('/api/despesa-categorias', require('./routes/despesaCategoriasRoutes'));
+app.use('/api/rendas-extras', require('./routes/rendasExtrasRoutes'));
 app.use('/uploads', express.static('uploads'));//adicionado depois para as imagens
 
 const PORT = process.env.PORT || 3001;
