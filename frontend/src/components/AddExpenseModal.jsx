@@ -96,8 +96,19 @@ function AddExpenseModal({ show, onHide, onSave }) {
     setError('');
     try {
       const dataFormatada = formData.data.toISOString().split('T')[0];
-      // O formData.valor já está no formato correto ("12.34"), não precisa de replace
-      await api.post('/api/despesas', { ...formData, data: dataFormatada });
+      
+      // ✅ CORREÇÃO DEFINITIVA AQUI
+      // O valor do CurrencyInput vem como "0,50". Trocamos a vírgula por ponto.
+      const valorCorrigido = formData.valor ? String(formData.valor).replace(',', '.') : '0';
+
+      // Prepara o payload final para a API
+      const payload = {
+        ...formData,
+        data: dataFormatada,
+        valor: valorCorrigido
+      };
+
+      await api.post('/api/despesas', payload);
       alert('Despesa adicionada com sucesso!');
       onSave();
       onHide();
@@ -111,21 +122,12 @@ function AddExpenseModal({ show, onHide, onSave }) {
       <div className="modal-dialog">
         <div className="modal-content">
           <form onSubmit={handleSubmit}>
-            <div className="modal-header">
-              <h5 className="modal-title">Adicionar Nova Despesa</h5>
-              <button type="button" className="btn-close" onClick={onHide}></button>
-            </div>
+            <div className="modal-header"><h5 className="modal-title">Adicionar Nova Despesa</h5><button type="button" className="btn-close" onClick={onHide}></button></div>
             <div className="modal-body">
               {error && <div className="alert alert-danger">{error}</div>}
               <div className="mb-3">
                 <label className="form-label">Associar a Produto (para Baixa de Estoque)</label>
-                <Select
-                  options={produtos} isClearable
-                  placeholder="Selecione um produto..."
-                  value={selectedProduto}
-                  onChange={setSelectedProduto}
-                  noOptionsMessage={() => "Nenhum produto encontrado"}
-                />
+                <Select options={produtos} isClearable placeholder="Selecione um produto..." value={selectedProduto} onChange={setSelectedProduto} noOptionsMessage={() => "Nenhum produto encontrado"}/>
               </div>
               {selectedProduto && (
                 <div className="mb-3">
@@ -137,25 +139,12 @@ function AddExpenseModal({ show, onHide, onSave }) {
               <div className="mb-3"><label>Descrição</label><input type="text" name="descricao" value={formData.descricao} onChange={handleChange} className="form-control" required /></div>
               <div className="mb-3">
                 <label>Valor (R$)</label>
-                <CurrencyInput
-                  name="valor"
-                  className="form-control"
-                  value={formData.valor}
-                  onValueChange={handleCurrencyChange}
-                  disabled={!!selectedProduto}
-                  intlConfig={{ locale: 'pt-BR', currency: 'BRL' }}
-                  decimalScale={2}
-                  placeholder="R$ 0,00"
-                  required
-                />
+                <CurrencyInput name="valor" className="form-control" value={formData.valor} onValueChange={handleCurrencyChange} disabled={!!selectedProduto} intlConfig={{ locale: 'pt-BR', currency: 'BRL' }} decimalScale={2} placeholder="R$ 0,00" required />
               </div>
               <div className="mb-3"><label>Categoria</label><select className="form-select" name="categoria_id" value={formData.categoria_id} onChange={handleChange}><option value="">Selecione...</option>{categorias.map(cat => (<option key={cat.value} value={cat.value}>{cat.label}</option>))}</select></div>
               <div className="mb-3"><label className="form-label d-block">Data da Despesa</label><DatePicker selected={formData.data} onChange={(date) => setFormData({...formData, data: date})} className="form-control" dateFormat="dd/MM/yyyy" locale="pt-BR" /></div>
             </div>
-            <div className="modal-footer">
-              <button type="button" className="btn btn-secondary" onClick={onHide}>Cancelar</button>
-              <button type="submit" className="btn btn-primary">Salvar Despesa</button>
-            </div>
+            <div className="modal-footer"><button type="button" className="btn btn-secondary" onClick={onHide}>Cancelar</button><button type="submit" className="btn btn-primary">Salvar Despesa</button></div>
           </form>
         </div>
       </div>

@@ -25,9 +25,19 @@ exports.getRendasExtras = async (req, res) => {
 
 exports.adicionarRendaExtra = async (req, res) => {
   const { descricao, valor, data } = req.body;
-  if (!descricao || !valor || !data) { return res.status(400).json({ message: 'Descrição, valor e data são obrigatórios.' }); }
+  if (descricao === undefined || valor === undefined || data === undefined) { 
+    return res.status(400).json({ message: 'Descrição, valor e data são obrigatórios.' }); 
+  }
   try {
-    await db.query('INSERT INTO rendas_extras (descricao, valor, data) VALUES (?, ?, ?)', [descricao, valor, data]);
+    // ✅ CORREÇÃO: Converte o valor de texto para número antes de salvar
+    const valorNumerico = parseFloat(String(valor).replace(',', '.'));
+    if (isNaN(valorNumerico)) {
+      throw new Error('O valor fornecido é inválido.');
+    }
+    
+    await db.query('INSERT INTO rendas_extras (descricao, valor, data) VALUES (?, ?, ?)', [descricao, valorNumerico, data]);
     res.status(201).json({ message: 'Renda extra adicionada com sucesso!' });
-  } catch (error) { res.status(500).json({ message: 'Erro ao adicionar renda extra.', error: error.message }); }
+  } catch (error) { 
+    res.status(500).json({ message: 'Erro ao adicionar renda extra.', error: error.message }); 
+  }
 };

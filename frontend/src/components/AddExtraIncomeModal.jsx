@@ -35,8 +35,17 @@ function AddExtraIncomeModal({ show, onHide, onSave }) {
     setError('');
     try {
       const dataFormatada = formData.data.toISOString().split('T')[0];
-      // O formData.valor já está no formato correto ("12.34"), não precisa de replace
-      await api.post('/api/rendas-extras', { ...formData, data: dataFormatada });
+      
+      // ✅ CORREÇÃO DEFINITIVA AQUI
+      const valorCorrigido = formData.valor ? String(formData.valor).replace(',', '.') : '0';
+
+      const payload = {
+        ...formData,
+        data: dataFormatada,
+        valor: valorCorrigido
+      };
+      
+      await api.post('/api/rendas-extras', payload);
       alert('Renda extra adicionada com sucesso!');
       onSave();
       onHide();
@@ -50,33 +59,17 @@ function AddExtraIncomeModal({ show, onHide, onSave }) {
       <div className="modal-dialog">
         <div className="modal-content">
           <form onSubmit={handleSubmit}>
-            <div className="modal-header">
-              <h5 className="modal-title">Adicionar Renda Extra</h5>
-              <button type="button" className="btn-close" onClick={onHide}></button>
-            </div>
+            <div className="modal-header"><h5 className="modal-title">Adicionar Renda Extra</h5><button type="button" className="btn-close" onClick={onHide}></button></div>
             <div className="modal-body">
               {error && <div className="alert alert-danger">{error}</div>}
               <div className="mb-3"><label htmlFor="income-descricao" className="form-label">Descrição</label><input type="text" className="form-control" id="income-descricao" name="descricao" value={formData.descricao} onChange={handleChange} required /></div>
               <div className="mb-3">
                 <label htmlFor="income-valor" className="form-label">Valor (R$)</label>
-                <CurrencyInput
-                  id="income-valor"
-                  name="valor"
-                  className="form-control"
-                  value={formData.valor}
-                  onValueChange={handleCurrencyChange}
-                  intlConfig={{ locale: 'pt-BR', currency: 'BRL' }}
-                  decimalScale={2}
-                  placeholder="R$ 0,00"
-                  required
-                />
+                <CurrencyInput id="income-valor" name="valor" className="form-control" value={formData.valor} onValueChange={handleCurrencyChange} intlConfig={{ locale: 'pt-BR', currency: 'BRL' }} decimalScale={2} placeholder="R$ 0,00" required />
               </div>
               <div className="mb-3"><label className="form-label d-block">Data da Renda</label><DatePicker selected={formData.data} onChange={(date) => setFormData({...formData, data: date})} className="form-control" dateFormat="dd/MM/yyyy" locale="pt-BR" /></div>
             </div>
-            <div className="modal-footer">
-              <button type="button" className="btn btn-secondary" onClick={onHide}>Cancelar</button>
-              <button type="submit" className="btn btn-primary">Salvar Renda</button>
-            </div>
+            <div className="modal-footer"><button type="button" className="btn btn-secondary" onClick={onHide}>Cancelar</button><button type="submit" className="btn btn-primary">Salvar Renda</button></div>
           </form>
         </div>
       </div>
