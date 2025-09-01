@@ -4,8 +4,9 @@ import api from '../services/api';
 import Pagination from '../components/Pagination';
 import LocalCartModal from '../components/LocalCartModal';
 import Select from 'react-select';
+import AsyncSelect from 'react-select/async';
 
-const ID_CLIENTE_BALCAO = 11; // Lembre-se de verificar se este ID está correto no seu banco
+const ID_CLIENTE_BALCAO = 11; // Substitua 11 pelo ID correto do seu usuário "Venda Balcão"
 
 function PhysicalSalePage() {
   const [products, setProducts] = useState([]);
@@ -18,7 +19,6 @@ function PhysicalSalePage() {
   const [categories, setCategories] = useState([]);
   const [filterCategory, setFilterCategory] = useState('');
   const [saleType, setSaleType] = useState('balcao');
-  const [customers, setCustomers] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [customerImage, setCustomerImage] = useState(null);
 
@@ -41,8 +41,11 @@ function PhysicalSalePage() {
 
   useEffect(() => {
     const debounceFetch = setTimeout(() => {
-      if (currentPage !== 1) { setCurrentPage(1); } 
-      else { fetchProducts(1); }
+      if (currentPage !== 1) {
+        setCurrentPage(1);
+      } else {
+        fetchProducts(1);
+      }
     }, 500);
     return () => clearTimeout(debounceFetch);
   }, [searchTerm, filterCategory]);
@@ -52,26 +55,38 @@ function PhysicalSalePage() {
   }, [currentPage]);
 
   useEffect(() => {
-    const fetchInitialData = async () => {
+    const fetchCategories = async () => {
       try {
-        const [catRes, custRes] = await Promise.all([
-            api.get('/api/categorias?limit=all'),
-            api.get('/api/usuarios/clientes')
-        ]);
-        const formattedCategories = catRes.data.categorias.map(cat => ({ value: cat.nome, label: cat.nome }));
+        const response = await api.get('/api/categorias?limit=all');
+        const formattedCategories = response.data.categorias.map(cat => ({
+          value: cat.nome,
+          label: cat.nome
+        }));
         setCategories(formattedCategories);
-        const formattedCustomers = custRes.data.map(c => ({
+      } catch (err) {
+        console.error("Falha ao buscar categorias", err);
+      }
+    };
+    fetchCategories();
+  }, []);
+
+  const loadCustomerOptions = (inputValue, callback) => {
+    setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({ search: inputValue, limit: 20 });
+        const response = await api.get(`/api/usuarios/clientes?${params.toString()}`);
+        const formattedCustomers = response.data.clientes.map(c => ({
           value: c.id,
           label: `${c.nome} (${c.email || 'Sem email'})`,
           imagem_perfil_url: c.imagem_perfil_url
         }));
-        setCustomers(formattedCustomers);
-      } catch (err) {
-        console.error("Falha ao buscar dados iniciais da página", err);
+        callback(formattedCustomers);
+      } catch (error) {
+        console.error("Erro ao buscar clientes", error);
+        callback([]);
       }
-    };
-    fetchInitialData();
-  }, []);
+    }, 1000);
+  };
 
   const handleImageChange = (event) => {
     const file = event.target.files[0];
@@ -85,8 +100,7 @@ function PhysicalSalePage() {
       const itemExistente = currentCart.find(item => item.id === productToAdd.id);
       if (itemExistente) {
         return currentCart.map(item =>
-          // ✅ CORREÇÃO: Usa 'estoque_total'
-          item.id === productToAdd.id && item.quantidade < productToAdd.estoque_total
+          item.id === productToAdd.id && item.quantidade < item.estoque_total
             ? { ...item, quantidade: item.quantidade + 1 }
             : item
         );
@@ -100,9 +114,9 @@ function PhysicalSalePage() {
       handleRemoveItem(productId);
       return;
     }
-    setLocalCart(prevCart => prevCart.map(item => 
+    setLocalCart(prevCart => prevCart.map(item =>
       item.id === productId && newQuantity <= item.estoque_total
-        ? { ...item, quantidade: newQuantity } 
+        ? { ...item, quantidade: newQuantity }
         : item
     ));
   };
@@ -110,7 +124,7 @@ function PhysicalSalePage() {
   const handleRemoveItem = (productId) => {
     setLocalCart(prevCart => prevCart.filter(item => item.id !== productId));
   };
-  
+
   const handleFinalizeSale = async (formaPagamento) => {
     let finalCustomerId = ID_CLIENTE_BALCAO;
     if (saleType === 'cadastrado') {
@@ -159,7 +173,7 @@ function PhysicalSalePage() {
 
       <div className="card card-body mb-4">
         <div className="row align-items-center">
-          <div className="col-md-auto"><img src={displayImage} alt="Cliente" className="rounded-circle" style={{ width: '80px', height: '80px', objectFit: 'cover' }} /></div>
+          <div className="col-md-auto"><img src={displayImage} alt="Cliente da Venda" className="rounded-circle" style={{ width: '80px', height: '80px', objectFit: 'cover' }} /></div>
           <div className="col-md-4">
             <label className="form-label fw-bold">Tipo de Venda</label>
             <div className="form-check">
@@ -174,8 +188,17 @@ function PhysicalSalePage() {
           <div className="col-md">
             {saleType === 'cadastrado' ? (
               <div>
-                <label className="form-label fw-bold">Buscar Cliente</label>
-                <Select options={customers} isClearable placeholder="Digite para buscar..." value={selectedCustomer} onChange={setSelectedCustomer} noOptionsMessage={() => "Nenhum cliente"} />
+                <label className="form-label fw-bold">Buscar Cliente (por Nome, Email ou Telefone)</label>
+                <AsyncSelect
+                  cacheOptions
+                  defaultOptions
+                  loadOptions={loadCustomerOptions}
+                  isClearable
+                  placeholder="Digite para buscar..."
+                  value={selectedCustomer}
+                  onChange={setSelectedCustomer}
+                  noOptionsMessage={() => "Nenhum cliente encontrado"}
+                />
               </div>
             ) : (
               <div>
@@ -203,14 +226,10 @@ function PhysicalSalePage() {
                 <img src={product.imagem_produto_url ? `http://localhost:3001/uploads/${product.imagem_produto_url}` : 'https://placehold.co/60'} alt={product.nome} className="img-thumbnail me-3" style={{width: '60px', height: '60px', objectFit: 'cover'}}/>
                 <div>
                   <strong>{product.nome}</strong>
-                  {/* ✅ CORREÇÃO: Usa 'estoque_total' */}
                   <div className="text-muted">Estoque: {product.estoque_total} | R$ {parseFloat(product.valor).toFixed(2).replace('.', ',')}</div>
                 </div>
               </div>
-              {/* ✅ CORREÇÃO: Usa 'estoque_total' */}
-              <button className="btn btn-outline-success" onClick={() => handleAddToCart(product)} disabled={product.estoque_total <= 0}>
-                Adicionar
-              </button>
+              <button className="btn btn-outline-success" onClick={() => handleAddToCart(product)} disabled={product.estoque_total <= 0}>Adicionar</button>
             </div>
           ))}
         </div>

@@ -95,11 +95,72 @@ exports.updateProfile = async (req, res) => {
 
 exports.getAllClientes = async (req, res) => {
   try {
-    const [clientes] = await db.query(
-      "SELECT id, nome, email FROM usuarios WHERE role = 'cliente' ORDER BY nome ASC"
-    );
-    res.status(200).json(clientes);
+    const { search, page = 1, limit = 1000 } = req.query; // Aumentamos o limite padrão para o seletor
+    
+    let params = [];
+    let whereConditions = "role = 'cliente'";
+
+    // Se houver um termo de busca, agora ele procura em 3 colunas
+    if (search) {
+      whereConditions += ' AND (nome LIKE ? OR email LIKE ? OR telefone LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+    }
+
+    // Contagem para paginação (mantida por consistência)
+    const countSql = `SELECT COUNT(id) as total FROM usuarios WHERE ${whereConditions}`;
+    const [countRows] = await db.query(countSql, params);
+    const totalItems = countRows[0].total;
+    const totalPages = Math.ceil(totalItems / limit);
+
+    // Busca dos dados paginados
+    const offset = (page - 1) * limit;
+    const finalParams = [...params, parseInt(limit), parseInt(offset)];
+    const sql = `SELECT id, nome, email, imagem_perfil_url FROM usuarios WHERE ${whereConditions} ORDER BY nome ASC LIMIT ? OFFSET ?`;
+    
+    const [clientes] = await db.query(sql, finalParams);
+    res.status(200).json({ clientes, totalPages, currentPage: parseInt(page) });
+
   } catch (error) {
+    console.error("Erro ao buscar clientes:", error);
     res.status(500).json({ message: 'Erro ao buscar clientes.', error: error.message });
   }
+};
+
+// ✅ NOVA FUNÇÃO SEGURA para o Admin editar um usuário
+exports.adminUpdateUsuario = async (req, res) => {
+    const { id } = req.params; // ID do usuário a ser editado
+    const { telefone, senha } = req.body;
+
+    if (!telefone && !senha) {
+        return res.status(400).json({ message: 'Pelo menos um campo (telefone ou senha) deve ser fornecido.' });
+    }
+
+    try {
+        let updateFields = [];
+        const params = [];
+
+        if (telefone) {
+            updateFields.push('telefone = ?');
+            params.push(telefone.replace(/\D/g, ''));
+        }
+        if (senha) {
+            const senhaHash = await bcrypt.hash(senha, 10);
+            updateFields.push('senha_hash = ?');
+            params.push(senhaHash);
+        }
+
+        if (updateFields.length === 0) {
+            return res.status(400).json({ message: 'Nenhum dado válido para atualizar.' });
+        }
+
+        params.push(id);
+        const sql = `UPDATE usuarios SET ${updateFields.join(', ')} WHERE id = ?`;
+        
+        await db.query(sql, params);
+
+        res.status(200).json({ message: 'Dados do cliente atualizados com sucesso!' });
+    } catch (error) {
+        console.error("Erro ao atualizar dados do usuário pelo admin:", error);
+        res.status(500).json({ message: 'Erro no servidor ao atualizar dados.' });
+    }
 };

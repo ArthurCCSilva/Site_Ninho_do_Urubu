@@ -11,6 +11,7 @@ import EditProfileModal from '../components/EditProfileModal';
 import Pagination from '../components/Pagination';
 import ReactivateProductModal from '../components/ReactivateProductModal';
 import CurrencyInput from 'react-currency-input-field';
+import AdminEditUserModal from '../components/AdminEditUserModal';
 
 function AdminDashboard() {
   // --- Estados do Componente Principal ---
@@ -55,6 +56,7 @@ function AdminDashboard() {
   const [unbundleQty, setUnbundleQty] = useState(1);
   const [allProductsForSelect, setAllProductsForSelect] = useState([]);
 
+  const [showAdminEditUserModal, setShowAdminEditUserModal] = useState(false);
   // --- Funções e Efeitos ---
   const fetchProducts = async (page = 1) => {
     try {
@@ -279,6 +281,9 @@ function AdminDashboard() {
               <Link to="/admin/financeiro" className="btn btn-warning mb-3 w-100">Painel Financeiro</Link>
               <button className="btn btn-info w-100 mb-3" onClick={() => setShowCategoryModal(true)}>Gerenciar Categorias</button>
               <button className="btn btn-outline-success w-100" onClick={() => setShowReactivateModal(true)}>Reativar Produtos</button>
+              <button className="btn btn-outline-info w-100" onClick={() => setShowAdminEditUserModal(true)}>
+                Editar Telefone/Senha de Cliente
+              </button>
             </div>
           </div>
         </div>
@@ -378,6 +383,10 @@ function AdminDashboard() {
       <CategoryModal show={showCategoryModal} onHide={() => setShowCategoryModal(false)} onUpdate={() => { fetchCategories(); fetchProducts(currentPage); }} />
       <EditProfileModal show={showEditProfileModal} onHide={() => setShowEditProfileModal(false)} />
       <ReactivateProductModal show={showReactivateModal} onHide={() => setShowReactivateModal(false)} onReactivated={handleProductReactivated} />
+      <AdminEditUserModal 
+        show={showAdminEditUserModal}
+        onHide={() => setShowAdminEditUserModal(false)}
+      />
     </div>
   );
 }
