@@ -17,6 +17,7 @@ import CustomerDashboard from './pages/CustomerDashboard';
 import ProductDetailPage from './pages/ProductDetailPage';
 import PhysicalSalePage from './pages/PhysicalSalePage';
 import FinancialDashboardPage from './pages/FinancialDashboardPage';
+import AdminCustomerInfoPage from './pages/AdminCustomerInfoPage';
 
 function App() {
   return (
@@ -77,6 +78,11 @@ function App() {
               <Route
                 path="/meus-pedidos"
                 element={<ProtectedRoute><CustomerDashboard /></ProtectedRoute>}
+              />
+
+              <Route
+                path="/admin/clientes"
+                element={<ProtectedRoute role="admin"><AdminCustomerInfoPage /></ProtectedRoute>}
               />
               
             </Routes>

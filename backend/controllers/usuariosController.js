@@ -95,15 +95,16 @@ exports.updateProfile = async (req, res) => {
 
 exports.getAllClientes = async (req, res) => {
   try {
-    const { search, page = 1, limit = 1000 } = req.query; // Aumentamos o limite padrão para o seletor
+    const { search, page = 1, limit = 10 } = req.query; 
     
     let params = [];
     let whereConditions = "role = 'cliente'";
 
     // Se houver um termo de busca, agora ele procura em 3 colunas
     if (search) {
-      whereConditions += ' AND (nome LIKE ? OR email LIKE ? OR telefone LIKE ?)';
-      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+      whereConditions += ' AND (id = ? OR nome LIKE ? OR email LIKE ? OR telefone LIKE ? OR cpf LIKE ?)';
+      const searchTerm = `%${search}%`;
+      params.push(search, searchTerm, searchTerm, searchTerm, searchTerm);
     }
 
     // Contagem para paginação (mantida por consistência)
@@ -115,7 +116,7 @@ exports.getAllClientes = async (req, res) => {
     // Busca dos dados paginados
     const offset = (page - 1) * limit;
     const finalParams = [...params, parseInt(limit), parseInt(offset)];
-    const sql = `SELECT id, nome, email, imagem_perfil_url FROM usuarios WHERE ${whereConditions} ORDER BY nome ASC LIMIT ? OFFSET ?`;
+    const sql = `SELECT id, nome, email, telefone, cpf, imagem_perfil_url FROM usuarios WHERE ${whereConditions} ORDER BY nome ASC LIMIT ? OFFSET ?`;
     
     const [clientes] = await db.query(sql, finalParams);
     res.status(200).json({ clientes, totalPages, currentPage: parseInt(page) });

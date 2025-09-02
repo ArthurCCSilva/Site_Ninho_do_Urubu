@@ -9,10 +9,7 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(() => localStorage.getItem('token'));
-  
-  // ✅ 1. ESTADO DE CARREGAMENTO ESSENCIAL
   const [isLoading, setIsLoading] = useState(true);
-  
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -30,7 +27,6 @@ export function AuthProvider({ children }) {
     } else {
       api.defaults.headers.common['Authorization'] = null;
     }
-    // ✅ 2. SINALIZA QUE A VERIFICAÇÃO INICIAL TERMINOU
     setIsLoading(false);
   }, [token]);
 
@@ -40,7 +36,6 @@ export function AuthProvider({ children }) {
       const newToken = response.data.token;
       localStorage.setItem('token', newToken);
       setToken(newToken);
-      
       const decodedUser = jwtDecode(newToken);
       if (decodedUser.role === 'admin') {
         navigate('/admin/dashboard');
@@ -53,23 +48,19 @@ export function AuthProvider({ children }) {
     }
   }, [navigate]);
 
+  // ✅ CORREÇÃO: A função register agora só faz a chamada à API.
   const register = useCallback(async (formData) => {
     try {
-      const data = new FormData();
-      data.append('nome', formData.nome);
-      data.append('email', formData.email);
-      data.append('senha', formData.senha);
-      data.append('telefone', formData.telefone);
-      if (formData.imagem_perfil) {
-        data.append('imagem_perfil', formData.imagem_perfil);
-      }
-      await api.post('/api/auth/register', data);
-      await login(formData.telefone, formData.senha);
+      await api.post('/api/auth/register', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
     } catch (error) {
       console.error("Falha no cadastro", error);
-      throw error;
+      throw error; // Lança o erro para o formulário tratar
     }
-  }, [login]);
+  }, []); // 'navigate' não é mais uma dependência
 
   const logout = useCallback(() => {
     localStorage.removeItem('token');
@@ -78,7 +69,6 @@ export function AuthProvider({ children }) {
     navigate('/login');
   }, [navigate]);
 
-  // ✅ 3. useMemo PARA GARANTIR QUE O OBJETO DO CONTEXTO SEJA ESTÁVEL
   const authContextValue = useMemo(() => ({
     user,
     token,
@@ -86,6 +76,7 @@ export function AuthProvider({ children }) {
     login,
     logout,
     register
+    // O estado 'registrationSuccess' foi removido daqui
   }), [user, token, isLoading, login, logout, register]);
 
   return (

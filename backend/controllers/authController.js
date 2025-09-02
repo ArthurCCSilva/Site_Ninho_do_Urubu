@@ -7,7 +7,7 @@ const db = require('../db');// Importa nossa conexão com o banco
 // --- REGISTRO ---
 exports.register = async (req, res) => {
   try {
-    const { nome, email, senha, telefone } = req.body;
+    const { nome, email, senha, telefone, cpf} = req.body;
     let imagem_perfil_url = req.file ? req.file.filename : null;
 
     // ✅ 1. VALIDAÇÃO ATUALIZADA: O email não é mais obrigatório
@@ -16,23 +16,20 @@ exports.register = async (req, res) => {
     }
 
     const telefoneSanitizado = telefone.replace(/\D/g, '');
+    const cpfSanitizado = cpf ? cpf.replace(/\D/g, '') : null;
     const senhaHash = await bcrypt.hash(senha, 10);
-
-    // ✅ 2. LÓGICA PARA LIDAR COM EMAIL VAZIO
-    // Se o email vier como uma string vazia, salvamos NULL no banco.
     const emailParaSalvar = email || null;
 
     const [result] = await db.query(
-      'INSERT INTO usuarios (nome, email, senha_hash, role, telefone, imagem_perfil_url) VALUES (?, ?, ?, ?, ?, ?)',
-      // ✅ 3. Usa a nova variável para o email
-      [nome, emailParaSalvar, senhaHash, 'cliente', telefoneSanitizado, imagem_perfil_url]
+      'INSERT INTO usuarios (nome, email, senha_hash, role, telefone, cpf, imagem_perfil_url) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [nome, emailParaSalvar, senhaHash, 'cliente', telefoneSanitizado, cpfSanitizado, imagem_perfil_url]
     );
 
     res.status(201).json({ message: 'Usuário criado com Sucesso!', userId: result.insertId });
   } catch (error) {
     if (error.code === 'ER_DUP_ENTRY') {
       // A mensagem de erro agora precisa ser mais genérica
-      return res.status(409).json({ message: 'Este e-mail ou telefone já está cadastrado.' })
+      return res.status(409).json({ message: 'Este e-mail, telefone ou CPF já está cadastrado.' })
     }
     console.error("Erro no registro:", error);
     res.status(500).json({ message: 'Erro no servidor', error: error.message });
