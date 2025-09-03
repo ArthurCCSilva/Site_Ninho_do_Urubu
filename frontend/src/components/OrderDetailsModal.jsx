@@ -2,14 +2,20 @@
 import { useState, useEffect, useRef } from 'react';
 import api from '../services/api';
 import { Modal } from 'bootstrap';
+import CurrencyInput from 'react-currency-input-field';
 
 function OrderDetailsModal({ show, onHide, pedidoId, onBack, onOrderUpdate }) {
   const [pedido, setPedido] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const modalRef = useRef();
+  const [novoPagamento, setNovoPagamento] = useState('');
 
-  // Função para buscar os detalhes do pedido, agora será reutilizada
+  // ✅ 1. ADICIONE A FUNÇÃO QUE ESTAVA FALTANDO
+  const formatCurrency = (value) => {
+    return (parseFloat(value) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  };
+
   const fetchDetalhesPedido = async () => {
     if (!pedidoId) return;
     setLoading(true);
@@ -26,14 +32,12 @@ function OrderDetailsModal({ show, onHide, pedidoId, onBack, onOrderUpdate }) {
     }
   };
 
-  // Busca os dados quando o modal abre
   useEffect(() => {
     if (show) {
       fetchDetalhesPedido();
     }
   }, [show, pedidoId]);
 
-  // Controla a exibição do modal do Bootstrap
   useEffect(() => {
     const modalElement = modalRef.current;
     if (!modalElement) return;
@@ -42,22 +46,35 @@ function OrderDetailsModal({ show, onHide, pedidoId, onBack, onOrderUpdate }) {
     else bsModal.hide();
   }, [show]);
 
-  // Nova função para lidar com a atualização da quantidade de um item
   const handleUpdateQuantity = async (itemId, novaQuantidade) => {
     try {
       await api.patch(`/api/pedidos/itens/${itemId}`, { novaQuantidade });
-      fetchDetalhesPedido(); // Atualiza os dados DENTRO do modal
-
-      // ✅ 2. AVISA A PÁGINA PRINCIPAL que uma mudança ocorreu
-      if (onOrderUpdate) {
-        onOrderUpdate();
-      }
-
+      fetchDetalhesPedido();
+      if (onOrderUpdate) onOrderUpdate();
     } catch (error) {
       alert(error.response?.data?.message || 'Erro ao atualizar item.');
     }
   };
-  
+
+  const handleRegistrarPagamento = async () => {
+    if (!novoPagamento || parseFloat(String(novoPagamento).replace(',', '.')) <= 0) {
+      return alert("Insira um valor de pagamento válido.");
+    }
+    try {
+      const valorCorrigido = String(novoPagamento).replace(',', '.');
+      await api.post(`/api/pedidos/${pedidoId}/pagamento-fiado`, { valor_pago: valorCorrigido });
+      alert('Pagamento registrado com sucesso!');
+      setNovoPagamento('');
+      fetchDetalhesPedido();
+      if (onOrderUpdate) onOrderUpdate();
+    } catch (err) {
+      alert(err.response?.data?.message || "Erro ao registrar pagamento.");
+    }
+  };
+
+  const totalPagoFiado = pedido?.pagamentos_fiado?.reduce((acc, p) => acc + parseFloat(p.valor_pago), 0) || 0;
+  const saldoDevedor = (parseFloat(pedido?.valor_total) || 0) - totalPagoFiado;
+
   return (
     <div className="modal fade" ref={modalRef} tabIndex="-1">
       <div className="modal-dialog modal-lg">
@@ -121,29 +138,54 @@ function OrderDetailsModal({ show, onHide, pedidoId, onBack, onOrderUpdate }) {
                   <div className="alert alert-info">
                     <div className="d-flex justify-content-between">
                       <span>Cliente pagará com:</span>
-                      <span>R$ {parseFloat(pedido.valor_pago_cliente).toFixed(2).replace('.', ',')}</span>
+                      <span>{formatCurrency(pedido.valor_pago_cliente)}</span>
                     </div>
                     <hr/>
                     <div className="d-flex justify-content-between fw-bold">
                       <span>Levar troco de:</span>
-                      <span>R$ {(pedido.valor_pago_cliente - pedido.valor_total).toFixed(2).replace('.', ',')}</span>
+                      <span>{formatCurrency(pedido.valor_pago_cliente - pedido.valor_total)}</span>
+                    </div>
+                  </div>
+                )}
+                
+                {pedido.status === 'Fiado' && (
+                  <div className="card bg-light">
+                    <div className="card-body">
+                      <h5 className="card-title">Status do Fiado</h5>
+                      <ul className="list-group list-group-flush mb-3">
+                        <li className="list-group-item d-flex justify-content-between bg-transparent"><span>Total do Pedido:</span> <span>{formatCurrency(pedido.valor_total)}</span></li>
+                        <li className="list-group-item d-flex justify-content-between bg-transparent"><span>Total Pago:</span> <span className="text-success fw-bold">{formatCurrency(totalPagoFiado)}</span></li>
+                        <li className="list-group-item d-flex justify-content-between bg-transparent"><span>Saldo Devedor:</span> <span className="text-danger fw-bold">{formatCurrency(saldoDevedor)}</span></li>
+                      </ul>
+                      <h6>Registrar Novo Pagamento:</h6>
+                      <div className="input-group">
+                        <CurrencyInput className="form-control" placeholder="0,00" value={novoPagamento} onValueChange={(value) => setNovoPagamento(value || '')} intlConfig={{ locale: 'pt-BR', currency: 'BRL' }} />
+                        <button className="btn btn-primary" type="button" onClick={handleRegistrarPagamento}>Registrar</button>
+                      </div>
+                      {pedido.pagamentos_fiado && pedido.pagamentos_fiado.length > 0 && (
+                        <>
+                          <h6 className="mt-3">Histórico de Pagamentos:</h6>
+                          <ul className="list-group list-group-sm">
+                            {pedido.pagamentos_fiado.map(p => (
+                              <li key={p.id} className="list-group-item d-flex justify-content-between">
+                                <span>{new Date(p.data_pagamento).toLocaleDateString('pt-BR')}</span>
+                                <span>{formatCurrency(p.valor_pago)}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </>
+                      )}
                     </div>
                   </div>
                 )}
 
-                <div className="text-end fw-bold fs-5 mt-3">Total do Pedido: R$ {parseFloat(pedido.valor_total).toFixed(2).replace('.', ',')}</div>
+                <div className="text-end fw-bold fs-5 mt-3">Total do Pedido: {formatCurrency(pedido.valor_total)}</div>
               </div>
             )}
           </div>
           <div className="modal-footer justify-content-between">
-            {onBack && 
-              <button type="button" className="btn btn-secondary" onClick={onBack}>
-                &larr; Voltar para Ações 
-              </button>
-            }
-            <button type="button" className="btn btn-primary" onClick={onHide}>
-              Fechar
-            </button>
+            {onBack && <button type="button" className="btn btn-secondary" onClick={onBack}>&larr; Voltar para Ações</button>}
+            <button type="button" className="btn btn-primary" onClick={onHide}>Fechar</button>
           </div>
         </div>
       </div>

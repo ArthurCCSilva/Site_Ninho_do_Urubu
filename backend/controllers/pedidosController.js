@@ -70,21 +70,59 @@ exports.getPedidoDetalhes = async (req, res) => {
     if (pedidos.length === 0) {
       return res.status(404).json({ message: 'Pedido não encontrado ou acesso negado.' });
     }
-
-    // ✅ CORREÇÃO AQUI: Adicionamos 'pi.id' à seleção da query
-    const sqlItens = `
-      SELECT pi.id, pi.quantidade, pi.preco_unitario, p.nome, p.imagem_produto_url 
-      FROM pedido_itens pi 
-      JOIN produtos p ON pi.produto_id = p.id 
-      WHERE pi.pedido_id = ?
-    `;
-    
+    const sqlItens = `SELECT pi.id, pi.quantidade, pi.preco_unitario, p.nome, p.imagem_produto_url FROM pedido_itens pi JOIN produtos p ON pi.produto_id = p.id WHERE pi.pedido_id = ?`;
     const [itens] = await db.query(sqlItens, [pedidoId]);
-    const detalhesPedido = { ...pedidos[0], itens: itens };
+    
+    // Busca os pagamentos parciais, se houver
+    const [pagamentos] = await db.query('SELECT * FROM pagamentos_fiado WHERE pedido_id = ? ORDER BY data_pagamento ASC', [pedidoId]);
+    
+    const detalhesPedido = { ...pedidos[0], itens: itens, pagamentos_fiado: pagamentos };
     res.status(200).json(detalhesPedido);
   } catch (error) {
     res.status(500).json({ message: 'Erro ao buscar detalhes do pedido.', error: error.message });
   }
+};
+
+exports.adicionarPagamentoFiado = async (req, res) => {
+    const { id: pedidoId } = req.params;
+    const { valor_pago } = req.body;
+    const connection = await db.getConnection();
+
+    try {
+        await connection.beginTransaction();
+
+        const valorPagoNumerico = parseFloat(String(valor_pago).replace(',', '.'));
+        if (isNaN(valorPagoNumerico) || valorPagoNumerico <= 0) {
+            throw new Error('O valor pago é inválido.');
+        }
+
+        const [pedidos] = await connection.query('SELECT valor_total FROM pedidos WHERE id = ? FOR UPDATE', [pedidoId]);
+        if (pedidos.length === 0) throw new Error('Pedido não encontrado.');
+        const valorTotalPedido = parseFloat(pedidos[0].valor_total);
+
+        const [pagamentos] = await connection.query('SELECT SUM(valor_pago) as totalJaPago FROM pagamentos_fiado WHERE pedido_id = ?', [pedidoId]);
+        const totalJaPago = parseFloat(pagamentos[0].totalJaPago) || 0;
+        
+        const saldoDevedor = valorTotalPedido - totalJaPago;
+        if (valorPagoNumerico > saldoDevedor) {
+            throw new Error(`O valor pago (R$ ${valorPagoNumerico.toFixed(2)}) excede o saldo devedor (R$ ${saldoDevedor.toFixed(2)}).`);
+        }
+
+        await connection.query('INSERT INTO pagamentos_fiado (pedido_id, valor_pago, data_pagamento) VALUES (?, ?, NOW())', [pedidoId, valorPagoNumerico]);
+
+        // Se o novo total pago quitar a dívida, atualiza o status do pedido
+        if ((totalJaPago + valorPagoNumerico) >= valorTotalPedido) {
+            await connection.query("UPDATE pedidos SET status = 'Entregue' WHERE id = ?", [pedidoId]);
+        }
+        
+        await connection.commit();
+        res.status(200).json({ message: 'Pagamento registrado com sucesso!' });
+    } catch (error) {
+        await connection.rollback();
+        res.status(500).json({ message: `Erro ao registrar pagamento: ${error.message}` });
+    } finally {
+        connection.release();
+    }
 };
 
 // PATCH /api/pedidos/:id/cancelar - Permite que um cliente cancele um pedido
@@ -213,7 +251,7 @@ exports.updateStatusPedido = async (req, res) => {
     const { id: pedidoId } = req.params;
     const { status: novoStatus } = req.body;
     const connection = await db.getConnection();
-    if (!['Processando', 'Enviado', 'Entregue'].includes(novoStatus)) {
+    if (!['Processando', 'Enviado', 'Entregue', 'Fiado'].includes(novoStatus)) {
         return res.status(400).json({ message: 'Status inválido.' });
     }
     try {

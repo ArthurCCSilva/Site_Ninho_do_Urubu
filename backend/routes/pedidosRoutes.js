@@ -20,4 +20,6 @@ router.patch('/:id/status', isAdmin, pedidosController.updateStatusPedido);
 router.patch('/:id/cancelar-admin', isAdmin, pedidosController.cancelarPedidoAdmin);
 router.patch('/itens/:itemId', isAdmin, pedidosController.updateItemPedido);
 
+router.post('/:id/pagamento-fiado', [verifyToken, isAdmin], pedidosController.adicionarPagamentoFiado);
+
 module.exports = router;

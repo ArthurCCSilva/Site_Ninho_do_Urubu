@@ -62,6 +62,9 @@ function AdminActionModal({ show, onHide, pedido, onUpdateStatus, onShowCancelMo
               <button className="btn btn-danger" onClick={handleCancelClick}>
                 Cancelar Pedido (Admin)
               </button>
+              <button className="btn btn-outline-dark" onClick={() => handleUpdateClick('Fiado')}>
+                Marcar como "Fiado"
+              </button>
             </div>
           </div>
           <div className="modal-footer">
