@@ -9,6 +9,9 @@ router.use(verifyToken);
 
 router.post('/', pedidosController.criarPedido);
 router.get('/meus-pedidos', pedidosController.getPedidosUsuario);
+
+router.get('/boleto-planos-carrinho', [verifyToken], pedidosController.getBoletoPlansForCart);
+
 router.get('/:id', pedidosController.getPedidoDetalhes);
 router.patch('/:id/cancelar', pedidosController.cancelarPedido);
 
@@ -19,7 +22,7 @@ router.post('/admin/venda-fisica', isAdmin, pedidosController.criarVendaFisica);
 router.patch('/:id/status', isAdmin, pedidosController.updateStatusPedido);
 router.patch('/:id/cancelar-admin', isAdmin, pedidosController.cancelarPedidoAdmin);
 router.patch('/itens/:itemId', isAdmin, pedidosController.updateItemPedido);
-
 router.post('/:id/pagamento-fiado', [verifyToken, isAdmin], pedidosController.adicionarPagamentoFiado);
+
 
 module.exports = router;

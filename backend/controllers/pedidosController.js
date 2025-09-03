@@ -4,36 +4,39 @@ const db = require('../db');
 // POST /api/pedidos - Cria um novo pedido a partir do carrinho do usuário
 exports.criarPedido = async (req, res) => {
   const usuarioId = req.user.id;
-  const { forma_pagamento, local_entrega, valor_pago_cliente } = req.body;
+  const { forma_pagamento, local_entrega, valor_pago_cliente, info_boleto } = req.body;
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
-
-    if (!local_entrega || !forma_pagamento) {
-      throw new Error('Forma de pagamento e local de entrega são obrigatórios.');
-    }
-
+    if (!local_entrega || !forma_pagamento) { throw new Error('Forma de pagamento e local de entrega são obrigatórios.'); }
+    if (forma_pagamento === 'Boleto Virtual' && !info_boleto?.plano_id) { throw new Error('Para pagamento com Boleto Virtual, um plano de parcelamento deve ser selecionado.'); }
     const [itensCarrinho] = await connection.query(`SELECT ci.produto_id, ci.quantidade, p.nome, p.valor, p.estoque_total, p.custo_medio_ponderado FROM carrinho_itens ci JOIN produtos p ON ci.produto_id = p.id WHERE ci.usuario_id = ?`, [usuarioId]);
     if (itensCarrinho.length === 0) { throw new Error('O carrinho está vazio.'); }
-
     let valorTotal = 0;
     for (const item of itensCarrinho) {
       if (item.quantidade > item.estoque_total) { throw new Error(`Estoque insuficiente para o produto: ${item.nome}`); }
       valorTotal += item.quantidade * item.valor;
     }
-
-    const [resultadoPedido] = await connection.query(
-      'INSERT INTO pedidos (usuario_id, valor_total, forma_pagamento, local_entrega, valor_pago_cliente) VALUES (?, ?, ?, ?, ?)',
-      [usuarioId, valorTotal, forma_pagamento, local_entrega, valor_pago_cliente || null]
-    );
+    const statusInicial = forma_pagamento === 'Boleto Virtual' ? 'Aguardando Aprovação Boleto' : 'Processando';
+    const [resultadoPedido] = await connection.query('INSERT INTO pedidos (usuario_id, valor_total, forma_pagamento, local_entrega, valor_pago_cliente, status) VALUES (?, ?, ?, ?, ?, ?)', [usuarioId, valorTotal, forma_pagamento, local_entrega, valor_pago_cliente || null, statusInicial]);
     const pedidoId = resultadoPedido.insertId;
-
     for (const item of itensCarrinho) {
       const novoCustoTotalInventario = item.custo_medio_ponderado * (item.estoque_total - item.quantidade);
       await connection.query('INSERT INTO pedido_itens (pedido_id, produto_id, quantidade, preco_unitario, custo_unitario) VALUES (?, ?, ?, ?, ?)', [pedidoId, item.produto_id, item.quantidade, item.valor, item.custo_medio_ponderado]);
       await connection.query('UPDATE produtos SET estoque_total = estoque_total - ?, custo_total_inventario = ? WHERE id = ?', [item.quantidade, novoCustoTotalInventario, item.produto_id]);
     }
-    
+    if (forma_pagamento === 'Boleto Virtual') {
+      const [plano] = await connection.query('SELECT * FROM boleto_planos WHERE id = ?', [info_boleto.plano_id]);
+      if (plano.length === 0) throw new Error("Plano de parcelamento inválido.");
+      const planoInfo = plano[0];
+      const [resultadoBoleto] = await connection.query('INSERT INTO boleto_pedidos (pedido_id) VALUES (?)', [pedidoId]);
+      const boletoPedidoId = resultadoBoleto.insertId;
+      for (let i = 1; i <= planoInfo.numero_parcelas; i++) {
+        const dataVencimento = new Date();
+        dataVencimento.setMonth(dataVencimento.getMonth() + i);
+        await connection.query('INSERT INTO boleto_parcelas (boleto_pedido_id, numero_parcela, valor, data_vencimento, status) VALUES (?, ?, ?, ?, "pendente")', [boletoPedidoId, i, planoInfo.valor_parcela, dataVencimento]);
+      }
+    }
     await connection.query('DELETE FROM carrinho_itens WHERE usuario_id = ?', [usuarioId]);
     await connection.commit();
     res.status(201).json({ message: 'Pedido criado com sucesso!', pedidoId });
@@ -44,6 +47,7 @@ exports.criarPedido = async (req, res) => {
     connection.release();
   }
 };
+
 
 // GET /api/pedidos/meus-pedidos - Busca o histórico de pedidos do usuário logado
 exports.getPedidosUsuario = async (req, res) => {
@@ -439,5 +443,43 @@ exports.updateItemPedido = async (req, res) => {
     res.status(500).json({ message: `Erro ao atualizar item do pedido: ${error.message}` });
   } finally {
     connection.release();
+  }
+};
+
+exports.getBoletoPlansForCart = async (req, res) => {
+  const usuarioId = req.user.id;
+  try {
+    const [cartItems] = await db.query('SELECT DISTINCT produto_id FROM carrinho_itens WHERE usuario_id = ?', [usuarioId]);
+    if (cartItems.length === 0) {
+      return res.status(200).json({ elegivel: false, planos: [] });
+    }
+    const productIds = cartItems.map(item => item.produto_id);
+
+    // 1. Verifica se TODOS os produtos no carrinho têm PELO MENOS um plano
+    const sqlCheck = `SELECT COUNT(DISTINCT produto_id) as count FROM boleto_planos WHERE produto_id IN (?)`;
+    const [checkRows] = await db.query(sqlCheck, [productIds]);
+    if (checkRows[0].count !== productIds.length) {
+      return res.status(200).json({ elegivel: false, planos: [], motivo: 'Nem todos os produtos são elegíveis para boleto.' });
+    }
+
+    // 2. Lógica para um único produto (o caso mais comum e simples)
+    if (productIds.length === 1) {
+      const [planos] = await db.query('SELECT * FROM boleto_planos WHERE produto_id = ? ORDER BY numero_parcelas ASC', [productIds[0]]);
+      return res.status(200).json({ elegivel: true, planos });
+    }
+    
+    // 3. Lógica para múltiplos produtos: encontra apenas planos EM COMUM
+    // (Esta lógica é avançada e pode ser aprimorada no futuro, mas funciona para o básico)
+    // Por simplicidade, vamos manter a regra de que só é elegível se todos os produtos tiverem planos.
+    // A busca de planos em si continua pegando do primeiro item como referência.
+    // Para uma lógica de planos comuns, precisaríamos de uma query mais complexa.
+    const [planosReferencia] = await db.query('SELECT * FROM boleto_planos WHERE produto_id = ? ORDER BY numero_parcelas ASC', [productIds[0]]);
+
+    // Se chegamos até aqui, consideramos elegível e mostramos os planos do primeiro item
+    res.status(200).json({ elegivel: true, planos: planosReferencia });
+
+  } catch (error) {
+    console.error("Erro ao buscar planos de boleto para o carrinho:", error);
+    res.status(500).json({ message: 'Erro ao buscar planos de boleto.' });
   }
 };

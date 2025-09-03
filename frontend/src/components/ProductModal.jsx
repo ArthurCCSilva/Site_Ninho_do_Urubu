@@ -33,6 +33,11 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
   const [showCropper, setShowCropper] = useState(false);
   const fileInputRef = useRef(null);
 
+  // Estados para os planos de parcelamento
+  const [planos, setPlanos] = useState([]);
+  const [novoPlano, setNovoPlano] = useState({ numero_parcelas: 2, valor_parcela: '', juros: false });
+
+  // Busca categorias, todos os produtos E os planos de parcelamento
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -49,11 +54,25 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
         console.error("Erro ao carregar dados para o modal", err);
       }
     };
+    
+    const fetchPlanos = async () => {
+      if (productToEdit) {
+        try {
+          const response = await api.get(`/api/boleto-planos/produto/${productToEdit.id}`);
+          setPlanos(response.data);
+        } catch (err) { console.error("Erro ao buscar planos", err); }
+      } else {
+        setPlanos([]);
+      }
+    };
+
     if (show) {
       fetchData();
+      fetchPlanos();
+      setNovoPlano({ numero_parcelas: 2, valor_parcela: '', juros: false });
     }
-  }, [show, productToEdit]);
-
+  }, [productToEdit, show]);
+  
   useEffect(() => {
     if (show) {
       if (productToEdit) {
@@ -126,7 +145,15 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
       dataToSend.unidades_por_pai = null;
     }
     const data = new FormData();
-    Object.keys(dataToSend).forEach(key => data.append(key, dataToSend[key]));
+    Object.keys(dataToSend).forEach(key => {
+        // Converte valores de moeda para o formato correto antes de enviar
+        if (key === 'valor' || key === 'custo') {
+            const correctedValue = String(dataToSend[key]).replace(',', '.');
+            data.append(key, correctedValue);
+        } else {
+            data.append(key, dataToSend[key]);
+        }
+    });
     if (imagemFile) {
       data.append('imagem_produto', imagemFile);
     }
@@ -145,6 +172,37 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
     }
   };
 
+  const handleAddPlano = async () => {
+    const valorParcelaCorrigido = novoPlano.valor_parcela ? String(novoPlano.valor_parcela).replace(',', '.') : '0';
+    if (!valorParcelaCorrigido || parseFloat(valorParcelaCorrigido) <= 0) {
+      return alert("Insira um valor de parcela válido.");
+    }
+    try {
+      await api.post('/api/boleto-planos', {
+        produto_id: productToEdit.id,
+        numero_parcelas: novoPlano.numero_parcelas,
+        valor_parcela: valorParcelaCorrigido,
+        juros: novoPlano.juros
+      });
+      const response = await api.get(`/api/boleto-planos/produto/${productToEdit.id}`);
+      setPlanos(response.data);
+      setNovoPlano({ numero_parcelas: 2, valor_parcela: '', juros: false });
+    } catch (err) {
+      alert("Erro ao adicionar plano.");
+    }
+  };
+  
+  const handleDeletePlano = async (planoId) => {
+    if (window.confirm("Tem certeza que deseja deletar este plano de parcelamento?")) {
+      try {
+        await api.delete(`/api/boleto-planos/${planoId}`);
+        setPlanos(planos.filter(p => p.id !== planoId));
+      } catch (err) {
+        alert("Erro ao deletar plano.");
+      }
+    }
+  };
+
   return (
     <>
       <div className="modal fade" ref={modalRef} tabIndex="-1">
@@ -160,21 +218,11 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
                 <div className="mb-3"><label className="form-label">Nome</label><input type="text" name="nome" value={formData.nome} onChange={handleChange} className="form-control" required /></div>
                 <div className="mb-3"><label className="form-label">Descrição</label><textarea rows="3" name="descricao" value={formData.descricao} onChange={handleChange} className="form-control" /></div>
                 <div className="row">
-                  <div className="col">
-                    <div className="mb-3">
-                      <label className="form-label">Valor de Venda (R$)</label>
-                      <CurrencyInput id="valor" name="valor" className="form-control" value={formData.valor} onValueChange={handleCurrencyChange} intlConfig={{ locale: 'pt-BR', currency: 'BRL' }} decimalScale={2} placeholder="R$ 0,00" required />
-                    </div>
-                  </div>
+                  <div className="col"><div className="mb-3"><label className="form-label">Valor de Venda (R$)</label><CurrencyInput id="valor" name="valor" className="form-control" value={formData.valor} onValueChange={handleCurrencyChange} intlConfig={{ locale: 'pt-BR', currency: 'BRL' }} decimalScale={2} placeholder="R$ 0,00" required /></div></div>
                   {!productToEdit && (
                     <>
                       <div className="col"><div className="mb-3"><label className="form-label">Estoque Inicial</label><input type="number" name="estoque" value={formData.estoque} onChange={handleChange} className="form-control" required /></div></div>
-                      <div className="col">
-                        <div className="mb-3">
-                          <label className="form-label">Custo/un. (R$)</label>
-                          <CurrencyInput id="custo" name="custo" className="form-control" value={formData.custo} onValueChange={handleCurrencyChange} intlConfig={{ locale: 'pt-BR', currency: 'BRL' }} decimalScale={2} placeholder="R$ 0,00" required />
-                        </div>
-                      </div>
+                      <div className="col"><div className="mb-3"><label className="form-label">Custo/un. (R$)</label><CurrencyInput id="custo" name="custo" className="form-control" value={formData.custo} onValueChange={handleCurrencyChange} intlConfig={{ locale: 'pt-BR', currency: 'BRL' }} decimalScale={2} placeholder="R$ 0,00" required /></div></div>
                     </>
                   )}
                 </div>
@@ -191,20 +239,45 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
                   </select>
                 </div>
                 {productType === 'pai' && (
-                  <div className="mb-3">
-                    <label className="form-label">Unidades contidas neste Fardo</label>
-                    <input type="number" name="unidades_por_pai" value={formData.unidades_por_pai} onChange={handleChange} className="form-control" placeholder="Ex: 6" />
-                  </div>
+                  <div className="mb-3"><label className="form-label">Unidades contidas neste Fardo</label><input type="number" name="unidades_por_pai" value={formData.unidades_por_pai} onChange={handleChange} className="form-control" placeholder="Ex: 6" /></div>
                 )}
                 {productType === 'filho' && (
-                  <div className="mb-3">
-                    <label className="form-label">Este produto é uma unidade de qual Fardo (Pai)?</label>
-                    <Select options={allProducts} placeholder="Selecione o fardo..." isClearable value={allProducts.find(o => o.value === formData.produto_pai_id) || null} onChange={handleParentProductChange} />
-                  </div>
+                  <div className="mb-3"><label className="form-label">Este produto é uma unidade de qual Fardo (Pai)?</label><Select options={allProducts} placeholder="Selecione o fardo..." isClearable value={allProducts.find(o => o.value === formData.produto_pai_id) || null} onChange={handleParentProductChange} /></div>
                 )}
                 <hr />
                 <div className="form-check form-switch mb-3"><input className="form-check-input" type="checkbox" role="switch" id="destaqueCheck" name="destaque" checked={formData.destaque} onChange={handleCheckboxChange} /><label className="form-check-label" htmlFor="destaqueCheck">Marcar como Produto Destaque</label></div>
                 <div className="form-check form-switch"><input className="form-check-input" type="checkbox" role="switch" id="promocaoCheck" name="promocao" checked={formData.promocao} onChange={handleCheckboxChange} /><label className="form-check-label" htmlFor="promocaoCheck">Marcar como Produto em Promoção</label></div>
+                
+                {productToEdit && (
+                  <>
+                    <hr/>
+                    <h5>Planos de Parcelamento (Boleto Virtual)</h5>
+                    <p className="small text-muted">Adicione aqui as opções de parcelamento para este produto.</p>
+                    <div className="card bg-light">
+                      <div className="card-body">
+                        <h6>Planos Atuais:</h6>
+                        {planos.length > 0 ? (
+                          <ul className="list-group mb-3">
+                            {planos.map(plano => (
+                              <li key={plano.id} className="list-group-item d-flex justify-content-between align-items-center">
+                                <span>{plano.numero_parcelas}x de R$ {parseFloat(plano.valor_parcela).toFixed(2).replace('.', ',')}<span className={`badge ms-2 ${plano.juros ? 'bg-warning' : 'bg-success'}`}>{plano.juros ? 'Com Juros' : 'Sem Juros'}</span></span>
+                                <button type="button" className="btn-close" aria-label="Deletar plano" onClick={() => handleDeletePlano(plano.id)}></button>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : <p className="small text-muted">Nenhum plano cadastrado.</p>}
+                        <h6>Adicionar Novo Plano:</h6>
+                        <div className="row g-2 align-items-end">
+                          <div className="col-md-3"><label>Nº Parcelas</label><input type="number" className="form-control" value={novoPlano.numero_parcelas} onChange={e => setNovoPlano({...novoPlano, numero_parcelas: e.target.value})} /></div>
+                          <div className="col-md-4"><label>Valor Parcela</label><CurrencyInput className="form-control" value={novoPlano.valor_parcela} onValueChange={(value) => setNovoPlano({...novoPlano, valor_parcela: value})} intlConfig={{ locale: 'pt-BR', currency: 'BRL' }} decimalScale={2} /></div>
+                          <div className="col-md-3 d-flex align-items-center pt-3"><div className="form-check form-switch"><input className="form-check-input" type="checkbox" checked={novoPlano.juros} onChange={e => setNovoPlano({...novoPlano, juros: e.target.checked})} id="jurosCheck" /><label className="form-check-label" htmlFor="jurosCheck">Com Juros</label></div></div>
+                          <div className="col-md-2 d-grid"><button type="button" className="btn btn-primary" onClick={handleAddPlano}>Adicionar</button></div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={onHide} disabled={loading}>Cancelar</button>
@@ -214,12 +287,7 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
           </div>
         </div>
       </div>
-      <ImageCropperModal 
-        show={showCropper}
-        onHide={() => setShowCropper(false)}
-        imageSrc={imageToCrop}
-        onCropComplete={handleCropComplete}
-      />
+      <ImageCropperModal show={showCropper} onHide={() => setShowCropper(false)} imageSrc={imageToCrop} onCropComplete={handleCropComplete} />
     </>
   );
 }
