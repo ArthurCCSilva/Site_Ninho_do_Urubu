@@ -4,24 +4,43 @@ const router = express.Router();
 const pedidosController = require('../controllers/pedidosController');
 const { verifyToken, isAdmin } = require('../middleware/authMiddleware');
 
-// Protege todas as rotas de pedidos
-router.use(verifyToken);
+// --- ROTAS PARA CLIENTES LOGADOS ---
 
-router.post('/', pedidosController.criarPedido);
-router.get('/meus-pedidos', pedidosController.getPedidosUsuario);
+// Cria um novo pedido a partir do carrinho do usuário
+router.post('/', [verifyToken], pedidosController.criarPedido);
 
+// Busca o histórico de pedidos do usuário logado
+router.get('/meus-pedidos', [verifyToken], pedidosController.getPedidosUsuario);
+
+// ✅ ROTA CORRIGIDA E NO LUGAR CERTO: Acessível por qualquer cliente logado
+// Busca os planos de boleto disponíveis para o carrinho atual
 router.get('/boleto-planos-carrinho', [verifyToken], pedidosController.getBoletoPlansForCart);
 
-router.get('/:id', pedidosController.getPedidoDetalhes);
-router.patch('/:id/cancelar', pedidosController.cancelarPedido);
+// Busca os detalhes de um pedido específico
+router.get('/:id', [verifyToken], pedidosController.getPedidoDetalhes);
 
-// 3. Rotas de Admin: O segurança da portaria já verificou o login.
-//    Agora, adicionamos apenas o segurança 'isAdmin' na porta dessas salas específicas.
-router.get('/admin/todos', isAdmin, pedidosController.getTodosPedidosAdmin);
-router.post('/admin/venda-fisica', isAdmin, pedidosController.criarVendaFisica);
-router.patch('/:id/status', isAdmin, pedidosController.updateStatusPedido);
-router.patch('/:id/cancelar-admin', isAdmin, pedidosController.cancelarPedidoAdmin);
-router.patch('/itens/:itemId', isAdmin, pedidosController.updateItemPedido);
+// Permite que um cliente cancele um pedido que ainda está em processamento
+router.patch('/:id/cancelar', [verifyToken], pedidosController.cancelarPedido);
+
+
+// --- ROTAS EXCLUSIVAS PARA ADMIN ---
+
+// Busca TODOS os pedidos para o painel do admin
+router.get('/admin/todos', [verifyToken, isAdmin], pedidosController.getTodosPedidosAdmin);
+
+// Cria um pedido a partir da tela de "Venda Física"
+router.post('/admin/venda-fisica', [verifyToken, isAdmin], pedidosController.criarVendaFisica);
+
+// Atualiza o status de um pedido
+router.patch('/:id/status', [verifyToken, isAdmin], pedidosController.updateStatusPedido);
+
+// Admin cancela um pedido (com motivo)
+router.patch('/admin/:id/cancelar', [verifyToken, isAdmin], pedidosController.cancelarPedidoAdmin);
+
+// Admin edita a quantidade de um item em um pedido existente
+router.patch('/itens/:itemId', [verifyToken, isAdmin], pedidosController.updateItemPedido);
+
+// Admin adiciona um pagamento parcial a um pedido "Fiado"
 router.post('/:id/pagamento-fiado', [verifyToken, isAdmin], pedidosController.adicionarPagamentoFiado);
 
 

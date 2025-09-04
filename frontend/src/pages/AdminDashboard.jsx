@@ -12,6 +12,7 @@ import Pagination from '../components/Pagination';
 import ReactivateProductModal from '../components/ReactivateProductModal';
 import CurrencyInput from 'react-currency-input-field';
 import AdminEditUserModal from '../components/AdminEditUserModal';
+import BoletoDaysModal from '../components/BoletoDaysModal';
 
 function AdminDashboard() {
   // --- Estados do Componente Principal ---
@@ -279,6 +280,7 @@ function AdminDashboard() {
               <Link to="/admin/pedidos" className="btn btn-primary mb-3 w-100">Gerenciar Pedidos</Link>
               <Link to="/admin/venda-fisica" className="btn btn-success mb-3 w-100">Registrar Venda Física</Link>
               <Link to="/admin/financeiro" className="btn btn-warning mb-3 w-100">Painel Financeiro</Link>
+              <Link to="/admin/boletos" className="btn btn-dark mb-3 w-100">Gerenciar Boletos</Link>
               <Link to="/admin/clientes" className="btn btn-secondary mb-3 w-100">Informações do Cliente</Link>
               <button className="btn btn-info w-100 mb-3" onClick={() => setShowCategoryModal(true)}>Gerenciar Categorias</button>
               <button className="btn btn-outline-success w-100" onClick={() => setShowReactivateModal(true)}>Reativar Produtos</button>

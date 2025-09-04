@@ -5,12 +5,21 @@ const db = require('../db');
 exports.getItensCarrinho = async (req, res) => {
   const usuarioId = req.user.id;
   try {
-    // ✅ ADICIONADO 'p.estoque' à seleção
+    // ✅ QUERY ATUALIZADA com LEFT JOIN para verificar se existem planos de boleto
     const sql = `
-      SELECT ci.produto_id, ci.quantidade, p.nome, p.valor, p.imagem_produto_url, p.estoque_total as estoque
+      SELECT 
+        ci.*, 
+        p.nome, 
+        p.valor, 
+        p.imagem_produto_url,
+        p.estoque_total,
+        CASE WHEN bp.produto_id IS NOT NULL THEN TRUE ELSE FALSE END as elegivel_boleto
       FROM carrinho_itens ci
       JOIN produtos p ON ci.produto_id = p.id
-      WHERE ci.usuario_id = ?
+      LEFT JOIN (
+        SELECT DISTINCT produto_id FROM boleto_planos
+      ) bp ON p.id = bp.produto_id
+      WHERE ci.usuario_id = ?;
     `;
     const [itens] = await db.query(sql, [usuarioId]);
     res.status(200).json(itens);

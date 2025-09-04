@@ -18,6 +18,7 @@ import ProductDetailPage from './pages/ProductDetailPage';
 import PhysicalSalePage from './pages/PhysicalSalePage';
 import FinancialDashboardPage from './pages/FinancialDashboardPage';
 import AdminCustomerInfoPage from './pages/AdminCustomerInfoPage';
+import AdminBoletosPage from './pages/AdminBoletosPage';
 
 function App() {
   return (
@@ -84,6 +85,10 @@ function App() {
                 path="/admin/clientes"
                 element={<ProtectedRoute role="admin"><AdminCustomerInfoPage /></ProtectedRoute>}
               />
+
+              <Route
+                path="/admin/boletos"
+                element={<ProtectedRoute role="admin"><AdminBoletosPage /></ProtectedRoute>} />
               
             </Routes>
           </main>

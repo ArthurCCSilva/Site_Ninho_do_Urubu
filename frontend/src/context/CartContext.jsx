@@ -12,7 +12,10 @@ export function CartProvider({ children }) {
   const fetchCartItems = async () => {
     if (!token) return;
     try {
-      const response = await api.get('/api/carrinho'); // Header já é adicionado globalmente
+      // ✅ CORREÇÃO: Envia o token explicitamente para garantir a autorização
+      const response = await api.get('/api/carrinho', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       setCartItems(response.data);
     } catch (error) {
       console.error("Falha ao buscar itens do carrinho", error);
@@ -34,7 +37,10 @@ export function CartProvider({ children }) {
       return;
     }
     try {
-      await api.post('/api/carrinho', { produto_id, quantidade });
+      // ✅ CORREÇÃO: Envia o token explicitamente
+      await api.post('/api/carrinho', { produto_id, quantidade }, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       fetchCartItems();
     } catch (error) {
       console.error("Falha ao adicionar ao carrinho", error);
@@ -45,14 +51,16 @@ export function CartProvider({ children }) {
   const removeFromCart = async (produto_id) => {
     if (!token) return;
     try {
-      await api.delete(`/api/carrinho/${produto_id}`);
+      // ✅ CORREÇÃO: Envia o token explicitamente
+      await api.delete(`/api/carrinho/${produto_id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       fetchCartItems();
     } catch (error) {
       console.error("Falha ao remover do carrinho", error);
     }
   };
   
-  // ✅ FUNÇÃO CHECKOUT ATUALIZADA
   const checkout = async (formaPagamento, localEntrega, valorPago, infoBoleto) => {
     if (!token) throw new Error("Usuário não autenticado.");
     try {
@@ -60,9 +68,12 @@ export function CartProvider({ children }) {
         forma_pagamento: formaPagamento,
         local_entrega: localEntrega,
         valor_pago_cliente: valorPago,
-        info_boleto: infoBoleto // Envia as informações do plano de boleto
+        info_boleto: infoBoleto
       };
-      const response = await api.post('/api/pedidos', payload);
+      // ✅ CORREÇÃO: Envia o token explicitamente
+      const response = await api.post('/api/pedidos', payload, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       setCartItems([]);
       return response.data; 
     } catch (error) {
@@ -77,7 +88,10 @@ export function CartProvider({ children }) {
       return;
     }
     try {
-      await api.put('/api/carrinho', { produto_id, quantidade });
+      // ✅ CORREÇÃO: Envia o token explicitamente
+      await api.put('/api/carrinho', { produto_id, quantidade }, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       fetchCartItems();
     } catch (error) {
       console.error("Falha ao atualizar a quantidade", error);

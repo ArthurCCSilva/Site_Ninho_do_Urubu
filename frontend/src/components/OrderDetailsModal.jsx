@@ -11,7 +11,6 @@ function OrderDetailsModal({ show, onHide, pedidoId, onBack, onOrderUpdate }) {
   const modalRef = useRef();
   const [novoPagamento, setNovoPagamento] = useState('');
 
-  // ✅ 1. ADICIONE A FUNÇÃO QUE ESTAVA FALTANDO
   const formatCurrency = (value) => {
     return (parseFloat(value) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   };
@@ -57,11 +56,11 @@ function OrderDetailsModal({ show, onHide, pedidoId, onBack, onOrderUpdate }) {
   };
 
   const handleRegistrarPagamento = async () => {
-    if (!novoPagamento || parseFloat(String(novoPagamento).replace(',', '.')) <= 0) {
+    const valorCorrigido = novoPagamento ? String(novoPagamento).replace(',', '.') : '0';
+    if (parseFloat(valorCorrigido) <= 0) {
       return alert("Insira um valor de pagamento válido.");
     }
     try {
-      const valorCorrigido = String(novoPagamento).replace(',', '.');
       await api.post(`/api/pedidos/${pedidoId}/pagamento-fiado`, { valor_pago: valorCorrigido });
       alert('Pagamento registrado com sucesso!');
       setNovoPagamento('');
@@ -175,6 +174,30 @@ function OrderDetailsModal({ show, onHide, pedidoId, onBack, onOrderUpdate }) {
                           </ul>
                         </>
                       )}
+                    </div>
+                  </div>
+                )}
+
+                {pedido.detalhes_boleto && (
+                  <div className="card bg-light mb-3">
+                    <div className="card-body">
+                      <h5 className="card-title">Detalhes do Boleto</h5>
+                      <ul className="list-group list-group-flush">
+                        {pedido.detalhes_boleto.parcelas.map(parc => {
+                          const isVencida = new Date(parc.data_vencimento) < new Date() && parc.status === 'pendente';
+                          return (
+                            <li key={parc.id} className={`list-group-item d-flex justify-content-between bg-transparent ${parc.status === 'pago' ? 'text-muted' : ''}`}>
+                              <span>Parcela {parc.numero_parcela}</span>
+                              <span>Vencimento: {new Date(parc.data_vencimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</span>
+                              <span>
+                                {isVencida && <span className="badge bg-danger me-2">Vencida</span>}
+                                <span className={`badge ${parc.status === 'pago' ? 'bg-success' : 'bg-warning'}`}>{parc.status}</span>
+                              </span>
+                              <span>{formatCurrency(parc.valor)}</span>
+                            </li>
+                          );
+                        })}
+                      </ul>
                     </div>
                   </div>
                 )}
