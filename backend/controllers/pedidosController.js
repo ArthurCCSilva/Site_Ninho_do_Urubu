@@ -11,49 +11,62 @@ exports.criarPedido = async (req, res) => {
 
     if (!local_entrega || !forma_pagamento) { throw new Error('Forma de pagamento e local de entrega são obrigatórios.'); }
     if (forma_pagamento === 'Boleto Virtual' && (!info_boleto?.plano_id || !info_boleto?.dia_vencimento)) {
-        throw new Error('Para Boleto Virtual, um plano e um dia de vencimento devem ser selecionados.');
+      throw new Error('Para Boleto Virtual, um plano e um dia de vencimento devem ser selecionados.');
     }
 
     const [itensCarrinho] = await connection.query(`SELECT ci.produto_id, ci.quantidade, p.nome, p.valor, p.estoque_total, p.custo_medio_ponderado FROM carrinho_itens ci JOIN produtos p ON ci.produto_id = p.id WHERE ci.usuario_id = ?`, [usuarioId]);
     if (itensCarrinho.length === 0) { throw new Error('O carrinho está vazio.'); }
 
-    let valorTotal = 0;
-    for (const item of itensCarrinho) {
-      if (item.quantidade > item.estoque_total) { throw new Error(`Estoque insuficiente para o produto: ${item.nome}`); }
-      valorTotal += item.quantidade * item.valor;
+    // ✅ LÓGICA DE CÁLCULO DO VALOR TOTAL CORRIGIDA
+    let valorTotal;
+    let planoInfo = null;
+
+    if (forma_pagamento === 'Boleto Virtual') {
+      // 1. Busca as informações do plano de parcelamento
+      const [planoRows] = await connection.query('SELECT * FROM boleto_planos WHERE id = ?', [info_boleto.plano_id]);
+      if (planoRows.length === 0) throw new Error("Plano de parcelamento inválido.");
+      planoInfo = planoRows[0];
+
+      // 2. Calcula o valor total do plano para UMA unidade
+      const valorTotalPlanoPorUnidade = parseFloat(planoInfo.numero_parcelas) * parseFloat(planoInfo.valor_parcela);
+      
+      // 3. Pega a quantidade total de itens (assumindo que todos são o mesmo produto elegível)
+      const quantidadeTotal = itensCarrinho.reduce((acc, item) => acc + item.quantidade, 0);
+
+      // 4. Calcula o valor final do pedido
+      valorTotal = valorTotalPlanoPorUnidade * quantidadeTotal;
+    } else {
+      // 5. Para outras formas de pagamento, calcula o total normalmente
+      valorTotal = 0;
+      for (const item of itensCarrinho) {
+        if (item.quantidade > item.estoque_total) { throw new Error(`Estoque insuficiente para o produto: ${item.nome}`); }
+        valorTotal += item.quantidade * item.valor;
+      }
     }
 
     const statusInicial = forma_pagamento === 'Boleto Virtual' ? 'Aguardando Aprovação Boleto' : 'Processando';
     const [resultadoPedido] = await connection.query('INSERT INTO pedidos (usuario_id, valor_total, forma_pagamento, local_entrega, valor_pago_cliente, status) VALUES (?, ?, ?, ?, ?, ?)', [usuarioId, valorTotal, forma_pagamento, local_entrega, valor_pago_cliente || null, statusInicial]);
     const pedidoId = resultadoPedido.insertId;
 
-    for (const item of itensCarrinho) { /* ... sua lógica de inserir pedido_itens e atualizar estoque ... */ }
-
+    for (const item of itensCarrinho) {
+        const novoCustoTotalInventario = item.custo_medio_ponderado * (item.estoque_total - item.quantidade);
+        await connection.query('INSERT INTO pedido_itens (pedido_id, produto_id, quantidade, preco_unitario, custo_unitario) VALUES (?, ?, ?, ?, ?)', [pedidoId, item.produto_id, item.quantidade, item.valor, item.custo_medio_ponderado]);
+        await connection.query('UPDATE produtos SET estoque_total = estoque_total - ?, custo_total_inventario = ? WHERE id = ?', [item.quantidade, novoCustoTotalInventario, item.produto_id]);
+    }
+    
     if (forma_pagamento === 'Boleto Virtual') {
-        const [plano] = await connection.query('SELECT * FROM boleto_planos WHERE id = ?', [info_boleto.plano_id]);
-        if (plano.length === 0) throw new Error("Plano de parcelamento inválido.");
-        
-        const planoInfo = plano[0];
         const diaVencimentoEscolhido = parseInt(info_boleto.dia_vencimento, 10);
-        
         const [resultadoBoleto] = await connection.query('INSERT INTO boleto_pedidos (pedido_id) VALUES (?)', [pedidoId]);
         const boletoPedidoId = resultadoBoleto.insertId;
-        
         const hoje = new Date();
         let mesInicial = hoje.getMonth();
         let anoInicial = hoje.getFullYear();
-
-        // Regra de negócio: se o dia de vencimento já passou neste mês, a primeira parcela é no mês que vem
-        if (hoje.getDate() > diaVencimentoEscolhido) {
-            mesInicial += 1;
-        }
-
+        if (hoje.getDate() > diaVencimentoEscolhido) { mesInicial += 1; }
         for (let i = 0; i < planoInfo.numero_parcelas; i++) {
             const dataVencimento = new Date(anoInicial, mesInicial + i, diaVencimentoEscolhido);
-            await connection.query(
-                'INSERT INTO boleto_parcelas (boleto_pedido_id, numero_parcela, valor, data_vencimento, status) VALUES (?, ?, ?, ?, "pendente")',
-                [boletoPedidoId, i + 1, planoInfo.valor_parcela, dataVencimento]
-            );
+            // O valor da parcela é o valor por unidade * a quantidade total
+            const valorDaParcela = parseFloat(planoInfo.valor_parcela) * itensCarrinho.reduce((acc, item) => acc + item.quantidade, 0);
+            await connection.query('INSERT INTO boleto_parcelas (boleto_pedido_id, numero_parcela, valor, data_vencimento, status) VALUES (?, ?, ?, ?, "pendente")', [boletoPedidoId, i + 1, valorDaParcela, dataVencimento]);
         }
     }
     
@@ -83,28 +96,41 @@ exports.getPedidoDetalhes = async (req, res) => {
   const { id: pedidoId } = req.params;
   const { id: usuarioId, role: usuarioRole } = req.user;
   try {
-    let sqlPedido = 'SELECT * FROM pedidos WHERE id = ?';
+    let sqlPedido = `
+      SELECT p.*, u.nome as cliente_nome, u.telefone as cliente_telefone, u.cpf as cliente_cpf 
+      FROM pedidos p 
+      JOIN usuarios u ON p.usuario_id = u.id 
+      WHERE p.id = ?
+    `;
     const paramsPedido = [pedidoId];
     if (usuarioRole !== 'admin') {
-      sqlPedido += ' AND usuario_id = ?';
+      sqlPedido += ' AND p.usuario_id = ?';
       paramsPedido.push(usuarioId);
     }
     const [pedidos] = await db.query(sqlPedido, paramsPedido);
     if (pedidos.length === 0) {
       return res.status(404).json({ message: 'Pedido não encontrado ou acesso negado.' });
     }
+    const pedido = pedidos[0];
     const sqlItens = `SELECT pi.id, pi.quantidade, pi.preco_unitario, p.nome, p.imagem_produto_url FROM pedido_itens pi JOIN produtos p ON pi.produto_id = p.id WHERE pi.pedido_id = ?`;
     const [itens] = await db.query(sqlItens, [pedidoId]);
-    
-    // Busca os pagamentos parciais, se houver
     const [pagamentos] = await db.query('SELECT * FROM pagamentos_fiado WHERE pedido_id = ? ORDER BY data_pagamento ASC', [pedidoId]);
-    
-    const detalhesPedido = { ...pedidos[0], itens: itens, pagamentos_fiado: pagamentos };
+    let detalhesDoBoleto = null;
+    let valorTotalFinal = parseFloat(pedido.valor_total);
+    if (pedido.forma_pagamento === 'Boleto Virtual') {
+      const [boletoPedido] = await db.query('SELECT id FROM boleto_pedidos WHERE pedido_id = ?', [pedidoId]);
+      if (boletoPedido.length > 0) {
+        const [parcelas] = await db.query('SELECT * FROM boleto_parcelas WHERE boleto_pedido_id = ? ORDER BY numero_parcela ASC', [boletoPedido[0].id]);
+        valorTotalFinal = parcelas.reduce((acc, p) => acc + parseFloat(p.valor), 0);
+        detalhesDoBoleto = { parcelas };
+      }
+    }
+    const detalhesPedido = { ...pedido, valor_total: valorTotalFinal, itens: itens, pagamentos_fiado: pagamentos, detalhes_boleto: detalhesDoBoleto };
     res.status(200).json(detalhesPedido);
   } catch (error) {
+    console.error("Erro ao buscar detalhes do pedido:", error);
     res.status(500).json({ message: 'Erro ao buscar detalhes do pedido.', error: error.message });
   }
-  
 };
 
 exports.adicionarPagamentoFiado = async (req, res) => {

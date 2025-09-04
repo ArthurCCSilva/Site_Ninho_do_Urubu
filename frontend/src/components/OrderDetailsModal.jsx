@@ -46,6 +46,7 @@ function OrderDetailsModal({ show, onHide, pedidoId, onBack, onOrderUpdate }) {
   }, [show]);
 
   const handleUpdateQuantity = async (itemId, novaQuantidade) => {
+    if (novaQuantidade < 0) return;
     try {
       await api.patch(`/api/pedidos/itens/${itemId}`, { novaQuantidade });
       fetchDetalhesPedido();
@@ -90,6 +91,7 @@ function OrderDetailsModal({ show, onHide, pedidoId, onBack, onOrderUpdate }) {
               <div>
                 <div className="row mb-3">
                   <div className="col-md-6">
+                    <p className="mb-1"><strong>Cliente:</strong> {pedido.cliente_nome}</p>
                     <p className="mb-1"><strong>Data:</strong> {new Date(pedido.data_pedido).toLocaleDateString('pt-BR')}</p>
                     <p className="mb-1"><strong>Status:</strong> {pedido.status}</p>
                     <p className="mb-0"><strong>Pagamento:</strong> {pedido.forma_pagamento || 'Não informado'}</p>
@@ -106,7 +108,7 @@ function OrderDetailsModal({ show, onHide, pedidoId, onBack, onOrderUpdate }) {
                 
                 <h6 className="mt-4">Itens do Pedido:</h6>
                 <div className="list-group">
-                  {pedido.itens.map((item) => (
+                  {pedido.itens && pedido.itens.length > 0 ? pedido.itens.map((item) => (
                     <div key={item.id} className="list-group-item d-flex flex-wrap justify-content-between align-items-center">
                       <div className="d-flex align-items-center me-3" style={{minWidth: '250px'}}>
                         <img 
@@ -117,18 +119,25 @@ function OrderDetailsModal({ show, onHide, pedidoId, onBack, onOrderUpdate }) {
                         />
                         <div className="flex-grow-1">
                           <div>{item.nome}</div>
-                          <small className="text-muted">{item.quantidade} x R$ {parseFloat(item.preco_unitario).toFixed(2).replace('.', ',')}</small>
+                          <small className="text-muted">{item.quantidade} x {formatCurrency(item.preco_unitario)}</small>
                         </div>
                       </div>
                       <div className="d-flex align-items-center">
-                        <div className="input-group input-group-sm" style={{ width: '120px' }}>
-                          <button className="btn btn-outline-secondary" type="button" onClick={() => handleUpdateQuantity(item.id, item.quantidade - 1)}>-</button>
-                          <span className="form-control text-center">{item.quantidade}</span>
-                          <button className="btn btn-outline-secondary" type="button" onClick={() => handleUpdateQuantity(item.id, item.quantidade + 1)}>+</button>
-                        </div>
+                        <div className="fw-bold me-3">{formatCurrency(item.quantidade * item.preco_unitario)}</div>
+                        
+                        {/* ✅ CORREÇÃO AQUI: Mostra os botões apenas se NÃO for Boleto Virtual */}
+                        {pedido.forma_pagamento !== 'Boleto Virtual' && (
+                            <div className="input-group input-group-sm" style={{ width: '120px' }}>
+                                <button className="btn btn-outline-secondary" type="button" onClick={() => handleUpdateQuantity(item.id, item.quantidade - 1)}>-</button>
+                                <span className="form-control text-center">{item.quantidade}</span>
+                                <button className="btn btn-outline-secondary" type="button" onClick={() => handleUpdateQuantity(item.id, item.quantidade + 1)}>+</button>
+                            </div>
+                        )}
                       </div>
                     </div>
-                  ))}
+                  )) : (
+                    <p className="text-muted">Nenhum item encontrado para este pedido.</p>
+                  )}
                 </div>
 
                 <hr className="my-3"/>
@@ -142,7 +151,7 @@ function OrderDetailsModal({ show, onHide, pedidoId, onBack, onOrderUpdate }) {
                     <hr/>
                     <div className="d-flex justify-content-between fw-bold">
                       <span>Levar troco de:</span>
-                      <span>{formatCurrency(pedido.valor_pago_cliente - pedido.valor_total)}</span>
+                      <span>{formatCurrency(parseFloat(pedido.valor_pago_cliente) - parseFloat(pedido.valor_total))}</span>
                     </div>
                   </div>
                 )}
