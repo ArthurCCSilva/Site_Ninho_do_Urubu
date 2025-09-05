@@ -301,45 +301,59 @@ exports.updateStatusPedido = async (req, res) => {
     const { id: pedidoId } = req.params;
     const { status: novoStatus } = req.body;
     const connection = await db.getConnection();
-    // Lista de status que um admin pode definir manualmente
-    const allowedStatus = ['Processando', 'Enviado', 'Entregue', 'Fiado', 'Boleto Negado'];
+    
+    // Lista de status que o admin pode definir manualmente
+    const allowedStatus = ['Processando', 'Enviado', 'Entregue', 'Fiado', 'Boleto Negado', 'Boleto em Pagamento'];
     if (!allowedStatus.includes(novoStatus)) {
-        return res.status(400).json({ message: 'Status inválido ou não permitido para alteração manual.' });
+        return res.status(400).json({ message: 'Status inválido.' });
     }
+
     try {
         await connection.beginTransaction();
         const [pedidosAtuais] = await connection.query('SELECT status FROM pedidos WHERE id = ?', [pedidoId]);
         if (pedidosAtuais.length === 0) { throw new Error('Pedido não encontrado.'); }
         const statusAtual = pedidosAtuais[0].status;
+
         if(statusAtual === novoStatus) {
             await connection.commit();
             return res.status(200).json({ message: 'O pedido já está com este status.' });
         }
-        if (statusAtual === 'Cancelado') {
+
+        // ✅ 1. LÓGICA DE DEVOLUÇÃO DE ESTOQUE
+        // Se o boleto for negado OU o pedido for cancelado, devolve os itens
+        if (novoStatus === 'Boleto Negado' || novoStatus === 'Cancelado') {
+            const [itensDoPedido] = await connection.query('SELECT produto_id, quantidade FROM pedido_itens WHERE pedido_id = ?', [pedidoId]);
+            for (const item of itensDoPedido) {
+                await connection.query(
+                    'UPDATE produtos SET estoque_total = estoque_total + ? WHERE id = ?', 
+                    [item.quantidade, item.produto_id]
+                );
+            }
+        }
+        
+        // Se um pedido cancelado for reativado, dá baixa no estoque novamente
+        if (statusAtual === 'Cancelado' && novoStatus !== 'Cancelado') {
             const [itensDoPedido] = await connection.query('SELECT produto_id, quantidade FROM pedido_itens WHERE pedido_id = ?', [pedidoId]);
             for (const item of itensDoPedido) {
                 const [produto] = await connection.query('SELECT estoque_total FROM produtos WHERE id = ?', [item.produto_id]);
                 if (produto[0].estoque_total < item.quantidade) {
                     throw new Error(`Estoque insuficiente para reativar o pedido (produto ID: ${item.produto_id}).`);
                 }
-            }
-            for (const item of itensDoPedido) {
                 await connection.query('UPDATE produtos SET estoque_total = estoque_total - ? WHERE id = ?', [item.quantidade, item.produto_id]);
             }
         }
-        let sql = 'UPDATE pedidos SET status = ?, cancelado_por = NULL';
+
+        let sql = 'UPDATE pedidos SET status = ?';
         const params = [novoStatus];
-
-        // ✅ LÓGICA ATUALIZADA
         if (novoStatus === 'Entregue') { 
-          sql += ', data_entrega = NOW()'; // Define a data de entrega
+          sql += ', data_entrega = NOW()';
         } else { 
-          sql += ', data_entrega = NULL'; // Limpa a data de entrega para outros status
+          sql += ', data_entrega = NULL';
         }
-
         sql += ' WHERE id = ?';
         params.push(pedidoId);
         await connection.query(sql, params);
+
         await connection.commit();
         res.status(200).json({ message: `Status do pedido atualizado para ${novoStatus}.` });
     } catch (error) {

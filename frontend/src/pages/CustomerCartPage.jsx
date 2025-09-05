@@ -3,6 +3,7 @@ import { useCart } from '../context/CartContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect, useMemo } from 'react';
 import api from '../services/api';
+import WarningModal from '../components/WarningModal';
 import './CustomerCartPage.css';
 
 function CustomerCartPage() {
@@ -18,6 +19,7 @@ function CustomerCartPage() {
   const [selectedPlano, setSelectedPlano] = useState('');
   const [boletoDueDays, setBoletoDueDays] = useState([]);
   const [selectedDueDay, setSelectedDueDay] = useState('');
+  const [showMixedCartWarning, setShowMixedCartWarning] = useState(false);
 
   useEffect(() => {
     const fetchBoletoData = async () => {
@@ -61,6 +63,15 @@ function CustomerCartPage() {
   
   const troco = valorPago > totalFinal ? valorPago - totalFinal : 0;
 
+  useEffect(() => {
+    const uniqueProductTypes = new Set(cartItems.map(item => item.produto_id));
+    if (formaPagamento === 'Boleto Virtual' && uniqueProductTypes.size > 1) {
+      setShowMixedCartWarning(true);
+    } else {
+      setShowMixedCartWarning(false);
+    }
+  }, [formaPagamento, cartItems]);
+
   const handleCheckout = async () => {
     if (!localEntrega.trim()) { return alert('Por favor, preencha o local de entrega.'); }
     if (formaPagamento === 'Dinheiro' && (!valorPago || parseFloat(valorPago) < totalFinal)) {
@@ -84,6 +95,20 @@ function CustomerCartPage() {
         setLoadingCheckout(false);
       }
     }
+  };
+
+  const handleRemoveOneAndContinue = () => {
+    // Remove o último item adicionado ao carrinho
+    if (cartItems.length > 0) {
+      const lastItem = cartItems[cartItems.length - 1];
+      removeFromCart(lastItem.produto_id);
+    }
+    setShowMixedCartWarning(false);
+  };
+  
+  const handleClearAndContinue = () => {
+    clearCart(); // Supondo que você tenha uma função clearCart no seu CartContext
+    setShowMixedCartWarning(false);
   };
 
   if (cartItems.length === 0) {
@@ -160,6 +185,22 @@ function CustomerCartPage() {
           </div>
         </div>
       </div>
+      <WarningModal 
+        show={showMixedCartWarning}
+        onHide={() => {
+            setShowMixedCartWarning(false);
+            setFormaPagamento('Cartão de Crédito'); // Volta para uma forma de pagamento segura
+        }}
+        title="Carrinho com Itens Diversos"
+      >
+        <p>O pagamento com "Boleto Virtual" só é permitido para a compra de **um tipo de produto por vez** (você pode comprar várias unidades do mesmo produto).</p>
+        <p>Seu carrinho contém itens diferentes. Por favor, escolha uma das opções abaixo:</p>
+        <div className="d-grid gap-2">
+            <button className="btn btn-primary" onClick={() => setFormaPagamento('PIX')}>Pagar com PIX</button>
+            <button className="btn btn-secondary" onClick={handleRemoveOneAndContinue}>Remover Último Item e Tentar Novamente</button>
+            <button className="btn btn-danger" onClick={handleClearAndContinue}>Limpar Carrinho</button>
+        </div>
+      </WarningModal>
     </div>
   );
 }

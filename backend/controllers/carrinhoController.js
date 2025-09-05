@@ -1,11 +1,9 @@
 // backend/controllers/carrinhoController.js
 const db = require('../db');
 
-// GET /api/carrinho - Busca os itens do carrinho do usuário logado
 exports.getItensCarrinho = async (req, res) => {
   const usuarioId = req.user.id;
   try {
-    // ✅ QUERY ATUALIZADA com LEFT JOIN para verificar se existem planos de boleto
     const sql = `
       SELECT 
         ci.*, 
@@ -28,17 +26,45 @@ exports.getItensCarrinho = async (req, res) => {
   }
 };
 
-exports.updateItemCarrinho = async (req, res) => {
+// ✅ NOME CORRIGIDO de 'adicionarItemCarrinho' para 'adicionarItem'
+exports.adicionarItem = async (req, res) => {
   const usuarioId = req.user.id;
   const { produto_id, quantidade } = req.body;
 
-  // Validação: a quantidade não pode ser menor que 1
+  try {
+    const [existente] = await db.query(
+      'SELECT * FROM carrinho_itens WHERE usuario_id = ? AND produto_id = ?',
+      [usuarioId, produto_id]
+    );
+
+    if (existente.length > 0) {
+      const novaQuantidade = existente[0].quantidade + quantidade;
+      await db.query(
+        'UPDATE carrinho_itens SET quantidade = ? WHERE id = ?',
+        [novaQuantidade, existente[0].id]
+      );
+    } else {
+      await db.query(
+        'INSERT INTO carrinho_itens (usuario_id, produto_id, quantidade) VALUES (?, ?, ?)',
+        [usuarioId, produto_id, quantidade]
+      );
+    }
+    res.status(201).json({ message: 'Item adicionado ao carrinho com sucesso!' });
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao adicionar item ao carrinho.', error: error.message });
+  }
+};
+
+// ✅ NOME CORRIGIDO de 'updateItemCarrinho' para 'updateQuantidadeItem'
+exports.updateQuantidadeItem = async (req, res) => {
+  const usuarioId = req.user.id;
+  const { produto_id, quantidade } = req.body;
+
   if (quantidade < 1) {
     return res.status(400).json({ message: 'A quantidade não pode ser menor que 1.' });
   }
 
   try {
-    // ✅ CORREÇÃO AQUI: Usa 'estoque_total' para verificar o estoque
     const [produtos] = await db.query('SELECT estoque_total FROM produtos WHERE id = ?', [produto_id]);
     if (produtos.length === 0) {
       return res.status(404).json({ message: 'Produto não encontrado.' });
@@ -61,40 +87,9 @@ exports.updateItemCarrinho = async (req, res) => {
   }
 };
 
-// POST /api/carrinho - Adiciona um item ao carrinho ou atualiza a quantidade
-exports.adicionarItemCarrinho = async (req, res) => {
-  const usuarioId = req.user.id;
-  const { produto_id, quantidade } = req.body;
 
-  try {
-    // Verifica se o item já existe no carrinho do usuário
-    const [existente] = await db.query(
-      'SELECT * FROM carrinho_itens WHERE usuario_id = ? AND produto_id = ?',
-      [usuarioId, produto_id]
-    );
-
-    if (existente.length > 0) {
-      // Se existe, atualiza a quantidade
-      const novaQuantidade = existente[0].quantidade + quantidade;
-      await db.query(
-        'UPDATE carrinho_itens SET quantidade = ? WHERE id = ?',
-        [novaQuantidade, existente[0].id]
-      );
-    } else {
-      // Se não existe, insere o novo item
-      await db.query(
-        'INSERT INTO carrinho_itens (usuario_id, produto_id, quantidade) VALUES (?, ?, ?)',
-        [usuarioId, produto_id, quantidade]
-      );
-    }
-    res.status(201).json({ message: 'Item adicionado ao carrinho com sucesso!' });
-  } catch (error) {
-    res.status(500).json({ message: 'Erro ao adicionar item ao carrinho.', error: error.message });
-  }
-};
-
-// DELETE /api/carrinho/:produtoId - Remove um item do carrinho
-exports.removerItemCarrinho = async (req, res) => {
+// ✅ NOME CORRIGIDO de 'removerItemCarrinho' para 'removerItem'
+exports.removerItem = async (req, res) => {
   const usuarioId = req.user.id;
   const { produtoId } = req.params;
   try {
@@ -105,5 +100,15 @@ exports.removerItemCarrinho = async (req, res) => {
     res.status(200).json({ message: 'Item removido do carrinho com sucesso.' });
   } catch (error) {
     res.status(500).json({ message: 'Erro ao remover item do carrinho.', error: error.message });
+  }
+};
+
+exports.limparCarrinho = async (req, res) => {
+  const usuarioId = req.user.id;
+  try {
+    await db.query('DELETE FROM carrinho_itens WHERE usuario_id = ?', [usuarioId]);
+    res.status(200).json({ message: 'Carrinho limpo com sucesso.' });
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao limpar o carrinho.', error: error.message });
   }
 };

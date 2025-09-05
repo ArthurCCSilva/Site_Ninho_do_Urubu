@@ -5,45 +5,44 @@ exports.getSummary = async (req, res) => {
   try {
     const { data_inicio, data_fim } = req.query;
     if (!data_inicio || !data_fim) {
-      return res.status(400).json({ message: 'Datas de início e fim são obrigatórias.' });
+      return res.status(400).json({ message: 'Datas são obrigatórias.' });
     }
 
-    // ✅ CORREÇÃO: Busca a receita de pedidos 'Entregue' que NUNCA foram fiado
+    // 1. RECEITA BRUTA (Regime de Caixa)
+    // Soma pedidos 'Entregue' que não são boleto nem fiado
     const [receitaPedidosNormais] = await db.query(
       `SELECT SUM(valor_total) as total FROM pedidos 
-       WHERE status = 'Entregue' AND data_pedido BETWEEN ? AND ?
-       AND id NOT IN (SELECT DISTINCT pedido_id FROM pagamentos_fiado)`, 
+       WHERE status = 'Entregue' 
+       AND forma_pagamento NOT IN ('Boleto Virtual', 'Fiado') 
+       AND data_pedido BETWEEN ? AND ?`,
       [data_inicio, data_fim]
     );
-    
-    // Busca a receita dos pagamentos de fiado recebidos no período
-    const [receitaPagamentosFiado] = await db.query(
-      "SELECT SUM(valor_pago) as total FROM pagamentos_fiado WHERE data_pagamento BETWEEN ? AND ?",
-      [data_inicio, data_fim]
-    );
-    
-    const receitaBruta = (parseFloat(receitaPedidosNormais[0].total) || 0) + (parseFloat(receitaPagamentosFiado[0].total) || 0);
+    // Soma pagamentos de fiados recebidos no período
+    const [receitaFiado] = await db.query("SELECT SUM(valor_pago) as total FROM pagamentos_fiado WHERE data_pagamento BETWEEN ? AND ?", [data_inicio, data_fim]);
+    // Soma parcelas de boletos pagas no período
+    const [receitaBoleto] = await db.query("SELECT SUM(valor) as total FROM boleto_parcelas WHERE status = 'pago' AND data_pagamento BETWEEN ? AND ?", [data_inicio, data_fim]);
+    const receitaBruta = (parseFloat(receitaPedidosNormais[0].total) || 0) + (parseFloat(receitaFiado[0].total) || 0) + (parseFloat(receitaBoleto[0].total) || 0);
 
+    // 2. CUSTO DOS PRODUTOS VENDIDOS (Quando saem do estoque)
     const [custoRows] = await db.query(
       `SELECT SUM(pi.custo_unitario * pi.quantidade) as custoProdutos 
-       FROM pedido_itens pi JOIN pedidos p ON pi.pedido_id = p.id
-       WHERE p.status IN ('Entregue', 'Fiado') AND p.data_pedido BETWEEN ? AND ?`,
-       [data_inicio, data_fim]
+       FROM pedido_itens pi JOIN pedidos p ON pi.pedido_id = p.id 
+       WHERE p.status IN ('Entregue', 'Fiado', 'Boleto em Pagamento') AND p.data_pedido BETWEEN ? AND ?`,
+      [data_inicio, data_fim]
     );
     const custoProdutos = parseFloat(custoRows[0].custoProdutos) || 0;
 
-    const [despesasRows] = await db.query("SELECT SUM(valor) as despesasOperacionais FROM despesas WHERE data BETWEEN ? AND ?", [data_inicio, data_fim]);
-    const [rendasRows] = await db.query("SELECT SUM(valor) as totalRendasExtras FROM rendas_extras WHERE data BETWEEN ? AND ?", [data_inicio, data_fim]);
-    const despesasOperacionais = parseFloat(despesasRows[0].despesasOperacionais) || 0;
-    const totalRendasExtras = parseFloat(rendasRows[0].totalRendasExtras) || 0;
-
+    // 3. DESPESAS E RENDAS EXTRAS
+    const [despesasRows] = await db.query("SELECT SUM(valor) as despesas FROM despesas WHERE data BETWEEN ? AND ?", [data_inicio, data_fim]);
+    const [rendasRows] = await db.query("SELECT SUM(valor) as rendas FROM rendas_extras WHERE data BETWEEN ? AND ?", [data_inicio, data_fim]);
+    const despesasOperacionais = parseFloat(despesasRows[0].despesas) || 0;
+    const totalRendasExtras = parseFloat(rendasRows[0].rendas) || 0;
+    
+    // 4. CÁLCULO FINAL
     const lucroBruto = receitaBruta - custoProdutos;
     const lucroLiquido = lucroBruto - despesasOperacionais + totalRendasExtras;
 
-    res.status(200).json({
-      receitaBruta, custoProdutos, despesasOperacionais,
-      totalRendasExtras, lucroBruto, lucroLiquido
-    });
+    res.status(200).json({ receitaBruta, custoProdutos, despesasOperacionais, totalRendasExtras, lucroBruto, lucroLiquido });
   } catch (error) {
     console.error("Erro ao buscar resumo financeiro:", error);
     res.status(500).json({ message: 'Erro ao buscar resumo financeiro.', error: error.message });
@@ -55,134 +54,45 @@ exports.getSalesOverTime = async (req, res) => {
     const { data_inicio, data_fim } = req.query;
     if (!data_inicio || !data_fim) { return res.status(400).json({ message: 'Datas são obrigatórias.' }); }
 
-    // ✅ CORREÇÃO: Busca receita de pedidos 'Entregue' que NUNCA foram fiado
-    const [receitaDiariaEntregue] = await db.query(
-        `SELECT DATE(data_pedido) as dia, SUM(valor_total) as total 
-         FROM pedidos WHERE status = 'Entregue' AND data_pedido BETWEEN ? AND ?
-         AND id NOT IN (SELECT DISTINCT pedido_id FROM pagamentos_fiado)
-         GROUP BY DATE(data_pedido)`, 
-        [data_inicio, data_fim]
-    );
+    const [receitaDiariaEntregue] = await db.query(`SELECT DATE(data_pedido) as dia, SUM(valor_total) as total FROM pedidos WHERE status = 'Entregue' AND forma_pagamento NOT IN ('Boleto Virtual', 'Fiado') AND data_pedido BETWEEN ? AND ? GROUP BY DATE(data_pedido)`, [data_inicio, data_fim]);
     const [receitaDiariaFiado] = await db.query(`SELECT DATE(data_pagamento) as dia, SUM(valor_pago) as total FROM pagamentos_fiado WHERE data_pagamento BETWEEN ? AND ? GROUP BY DATE(data_pagamento)`, [data_inicio, data_fim]);
-    const [custoDiario] = await db.query(`SELECT DATE(p.data_pedido) as dia, SUM(pi.custo_unitario * pi.quantidade) as total FROM pedido_itens pi JOIN pedidos p ON pi.pedido_id = p.id WHERE p.status IN ('Entregue', 'Fiado') AND p.data_pedido BETWEEN ? AND ? GROUP BY DATE(p.data_pedido)`, [data_inicio, data_fim]);
+    const [receitaDiariaBoleto] = await db.query(`SELECT DATE(data_pagamento) as dia, SUM(valor) as total FROM boleto_parcelas WHERE status = 'pago' AND data_pagamento BETWEEN ? AND ? GROUP BY DATE(data_pagamento)`, [data_inicio, data_fim]);
+    const [custoDiario] = await db.query(`SELECT DATE(p.data_pedido) as dia, SUM(pi.custo_unitario * pi.quantidade) as total FROM pedido_itens pi JOIN pedidos p ON pi.pedido_id = p.id WHERE p.status IN ('Entregue', 'Fiado', 'Boleto em Pagamento') AND p.data_pedido BETWEEN ? AND ? GROUP BY DATE(p.data_pedido)`, [data_inicio, data_fim]);
     const [despesasDiarias] = await db.query(`SELECT data as dia, SUM(valor) as total FROM despesas WHERE data BETWEEN ? AND ? GROUP BY data`, [data_inicio, data_fim]);
     const [rendasExtrasDiarias] = await db.query(`SELECT data as dia, SUM(valor) as total FROM rendas_extras WHERE data BETWEEN ? AND ? GROUP BY data`, [data_inicio, data_fim]);
     
     const resultados = {};
     const preencherResultados = (rows, campo) => {
       rows.forEach(row => {
+        if (!row.dia) return;
         const dia = new Date(row.dia).toISOString().split('T')[0];
         if (!resultados[dia]) {
           resultados[dia] = { dia, receitaBruta: 0, custoProdutos: 0, despesas: 0, rendasExtras: 0 };
         }
         if (campo === 'receitaBruta') {
-            resultados[dia][campo] += parseFloat(row.total);
+            resultados[dia][campo] += parseFloat(row.total) || 0;
         } else {
-            resultados[dia][campo] = parseFloat(row.total);
+            resultados[dia][campo] = parseFloat(row.total) || 0;
         }
       });
     };
     
     preencherResultados(receitaDiariaEntregue, 'receitaBruta');
     preencherResultados(receitaDiariaFiado, 'receitaBruta');
+    preencherResultados(receitaDiariaBoleto, 'receitaBruta');
     preencherResultados(custoDiario, 'custoProdutos');
     preencherResultados(despesasDiarias, 'despesas');
     preencherResultados(rendasExtrasDiarias, 'rendasExtras');
 
     const dadosFinais = Object.values(resultados).map(r => {
       const lucroLiquido = r.receitaBruta - r.custoProdutos - r.despesas + r.rendasExtras;
-      return { ...r, lucroLiquido };
+      return { ...r, lucroLiquido, receitaBruta: r.receitaBruta };
     }).sort((a, b) => new Date(a.dia) - new Date(b.dia));
 
     res.status(200).json(dadosFinais);
   } catch (error) {
     console.error("Erro ao buscar dados de vendas ao longo do tempo:", error);
-    res.status(500).json({ message: 'Erro ao buscar dados de vendas.', error: error.message });
-  }
-};
-
-exports.getSalesOverTime = async (req, res) => {
-  try {
-    const { data_inicio, data_fim } = req.query;
-    if (!data_inicio || !data_fim) { return res.status(400).json({ message: 'Datas são obrigatórias.' }); }
-
-    // ✅ LÓGICA ATUALIZADA para refletir o fluxo de caixa
-    const [receitaDiariaEntregue] = await db.query(`SELECT DATE(data_pedido) as dia, SUM(valor_total) as total FROM pedidos WHERE status = 'Entregue' AND data_pedido BETWEEN ? AND ? GROUP BY DATE(data_pedido)`, [data_inicio, data_fim]);
-    const [receitaDiariaFiado] = await db.query(`SELECT DATE(data_pagamento) as dia, SUM(valor_pago) as total FROM pagamentos_fiado WHERE data_pagamento BETWEEN ? AND ? GROUP BY DATE(data_pagamento)`, [data_inicio, data_fim]);
-    const [custoDiario] = await db.query(`SELECT DATE(p.data_pedido) as dia, SUM(pi.custo_unitario * pi.quantidade) as total FROM pedido_itens pi JOIN pedidos p ON pi.pedido_id = p.id WHERE p.status IN ('Entregue', 'Fiado') AND p.data_pedido BETWEEN ? AND ? GROUP BY DATE(p.data_pedido)`, [data_inicio, data_fim]);
-    const [despesasDiarias] = await db.query(`SELECT data as dia, SUM(valor) as total FROM despesas WHERE data BETWEEN ? AND ? GROUP BY data`, [data_inicio, data_fim]);
-    const [rendasExtrasDiarias] = await db.query(`SELECT data as dia, SUM(valor) as total FROM rendas_extras WHERE data BETWEEN ? AND ? GROUP BY data`, [data_inicio, data_fim]);
-    
-    const resultados = {};
-    const preencherResultados = (rows, campo) => {
-      rows.forEach(row => {
-        const dia = new Date(row.dia).toISOString().split('T')[0];
-        if (!resultados[dia]) {
-          resultados[dia] = { dia, receitaBruta: 0, custoProdutos: 0, despesas: 0, rendasExtras: 0 };
-        }
-        // Se o campo for receita, somamos ao que já existe (para juntar entregues e fiados no mesmo dia)
-        if (campo === 'receitaBruta') {
-            resultados[dia][campo] += parseFloat(row.total);
-        } else {
-            resultados[dia][campo] = parseFloat(row.total);
-        }
-      });
-    };
-    
-    preencherResultados(receitaDiariaEntregue, 'receitaBruta');
-    preencherResultados(receitaDiariaFiado, 'receitaBruta');
-    preencherResultados(custoDiario, 'custoProdutos');
-    preencherResultados(despesasDiarias, 'despesas');
-    preencherResultados(rendasExtrasDiarias, 'rendasExtras');
-
-    const dadosFinais = Object.values(resultados).map(r => {
-      const lucroLiquido = r.receitaBruta - r.custoProdutos - r.despesas + r.rendasExtras;
-      return { ...r, lucroLiquido };
-    }).sort((a, b) => new Date(a.dia) - new Date(b.dia));
-
-    res.status(200).json(dadosFinais);
-  } catch (error) {
-    console.error("Erro ao buscar dados de vendas ao longo do tempo:", error);
-    res.status(500).json({ message: 'Erro ao buscar dados de vendas.', error: error.message });
-  }
-};
-
-exports.getSalesOverTime = async (req, res) => {
-  try {
-    const { data_inicio, data_fim } = req.query;
-    if (!data_inicio || !data_fim) {
-      return res.status(400).json({ message: 'Datas são obrigatórias.' });
-    }
-    const [receitaDiaria] = await db.query(`SELECT DATE(data_pedido) as dia, SUM(valor_total) as total FROM pedidos WHERE status = 'Entregue' AND data_pedido BETWEEN ? AND ? GROUP BY DATE(data_pedido)`, [data_inicio, data_fim]);
-    const [custoDiario] = await db.query(`SELECT DATE(p.data_pedido) as dia, SUM(pi.custo_unitario * pi.quantidade) as total FROM pedido_itens pi JOIN pedidos p ON pi.pedido_id = p.id WHERE p.status = 'Entregue' AND p.data_pedido BETWEEN ? AND ? GROUP BY DATE(p.data_pedido)`, [data_inicio, data_fim]);
-    const [despesasDiarias] = await db.query(`SELECT data as dia, SUM(valor) as total FROM despesas WHERE data BETWEEN ? AND ? GROUP BY data`, [data_inicio, data_fim]);
-    const [rendasExtrasDiarias] = await db.query(`SELECT data as dia, SUM(valor) as total FROM rendas_extras WHERE data BETWEEN ? AND ? GROUP BY data`, [data_inicio, data_fim]);
-    
-    const resultados = {};
-    const preencherResultados = (rows, campo) => {
-      rows.forEach(row => {
-        const dia = new Date(row.dia).toISOString().split('T')[0];
-        if (!resultados[dia]) {
-          resultados[dia] = { dia, receitaBruta: 0, custoProdutos: 0, despesas: 0, rendasExtras: 0 };
-        }
-        resultados[dia][campo] = parseFloat(row.total);
-      });
-    };
-    
-    preencherResultados(receitaDiaria, 'receitaBruta');
-    preencherResultados(custoDiario, 'custoProdutos');
-    preencherResultados(despesasDiarias, 'despesas');
-    preencherResultados(rendasExtrasDiarias, 'rendasExtras');
-
-    const dadosFinais = Object.values(resultados).map(r => {
-      const lucroLiquido = r.receitaBruta - r.custoProdutos - r.despesas + r.rendasExtras;
-      return { ...r, lucroLiquido };
-    }).sort((a, b) => new Date(a.dia) - new Date(b.dia));
-
-    res.status(200).json(dadosFinais);
-  } catch (error) {
-    console.error("Erro ao buscar dados de vendas ao longo do tempo:", error);
-    res.status(500).json({ message: 'Erro ao buscar dados de vendas.', error: error.message });
+    res.status(500).json({ message: 'Erro ao buscar dados de vendas ao longo do tempo.' });
   }
 };
 
@@ -246,7 +156,7 @@ exports.getMonthlyComparison = async (req, res) => {
         const [rows] = await db.query("SELECT SUM(valor_total) as total FROM pedidos WHERE status = 'Entregue' AND YEAR(data_pedido) = ? AND MONTH(data_pedido) = ?", [ano, mes]);
         valor = parseFloat(rows[0].total) || 0;
       } else if (metrica === 'custoProdutos') {
-        const [rows] = await db.query("SELECT SUM(pi.custo_unitario * pi.quantidade) as total FROM pedido_itens pi JOIN pedidos p ON pi.pedido_id = p.id WHERE p.status = 'Entregue' AND YEAR(p.data_pedido) = ? AND MONTH(p.data_pedido) = ?", [ano, mes]);
+        const [rows] = await db.query("SELECT SUM(pi.custo_unitario * pi.quantidade) as total FROM pedido_itens pi JOIN pedidos p ON pi.pedido_id = p.id WHERE p.status = 'Entregue' AND YEAR(p.data_pedido) = ? AND MONTH(data_pedido) = ?", [ano, mes]);
         valor = parseFloat(rows[0].total) || 0;
       } else if (metrica === 'despesasOperacionais') {
         const [rows] = await db.query("SELECT SUM(valor) as total FROM despesas WHERE YEAR(data) = ? AND MONTH(data) = ?", [ano, mes]);
@@ -254,7 +164,7 @@ exports.getMonthlyComparison = async (req, res) => {
       } else if (metrica === 'lucroLiquido') {
         const [receitaRows] = await db.query("SELECT SUM(valor_total) as total FROM pedidos WHERE status = 'Entregue' AND YEAR(data_pedido) = ? AND MONTH(data_pedido) = ?", [ano, mes]);
         const receitaBruta = parseFloat(receitaRows[0].total) || 0;
-        const [custoRows] = await db.query("SELECT SUM(pi.custo_unitario * pi.quantidade) as total FROM pedido_itens pi JOIN pedidos p ON pi.pedido_id = p.id WHERE p.status = 'Entregue' AND YEAR(p.data_pedido) = ? AND MONTH(p.data_pedido) = ?", [ano, mes]);
+        const [custoRows] = await db.query("SELECT SUM(pi.custo_unitario * pi.quantidade) as total FROM pedido_itens pi JOIN pedidos p ON pi.pedido_id = p.id WHERE p.status = 'Entregue' AND YEAR(p.data_pedido) = ? AND MONTH(data_pedido) = ?", [ano, mes]);
         const custoProdutos = parseFloat(custoRows[0].total) || 0;
         const [despesasRows] = await db.query("SELECT SUM(valor) as total FROM despesas WHERE YEAR(data) = ? AND MONTH(data) = ?", [ano, mes]);
         const despesasOperacionais = parseFloat(despesasRows[0].total) || 0;

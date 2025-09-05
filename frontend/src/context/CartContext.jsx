@@ -100,8 +100,19 @@ export function CartProvider({ children }) {
     }
   };
 
+  const clearCart = async () => {
+    if (!token) return;
+    try {
+      // Chama uma rota de API para deletar todos os itens do usuário de uma vez
+      await api.delete('/api/carrinho/limpar');
+      setCartItems([]); // Limpa o estado local imediatamente
+    } catch (error) {
+      console.error("Falha ao limpar o carrinho", error);
+    }
+  };
+
   return (
-    <CartContext.Provider value={{ cartItems, addToCart, removeFromCart, checkout, updateQuantity, fetchCartItems }}>
+    <CartContext.Provider value={{ cartItems, addToCart, removeFromCart, checkout, updateQuantity, fetchCartItems, clearCart }}>
       {children}
     </CartContext.Provider>
   );
