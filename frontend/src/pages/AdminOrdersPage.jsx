@@ -86,7 +86,7 @@ function AdminOrdersPage() {
 
     try {
       // 1. Chama a API para cancelar o pedido no banco
-      await api.patch(`/api/pedidos/${selectedPedido.id}/cancelar-admin`, { motivo });
+      await api.patch(`/api/pedidos/admin/${selectedPedido.id}/cancelar`, { motivo });
       
       const telefoneCliente = selectedPedido.cliente_telefone;
 
