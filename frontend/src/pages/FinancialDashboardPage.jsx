@@ -244,8 +244,12 @@ function FinancialDashboardPage() {
         });
         const response = await api.get(`/api/financials/product-sales-comparison?${params.toString()}`);
         const data = response.data;
+        
+        // A lógica de processamento dos dados precisa ser ajustada para a nova resposta da API
         const allDates = new Set();
-        Object.values(data).forEach(productData => { productData.forEach(d => allDates.add(d.date)); });
+        Object.values(data).forEach(productData => {
+          productData.forEach(d => allDates.add(d.date));
+        });
         const sortedDates = Array.from(allDates).sort();
         const labels = sortedDates.map(d => {
           const date = new Date(d);
@@ -259,8 +263,9 @@ function FinancialDashboardPage() {
           return {
             label: productName,
             data: sortedDates.map(dateStr => {
-              const dayData = productData.find(d => d.date.startsWith(dateStr));
-              return dayData ? dayData.valor : 0;
+              const dayData = productData.find(d => d.date === dateStr);
+              // A API agora retorna 'totalVendido' na função auxiliar
+              return dayData ? dayData.totalVendido : 0; 
             }),
             borderColor: color, backgroundColor: `${color}B3`, tension: 0.1,
           };

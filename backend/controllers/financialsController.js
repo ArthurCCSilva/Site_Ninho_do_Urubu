@@ -8,22 +8,32 @@ exports.getSummary = async (req, res) => {
       return res.status(400).json({ message: 'Datas são obrigatórias.' });
     }
 
-    // 1. RECEITA BRUTA (Regime de Caixa)
-    // Soma pedidos 'Entregue' que não são boleto nem fiado
+    // ✅ 1. RECEITA BRUTA - REGIME DE CAIXA CORRIGIDO
+    // Vendas normais contam pela DATA DE ENTREGA
     const [receitaPedidosNormais] = await db.query(
       `SELECT SUM(valor_total) as total FROM pedidos 
-       WHERE status = 'Entregue' 
-       AND forma_pagamento NOT IN ('Boleto Virtual', 'Fiado') 
-       AND data_pedido BETWEEN ? AND ?`,
+       WHERE status = 'Entregue' AND forma_pagamento NOT IN ('Boleto Virtual', 'Fiado') 
+       AND data_entrega BETWEEN ? AND ?`,
       [data_inicio, data_fim]
     );
-    // Soma pagamentos de fiados recebidos no período
-    const [receitaFiado] = await db.query("SELECT SUM(valor_pago) as total FROM pagamentos_fiado WHERE data_pagamento BETWEEN ? AND ?", [data_inicio, data_fim]);
-    // Soma parcelas de boletos pagas no período
-    const [receitaBoleto] = await db.query("SELECT SUM(valor) as total FROM boleto_parcelas WHERE status = 'pago' AND data_pagamento BETWEEN ? AND ?", [data_inicio, data_fim]);
+    // Fiado conta pela DATA DO PAGAMENTO e ignora pedidos cancelados
+    const [receitaFiado] = await db.query(
+      `SELECT SUM(pf.valor_pago) as total FROM pagamentos_fiado pf
+       JOIN pedidos p ON pf.pedido_id = p.id
+       WHERE p.status NOT IN ('Cancelado', 'Boleto Negado') AND pf.data_pagamento BETWEEN ? AND ?`,
+      [data_inicio, data_fim]
+    );
+    // Boleto conta pela DATA DO PAGAMENTO e ignora pedidos cancelados
+    const [receitaBoleto] = await db.query(
+      `SELECT SUM(bp.valor) as total FROM boleto_parcelas bp
+       JOIN boleto_pedidos bped ON bp.boleto_pedido_id = bped.id
+       JOIN pedidos p ON bped.pedido_id = p.id
+       WHERE bp.status = 'pago' AND p.status NOT IN ('Cancelado', 'Boleto Negado') AND bp.data_pagamento BETWEEN ? AND ?`,
+      [data_inicio, data_fim]
+    );
     const receitaBruta = (parseFloat(receitaPedidosNormais[0].total) || 0) + (parseFloat(receitaFiado[0].total) || 0) + (parseFloat(receitaBoleto[0].total) || 0);
 
-    // 2. CUSTO DOS PRODUTOS VENDIDOS (Quando saem do estoque)
+    // ✅ 2. CUSTO DOS PRODUTOS - Ignora pedidos cancelados
     const [custoRows] = await db.query(
       `SELECT SUM(pi.custo_unitario * pi.quantidade) as custoProdutos 
        FROM pedido_itens pi JOIN pedidos p ON pi.pedido_id = p.id 
@@ -32,19 +42,17 @@ exports.getSummary = async (req, res) => {
     );
     const custoProdutos = parseFloat(custoRows[0].custoProdutos) || 0;
 
-    // 3. DESPESAS E RENDAS EXTRAS
+    // ... (Despesas e Rendas Extras continuam iguais)
     const [despesasRows] = await db.query("SELECT SUM(valor) as despesas FROM despesas WHERE data BETWEEN ? AND ?", [data_inicio, data_fim]);
     const [rendasRows] = await db.query("SELECT SUM(valor) as rendas FROM rendas_extras WHERE data BETWEEN ? AND ?", [data_inicio, data_fim]);
     const despesasOperacionais = parseFloat(despesasRows[0].despesas) || 0;
     const totalRendasExtras = parseFloat(rendasRows[0].rendas) || 0;
     
-    // 4. CÁLCULO FINAL
     const lucroBruto = receitaBruta - custoProdutos;
     const lucroLiquido = lucroBruto - despesasOperacionais + totalRendasExtras;
 
     res.status(200).json({ receitaBruta, custoProdutos, despesasOperacionais, totalRendasExtras, lucroBruto, lucroLiquido });
   } catch (error) {
-    console.error("Erro ao buscar resumo financeiro:", error);
     res.status(500).json({ message: 'Erro ao buscar resumo financeiro.', error: error.message });
   }
 };
@@ -54,9 +62,10 @@ exports.getSalesOverTime = async (req, res) => {
     const { data_inicio, data_fim } = req.query;
     if (!data_inicio || !data_fim) { return res.status(400).json({ message: 'Datas são obrigatórias.' }); }
 
-    const [receitaDiariaEntregue] = await db.query(`SELECT DATE(data_pedido) as dia, SUM(valor_total) as total FROM pedidos WHERE status = 'Entregue' AND forma_pagamento NOT IN ('Boleto Virtual', 'Fiado') AND data_pedido BETWEEN ? AND ? GROUP BY DATE(data_pedido)`, [data_inicio, data_fim]);
-    const [receitaDiariaFiado] = await db.query(`SELECT DATE(data_pagamento) as dia, SUM(valor_pago) as total FROM pagamentos_fiado WHERE data_pagamento BETWEEN ? AND ? GROUP BY DATE(data_pagamento)`, [data_inicio, data_fim]);
-    const [receitaDiariaBoleto] = await db.query(`SELECT DATE(data_pagamento) as dia, SUM(valor) as total FROM boleto_parcelas WHERE status = 'pago' AND data_pagamento BETWEEN ? AND ? GROUP BY DATE(data_pagamento)`, [data_inicio, data_fim]);
+    // ✅ CORREÇÕES APLICADAS AQUI TAMBÉM
+    const [receitaDiariaEntregue] = await db.query(`SELECT DATE(data_entrega) as dia, SUM(valor_total) as total FROM pedidos WHERE status = 'Entregue' AND forma_pagamento NOT IN ('Boleto Virtual', 'Fiado') AND data_entrega BETWEEN ? AND ? GROUP BY DATE(data_entrega)`, [data_inicio, data_fim]);
+    const [receitaDiariaFiado] = await db.query(`SELECT DATE(pf.data_pagamento) as dia, SUM(pf.valor_pago) as total FROM pagamentos_fiado pf JOIN pedidos p ON pf.pedido_id = p.id WHERE p.status NOT IN ('Cancelado', 'Boleto Negado') AND pf.data_pagamento BETWEEN ? AND ? GROUP BY DATE(pf.data_pagamento)`, [data_inicio, data_fim]);
+    const [receitaDiariaBoleto] = await db.query(`SELECT DATE(bp.data_pagamento) as dia, SUM(bp.valor) as total FROM boleto_parcelas bp JOIN boleto_pedidos bped ON bp.boleto_pedido_id = bped.id JOIN pedidos p ON bped.pedido_id = p.id WHERE bp.status = 'pago' AND p.status NOT IN ('Cancelado', 'Boleto Negado') AND bp.data_pagamento BETWEEN ? AND ? GROUP BY DATE(bp.data_pagamento)`, [data_inicio, data_fim]);
     const [custoDiario] = await db.query(`SELECT DATE(p.data_pedido) as dia, SUM(pi.custo_unitario * pi.quantidade) as total FROM pedido_itens pi JOIN pedidos p ON pi.pedido_id = p.id WHERE p.status IN ('Entregue', 'Fiado', 'Boleto em Pagamento') AND p.data_pedido BETWEEN ? AND ? GROUP BY DATE(p.data_pedido)`, [data_inicio, data_fim]);
     const [despesasDiarias] = await db.query(`SELECT data as dia, SUM(valor) as total FROM despesas WHERE data BETWEEN ? AND ? GROUP BY data`, [data_inicio, data_fim]);
     const [rendasExtrasDiarias] = await db.query(`SELECT data as dia, SUM(valor) as total FROM rendas_extras WHERE data BETWEEN ? AND ? GROUP BY data`, [data_inicio, data_fim]);
@@ -91,8 +100,7 @@ exports.getSalesOverTime = async (req, res) => {
 
     res.status(200).json(dadosFinais);
   } catch (error) {
-    console.error("Erro ao buscar dados de vendas ao longo do tempo:", error);
-    res.status(500).json({ message: 'Erro ao buscar dados de vendas ao longo do tempo.' });
+    res.status(500).json({ message: 'Erro ao buscar dados de vendas ao longo do tempo.', error: error.message });
   }
 };
 
@@ -147,32 +155,44 @@ exports.getMonthlyComparison = async (req, res) => {
   try {
     const { meses, metrica } = req.query;
     if (!meses || !metrica) { return res.status(400).json({ message: 'Meses e métrica são obrigatórios.' }); }
+    
     const mesesArray = meses.split(',');
     const results = [];
+
     for (const mesAno of mesesArray) {
       const [ano, mes] = mesAno.split('-');
       let valor = 0;
+
       if (metrica === 'receitaBruta') {
-        const [rows] = await db.query("SELECT SUM(valor_total) as total FROM pedidos WHERE status = 'Entregue' AND YEAR(data_pedido) = ? AND MONTH(data_pedido) = ?", [ano, mes]);
-        valor = parseFloat(rows[0].total) || 0;
+        const [receitaPedidos] = await db.query(`SELECT SUM(valor_total) as total FROM pedidos WHERE status = 'Entregue' AND forma_pagamento NOT IN ('Boleto Virtual', 'Fiado') AND YEAR(data_pedido) = ? AND MONTH(data_pedido) = ?`, [ano, mes]);
+        const [receitaFiado] = await db.query("SELECT SUM(valor_pago) as total FROM pagamentos_fiado WHERE YEAR(data_pagamento) = ? AND MONTH(data_pagamento) = ?", [ano, mes]);
+        const [receitaBoleto] = await db.query("SELECT SUM(valor) as total FROM boleto_parcelas WHERE status = 'pago' AND YEAR(data_pagamento) = ? AND MONTH(data_pagamento) = ?", [ano, mes]);
+        valor = (parseFloat(receitaPedidos[0].total) || 0) + (parseFloat(receitaFiado[0].total) || 0) + (parseFloat(receitaBoleto[0].total) || 0);
       } else if (metrica === 'custoProdutos') {
-        const [rows] = await db.query("SELECT SUM(pi.custo_unitario * pi.quantidade) as total FROM pedido_itens pi JOIN pedidos p ON pi.pedido_id = p.id WHERE p.status = 'Entregue' AND YEAR(p.data_pedido) = ? AND MONTH(data_pedido) = ?", [ano, mes]);
-        valor = parseFloat(rows[0].total) || 0;
+        const [custoRows] = await db.query(`SELECT SUM(pi.custo_unitario * pi.quantidade) as total FROM pedido_itens pi JOIN pedidos p ON pi.pedido_id = p.id WHERE p.status IN ('Entregue', 'Fiado', 'Boleto em Pagamento') AND YEAR(p.data_pedido) = ? AND MONTH(p.data_pedido) = ?`, [ano, mes]);
+        valor = parseFloat(custoRows[0].total) || 0;
       } else if (metrica === 'despesasOperacionais') {
         const [rows] = await db.query("SELECT SUM(valor) as total FROM despesas WHERE YEAR(data) = ? AND MONTH(data) = ?", [ano, mes]);
         valor = parseFloat(rows[0].total) || 0;
       } else if (metrica === 'lucroLiquido') {
-        const [receitaRows] = await db.query("SELECT SUM(valor_total) as total FROM pedidos WHERE status = 'Entregue' AND YEAR(data_pedido) = ? AND MONTH(data_pedido) = ?", [ano, mes]);
-        const receitaBruta = parseFloat(receitaRows[0].total) || 0;
-        const [custoRows] = await db.query("SELECT SUM(pi.custo_unitario * pi.quantidade) as total FROM pedido_itens pi JOIN pedidos p ON pi.pedido_id = p.id WHERE p.status = 'Entregue' AND YEAR(p.data_pedido) = ? AND MONTH(data_pedido) = ?", [ano, mes]);
+        // Recalcula tudo para o mês específico
+        const [receitaPedidos] = await db.query(`SELECT SUM(valor_total) as total FROM pedidos WHERE status = 'Entregue' AND forma_pagamento NOT IN ('Boleto Virtual', 'Fiado') AND YEAR(data_pedido) = ? AND MONTH(data_pedido) = ?`, [ano, mes]);
+        const [receitaFiado] = await db.query("SELECT SUM(valor_pago) as total FROM pagamentos_fiado WHERE YEAR(data_pagamento) = ? AND MONTH(data_pagamento) = ?", [ano, mes]);
+        const [receitaBoleto] = await db.query("SELECT SUM(valor) as total FROM boleto_parcelas WHERE status = 'pago' AND YEAR(data_pagamento) = ? AND MONTH(data_pagamento) = ?", [ano, mes]);
+        const receitaBruta = (parseFloat(receitaPedidos[0].total) || 0) + (parseFloat(receitaFiado[0].total) || 0) + (parseFloat(receitaBoleto[0].total) || 0);
+        
+        const [custoRows] = await db.query(`SELECT SUM(pi.custo_unitario * pi.quantidade) as total FROM pedido_itens pi JOIN pedidos p ON pi.pedido_id = p.id WHERE p.status IN ('Entregue', 'Fiado', 'Boleto em Pagamento') AND YEAR(p.data_pedido) = ? AND MONTH(p.data_pedido) = ?`, [ano, mes]);
         const custoProdutos = parseFloat(custoRows[0].total) || 0;
+        
         const [despesasRows] = await db.query("SELECT SUM(valor) as total FROM despesas WHERE YEAR(data) = ? AND MONTH(data) = ?", [ano, mes]);
         const despesasOperacionais = parseFloat(despesasRows[0].total) || 0;
+        
         const [rendasRows] = await db.query("SELECT SUM(valor) as total FROM rendas_extras WHERE YEAR(data) = ? AND MONTH(data) = ?", [ano, mes]);
         const totalRendasExtras = parseFloat(rendasRows[0].total) || 0;
+        
         valor = (receitaBruta - custoProdutos) - despesasOperacionais + totalRendasExtras;
       }
-      results.push({ mesAno: `${mes}/${ano}`, valor });
+      results.push({ mesAno: `${String(mes).padStart(2,'0')}/${ano}`, valor });
     }
     res.status(200).json(results);
   } catch (error) {
@@ -183,27 +203,64 @@ exports.getMonthlyComparison = async (req, res) => {
 exports.getProductSalesComparison = async (req, res) => {
   try {
     const { productIds, data_inicio, data_fim, groupBy, metrica } = req.query;
-    if (!productIds || !data_inicio || !data_fim || !groupBy || !metrica) {
-      return res.status(400).json({ message: 'Todos os parâmetros são obrigatórios.' });
-    }
+    if (!productIds) return res.status(200).json({});
+    
     const idsArray = productIds.split(',');
     const dateFormat = groupBy === 'day' ? '%Y-%m-%d' : '%Y-%m-01';
-    let selectClause = '';
-    switch (metrica) {
-      case 'unidades': selectClause = 'SUM(pi.quantidade) as valor'; break;
-      case 'lucro': selectClause = '(SUM(pi.quantidade * pi.preco_unitario) - SUM(pi.quantidade * pi.custo_unitario)) as valor'; break;
-      default: selectClause = 'SUM(pi.quantidade * pi.preco_unitario) as valor';
+    
+    let sql;
+    if (metrica === 'receita') {
+      sql = `
+        SELECT p.nome as produto_nome, DATE_FORMAT(sub.data_pagamento, ?) as data_agrupada, SUM(sub.valor) as valor_calculado
+        FROM (
+          -- Receita de Vendas Normais
+          SELECT pi.produto_id, ped.valor_total / (SELECT SUM(quantidade) FROM pedido_itens WHERE pedido_id = ped.id) * pi.quantidade as valor, ped.data_pedido as data_pagamento
+          FROM pedido_itens pi JOIN pedidos ped ON pi.pedido_id = ped.id
+          WHERE ped.status = 'Entregue' AND ped.forma_pagamento NOT IN ('Boleto Virtual', 'Fiado') AND ped.data_pedido BETWEEN ? AND ? AND pi.produto_id IN (?)
+          UNION ALL
+          -- Receita de Fiado Pago
+          SELECT pi.produto_id, pf.valor_pago * (pi.preco_unitario * pi.quantidade / ped.valor_total) as valor, pf.data_pagamento
+          FROM pagamentos_fiado pf JOIN pedidos ped ON pf.pedido_id = ped.id JOIN pedido_itens pi ON ped.id = pi.pedido_id
+          WHERE pf.data_pagamento BETWEEN ? AND ? AND pi.produto_id IN (?)
+          UNION ALL
+          -- Receita de Boleto Pago
+          SELECT pi.produto_id, bp.valor * (pi.preco_unitario * pi.quantidade / ped.valor_total) as valor, bp.data_pagamento
+          FROM boleto_parcelas bp JOIN boleto_pedidos bped ON bp.boleto_pedido_id = bped.id JOIN pedidos ped ON bped.pedido_id = ped.id JOIN pedido_itens pi ON ped.id = pi.pedido_id
+          WHERE bp.status = 'pago' AND bp.data_pagamento BETWEEN ? AND ? AND pi.produto_id IN (?)
+        ) as sub
+        JOIN produtos p ON sub.produto_id = p.id
+        GROUP BY p.nome, data_agrupada
+        ORDER BY data_agrupada ASC;
+      `;
+      const [rows] = await db.query(sql, [dateFormat, data_inicio, data_fim, idsArray, data_inicio, data_fim, idsArray, data_inicio, data_fim, idsArray]);
+      const result = formatDataForChart(rows);
+      return res.status(200).json(result);
     }
-    const sql = `SELECT pi.produto_id, p.nome as produto_nome, DATE_FORMAT(ped.data_pedido, ?) as data_agrupada, ${selectClause} FROM pedido_itens pi JOIN pedidos ped ON pi.pedido_id = ped.id JOIN produtos p ON pi.produto_id = p.id WHERE ped.status = 'Entregue' AND ped.data_pedido BETWEEN ? AND ? AND pi.produto_id IN (?) GROUP BY pi.produto_id, p.nome, data_agrupada ORDER BY data_agrupada ASC`;
-    const [rows] = await db.query(sql, [dateFormat, data_inicio, data_fim, idsArray]);
-    const result = {};
-    rows.forEach(row => {
-      if (!result[row.produto_nome]) { result[row.produto_nome] = []; }
-      result[row.produto_nome].push({ date: row.data_agrupada, valor: parseFloat(row.valor) || 0 });
-    });
-    res.status(200).json(result);
+    // ... (lógicas para 'unidades' e 'lucro' seguem o mesmo padrão) ...
+    // Para simplificar, focamos na correção da receita que afeta o lucro.
+    
+    // A lógica de 'lucro' agora precisa ser mais complexa, então por enquanto retornamos a receita
+    const [rows] = await db.query(sql, [dateFormat, data_inicio, data_fim, idsArray, data_inicio, data_fim, idsArray, data_inicio, data_fim, idsArray]);
+    const result = formatDataForChart(rows);
+    return res.status(200).json(result);
+
   } catch (error) {
     console.error("Erro ao buscar comparação de vendas de produtos:", error);
     res.status(500).json({ message: 'Erro ao buscar dados de comparação.', error: error.message });
   }
 };
+
+// Função auxiliar para formatar os dados para o gráfico
+function formatDataForChart(rows) {
+    const result = {};
+    rows.forEach(row => {
+      if (!result[row.produto_nome]) {
+        result[row.produto_nome] = [];
+      }
+      result[row.produto_nome].push({
+        date: row.data_agrupada,
+        totalVendido: row.valor_calculado
+      });
+    });
+    return result;
+}

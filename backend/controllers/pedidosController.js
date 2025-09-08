@@ -17,40 +17,40 @@ exports.criarPedido = async (req, res) => {
     const [itensCarrinho] = await connection.query(`SELECT ci.produto_id, ci.quantidade, p.nome, p.valor, p.estoque_total, p.custo_medio_ponderado FROM carrinho_itens ci JOIN produtos p ON ci.produto_id = p.id WHERE ci.usuario_id = ?`, [usuarioId]);
     if (itensCarrinho.length === 0) { throw new Error('O carrinho está vazio.'); }
 
-    // ✅ LÓGICA DE CÁLCULO DO VALOR TOTAL CORRIGIDA
-    let valorTotal;
+    let valorTotalPedido;
     let planoInfo = null;
+    // ✅ 1. PREÇO UNITÁRIO EFETIVO: Começa com o valor base do produto
+    // (Assumindo um tipo de produto por carrinho para boleto)
+    let precoUnitarioEfetivo = itensCarrinho.length > 0 ? parseFloat(itensCarrinho[0].valor) : 0;
 
     if (forma_pagamento === 'Boleto Virtual') {
-      // 1. Busca as informações do plano de parcelamento
       const [planoRows] = await connection.query('SELECT * FROM boleto_planos WHERE id = ?', [info_boleto.plano_id]);
       if (planoRows.length === 0) throw new Error("Plano de parcelamento inválido.");
       planoInfo = planoRows[0];
-
-      // 2. Calcula o valor total do plano para UMA unidade
       const valorTotalPlanoPorUnidade = parseFloat(planoInfo.numero_parcelas) * parseFloat(planoInfo.valor_parcela);
-      
-      // 3. Pega a quantidade total de itens (assumindo que todos são o mesmo produto elegível)
       const quantidadeTotal = itensCarrinho.reduce((acc, item) => acc + item.quantidade, 0);
-
-      // 4. Calcula o valor final do pedido
-      valorTotal = valorTotalPlanoPorUnidade * quantidadeTotal;
+      valorTotalPedido = valorTotalPlanoPorUnidade * quantidadeTotal;
+      // ✅ 2. ATUALIZA o preço unitário efetivo com o valor do plano
+      precoUnitarioEfetivo = valorTotalPlanoPorUnidade;
     } else {
-      // 5. Para outras formas de pagamento, calcula o total normalmente
-      valorTotal = 0;
+      valorTotalPedido = 0;
       for (const item of itensCarrinho) {
         if (item.quantidade > item.estoque_total) { throw new Error(`Estoque insuficiente para o produto: ${item.nome}`); }
-        valorTotal += item.quantidade * item.valor;
+        valorTotalPedido += item.quantidade * item.valor;
       }
     }
 
     const statusInicial = forma_pagamento === 'Boleto Virtual' ? 'Aguardando Aprovação Boleto' : 'Processando';
-    const [resultadoPedido] = await connection.query('INSERT INTO pedidos (usuario_id, valor_total, forma_pagamento, local_entrega, valor_pago_cliente, status) VALUES (?, ?, ?, ?, ?, ?)', [usuarioId, valorTotal, forma_pagamento, local_entrega, valor_pago_cliente || null, statusInicial]);
+    const [resultadoPedido] = await connection.query('INSERT INTO pedidos (usuario_id, valor_total, forma_pagamento, local_entrega, valor_pago_cliente, status) VALUES (?, ?, ?, ?, ?, ?)', [usuarioId, valorTotalPedido, forma_pagamento, local_entrega, valor_pago_cliente || null, statusInicial]);
     const pedidoId = resultadoPedido.insertId;
 
     for (const item of itensCarrinho) {
         const novoCustoTotalInventario = item.custo_medio_ponderado * (item.estoque_total - item.quantidade);
-        await connection.query('INSERT INTO pedido_itens (pedido_id, produto_id, quantidade, preco_unitario, custo_unitario) VALUES (?, ?, ?, ?, ?)', [pedidoId, item.produto_id, item.quantidade, item.valor, item.custo_medio_ponderado]);
+        // ✅ 3. SALVA o preço unitário correto (seja o base ou o com juros)
+        await connection.query(
+            'INSERT INTO pedido_itens (pedido_id, produto_id, quantidade, preco_unitario, custo_unitario) VALUES (?, ?, ?, ?, ?)', 
+            [pedidoId, item.produto_id, item.quantidade, precoUnitarioEfetivo, item.custo_medio_ponderado]
+        );
         await connection.query('UPDATE produtos SET estoque_total = estoque_total - ?, custo_total_inventario = ? WHERE id = ?', [item.quantidade, novoCustoTotalInventario, item.produto_id]);
     }
     
@@ -64,7 +64,6 @@ exports.criarPedido = async (req, res) => {
         if (hoje.getDate() > diaVencimentoEscolhido) { mesInicial += 1; }
         for (let i = 0; i < planoInfo.numero_parcelas; i++) {
             const dataVencimento = new Date(anoInicial, mesInicial + i, diaVencimentoEscolhido);
-            // O valor da parcela é o valor por unidade * a quantidade total
             const valorDaParcela = parseFloat(planoInfo.valor_parcela) * itensCarrinho.reduce((acc, item) => acc + item.quantidade, 0);
             await connection.query('INSERT INTO boleto_parcelas (boleto_pedido_id, numero_parcela, valor, data_vencimento, status) VALUES (?, ?, ?, ?, "pendente")', [boletoPedidoId, i + 1, valorDaParcela, dataVencimento]);
         }
