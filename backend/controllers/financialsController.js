@@ -131,10 +131,95 @@ exports.getProductProfitability = async (req, res) => {
 exports.getPaymentMethodStats = async (req, res) => {
   try {
     const { data_inicio, data_fim } = req.query;
-    if (!data_inicio || !data_fim) { return res.status(400).json({ message: 'Datas são obrigatórias.' }); }
-    const sql = `SELECT p.forma_pagamento, COUNT(p.id) as numero_de_vendas, SUM(p.valor_total) as receita_total, SUM(pi.quantidade * pi.custo_unitario) as custo_total, (SUM(p.valor_total) - SUM(pi.quantidade * pi.custo_unitario)) as lucro_total FROM pedidos p JOIN pedido_itens pi ON p.id = pi.pedido_id WHERE p.status IN ('Entregue', 'Enviado', 'Processando') AND p.data_pedido BETWEEN ? AND ? GROUP BY p.forma_pagamento ORDER BY lucro_total DESC;`;
-    const [stats] = await db.query(sql, [data_inicio, data_fim]);
-    res.status(200).json(stats);
+    if (!data_inicio || !data_fim) {
+      return res.status(400).json({ message: 'Datas são obrigatórias.' });
+    }
+
+    const stats = {};
+
+    // 1. Receita de Vendas Normais ('Entregue')
+    const [receitaNormalRows] = await db.query(
+      `SELECT forma_pagamento, COUNT(id) as vendas, SUM(valor_total) as receita 
+       FROM pedidos 
+       WHERE status = 'Entregue' AND forma_pagamento NOT IN ('Boleto Virtual', 'Fiado') 
+       AND data_entrega BETWEEN ? AND ? 
+       GROUP BY forma_pagamento`,
+      [data_inicio, data_fim]
+    );
+
+    receitaNormalRows.forEach(row => {
+      if (!stats[row.forma_pagamento]) {
+        stats[row.forma_pagamento] = { vendas: 0, receita: 0, custo: 0, lucro: 0 };
+      }
+      stats[row.forma_pagamento].vendas += row.vendas;
+      stats[row.forma_pagamento].receita += parseFloat(row.receita);
+    });
+
+    // 2. Receita de Fiado (pagamentos recebidos)
+    const [receitaFiadoRows] = await db.query(
+      `SELECT p.forma_pagamento, SUM(pf.valor_pago) as receita 
+       FROM pagamentos_fiado pf 
+       JOIN pedidos p ON pf.pedido_id = p.id 
+       WHERE p.status NOT IN ('Cancelado', 'Boleto Negado') AND pf.data_pagamento BETWEEN ? AND ?
+       GROUP BY p.forma_pagamento`,
+      [data_inicio, data_fim]
+    );
+
+    receitaFiadoRows.forEach(row => {
+      if (!stats[row.forma_pagamento]) {
+        stats[row.forma_pagamento] = { vendas: 0, receita: 0, custo: 0, lucro: 0 };
+      }
+      stats[row.forma_pagamento].receita += parseFloat(row.receita);
+    });
+
+    // 3. Receita de Boleto (parcelas pagas)
+    const [receitaBoletoRows] = await db.query(
+      `SELECT p.forma_pagamento, SUM(bp.valor) as receita 
+       FROM boleto_parcelas bp
+       JOIN boleto_pedidos bped ON bp.boleto_pedido_id = bped.id
+       JOIN pedidos p ON bped.pedido_id = p.id
+       WHERE bp.status = 'pago' AND p.status NOT IN ('Cancelado', 'Boleto Negado') AND bp.data_pagamento BETWEEN ? AND ?
+       GROUP BY p.forma_pagamento`,
+      [data_inicio, data_fim]
+    );
+
+    receitaBoletoRows.forEach(row => {
+      if (!stats[row.forma_pagamento]) {
+        stats[row.forma_pagamento] = { vendas: 0, receita: 0, custo: 0, lucro: 0 };
+      }
+      stats[row.forma_pagamento].receita += parseFloat(row.receita);
+    });
+
+    // 4. Custo Total por forma de pagamento
+    const [custoRows] = await db.query(
+      `SELECT p.forma_pagamento, SUM(pi.custo_unitario * pi.quantidade) as custo 
+       FROM pedido_itens pi 
+       JOIN pedidos p ON pi.pedido_id = p.id 
+       WHERE p.status IN ('Entregue', 'Fiado', 'Boleto em Pagamento') AND p.data_pedido BETWEEN ? AND ?
+       GROUP BY p.forma_pagamento`,
+      [data_inicio, data_fim]
+    );
+
+    custoRows.forEach(row => {
+      if (!stats[row.forma_pagamento]) {
+        stats[row.forma_pagamento] = { vendas: 0, receita: 0, custo: 0, lucro: 0 };
+      }
+      stats[row.forma_pagamento].custo += parseFloat(row.custo);
+    });
+
+    // 5. Calcula o lucro e formata para a resposta final
+    const finalStats = Object.keys(stats).map(key => {
+      const { vendas, receita, custo } = stats[key];
+      return {
+        forma_pagamento: key,
+        numero_de_vendas: vendas,
+        receita_total: receita,
+        custo_total: custo,
+        lucro_total: receita - custo
+      };
+    }).sort((a, b) => b.lucro_total - a.lucro_total);
+
+    res.status(200).json(finalStats);
   } catch (error) {
     console.error("Erro ao buscar estatísticas de pagamento:", error);
     res.status(500).json({ message: 'Erro ao buscar estatísticas de pagamento.', error: error.message });
