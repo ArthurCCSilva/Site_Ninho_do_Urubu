@@ -12,11 +12,10 @@ router.post('/', [verifyToken], pedidosController.criarPedido);
 // Busca o histórico de pedidos do usuário logado
 router.get('/meus-pedidos', [verifyToken], pedidosController.getPedidosUsuario);
 
-// ✅ ROTA CORRIGIDA E NO LUGAR CERTO: Acessível por qualquer cliente logado
 // Busca os planos de boleto disponíveis para o carrinho atual
 router.get('/boleto-planos-carrinho', [verifyToken], pedidosController.getBoletoPlansForCart);
 
-// Busca os detalhes de um pedido específico
+// Busca os detalhes de um pedido específico (acessível por cliente dono do pedido ou admin)
 router.get('/:id', [verifyToken], pedidosController.getPedidoDetalhes);
 
 // Permite que um cliente cancele um pedido que ainda está em processamento
@@ -42,6 +41,5 @@ router.patch('/itens/:itemId', [verifyToken, isAdmin], pedidosController.updateI
 
 // Admin adiciona um pagamento parcial a um pedido "Fiado"
 router.post('/:id/pagamento-fiado', [verifyToken, isAdmin], pedidosController.adicionarPagamentoFiado);
-
 
 module.exports = router;
