@@ -124,15 +124,27 @@ function OrderDetailsModal({ show, onHide, pedidoId, onBack, onOrderUpdate }) {
                       </div>
                       <div className="d-flex align-items-center">
                         <div className="fw-bold me-3">{formatCurrency(item.quantidade * item.preco_unitario)}</div>
-                        
-                        {/* ✅ CORREÇÃO AQUI: Mostra os botões apenas se NÃO for Boleto Virtual */}
-                        {pedido.forma_pagamento !== 'Boleto Virtual' && (
-                            <div className="input-group input-group-sm" style={{ width: '120px' }}>
-                                <button className="btn btn-outline-secondary" type="button" onClick={() => handleUpdateQuantity(item.id, item.quantidade - 1)}>-</button>
-                                <span className="form-control text-center">{item.quantidade}</span>
-                                <button className="btn btn-outline-secondary" type="button" onClick={() => handleUpdateQuantity(item.id, item.quantidade + 1)}>+</button>
-                            </div>
-                        )}
+                        <div className="input-group input-group-sm" style={{ width: '120px' }}>
+                          <button 
+                            className="btn btn-outline-secondary" 
+                            type="button" 
+                            onClick={() => handleUpdateQuantity(item.id, item.quantidade - 1)}
+                            // ✅ BOTÃO DESABILITADO SE O STATUS NÃO PERMITIR
+                            disabled={pedido.status !== 'Processando' && pedido.status !== 'Enviado'}
+                          >
+                            -
+                          </button>
+                          <span className="form-control text-center">{item.quantidade}</span>
+                          <button 
+                            className="btn btn-outline-secondary" 
+                            type="button" 
+                            onClick={() => handleUpdateQuantity(item.id, item.quantidade + 1)}
+                            // ✅ BOTÃO DESABILITADO SE O STATUS NÃO PERMITIR
+                            disabled={pedido.status !== 'Processando' && pedido.status !== 'Enviado'}
+                          >
+                            +
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )) : (

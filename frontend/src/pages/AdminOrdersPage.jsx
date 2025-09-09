@@ -149,6 +149,10 @@ function AdminOrdersPage() {
               <option value="Enviado">Enviado</option>
               <option value="Entregue">Entregue</option>
               <option value="Cancelado">Cancelado</option>
+              <option value="Fiado">Fiado</option>
+              <option value="Aguardando Aprovação Boleto">Aguardando Aprovação Boleto</option>
+              <option value="Boleto em Pagamento">Boleto em Pagamento</option>
+              <option value="Boleto Negado">Boleto Negado</option>
             </select>
           </div>
         </div>

@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import OrderList from '../components/OrderList';
-import OrderDetailsModal from '../components/OrderDetailsModal';
+import CustomerOrderDetailsModal from '../components/CustomerOrderDetailsModal';
 import EditProfileModal from '../components/EditProfileModal';
 
 function CustomerDashboard() {
@@ -14,10 +14,8 @@ function CustomerDashboard() {
   const [activeTab, setActiveTab] = useState('andamento');
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedPedidoId, setSelectedPedidoId] = useState(null);
-
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
 
-  // Efeito para buscar os pedidos do usuário de forma estável
   useEffect(() => {
     const fetchPedidos = async () => {
       try {
@@ -31,7 +29,6 @@ function CustomerDashboard() {
         setLoading(false);
       }
     };
-    
     if (!isAuthLoading && user) {
       fetchPedidos();
     } else if (!isAuthLoading && !user) {
@@ -40,13 +37,11 @@ function CustomerDashboard() {
     }
   }, [user, isAuthLoading]);
 
-  // Função para o cliente cancelar um pedido
   const handleCancelarPedido = async (pedidoId) => {
     if (window.confirm('Tem certeza que deseja cancelar este pedido?')) {
       try {
         await api.patch(`/api/pedidos/${pedidoId}/cancelar`);
         alert('Pedido cancelado com sucesso.');
-        // Para atualizar a lista, chamamos a função de busca novamente
         const response = await api.get('/api/pedidos/meus-pedidos');
         setPedidos(response.data);
       } catch (err) {
@@ -55,7 +50,6 @@ function CustomerDashboard() {
     }
   };
 
-  // Função completa para o cliente alterar sua foto de perfil
   const handleProfileImageChange = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -71,21 +65,20 @@ function CustomerDashboard() {
     }
   };
 
-  // Função para controlar a abertura do modal de detalhes
   const handleShowDetails = (pedidoId) => {
     setSelectedPedidoId(pedidoId);
     setShowDetailsModal(true);
   };
 
-  // Lógica para montar a URL da imagem de perfil
   const profileImageUrl = user?.imagem_perfil_url
     ? `http://localhost:3001/uploads/${user.imagem_perfil_url}`
     : 'https://placehold.co/150';
 
-  // Filtra os pedidos em duas listas para serem exibidas nas abas
-  const pedidosEmAndamento = pedidos.filter(p => p.status === 'Processando' || p.status === 'Enviado');
-  const pedidosConcluidos = pedidos.filter(p => p.status === 'Entregue' || p.status === 'Cancelado');
-  
+  // ✅ 1. LÓGICA DE FILTRAGEM ATUALIZADA
+  const pedidosEmAndamento = pedidos.filter(p => p.status === 'Processando' || p.status === 'Enviado' || p.status === 'Aguardando Aprovação Boleto' || p.status === 'Boleto em Pagamento');
+  const pedidosConcluidos = pedidos.filter(p => p.status === 'Entregue' || p.status === 'Cancelado' || p.status === 'Boleto Negado');
+  const pedidosFiado = pedidos.filter(p => p.status === 'Fiado'); // Nova lista para fiados
+
   if (isAuthLoading || loading) {
     return (
       <div className="text-center my-5">
@@ -113,7 +106,7 @@ function CustomerDashboard() {
                 </div>
                 <div className="col-md-9">
                   <h5 className="card-title">{user?.nome}</h5>
-                  <p className="card-text mb-0"><strong>Email:</strong> {user?.email}</p>
+                  <p className="card-text mb-0"><strong>Email:</strong> {user?.email || 'Não informado'}</p>
                 </div>
               </div>
             </div>
@@ -135,21 +128,23 @@ function CustomerDashboard() {
         <div className="card-header">
           <ul className="nav nav-tabs card-header-tabs">
             <li className="nav-item">
-              <button 
-                className={`nav-link ${activeTab === 'andamento' ? 'active' : ''}`}
-                onClick={() => setActiveTab('andamento')}
-              >
+              <button className={`nav-link ${activeTab === 'andamento' ? 'active' : ''}`} onClick={() => setActiveTab('andamento')}>
                 Pedidos em Andamento ({pedidosEmAndamento.length})
               </button>
             </li>
             <li className="nav-item">
-              <button 
-                className={`nav-link ${activeTab === 'concluidos' ? 'active' : ''}`}
-                onClick={() => setActiveTab('concluidos')}
-              >
+              <button className={`nav-link ${activeTab === 'concluidos' ? 'active' : ''}`} onClick={() => setActiveTab('concluidos')}>
                 Histórico de Compras ({pedidosConcluidos.length})
               </button>
             </li>
+            {/* ✅ 2. NOVA ABA DE FIADO (só aparece se houver pedidos fiado) */}
+            {pedidosFiado.length > 0 && (
+              <li className="nav-item">
+                <button className={`nav-link ${activeTab === 'fiado' ? 'active' : ''}`} onClick={() => setActiveTab('fiado')}>
+                  Pedidos Fiado <span className="badge bg-danger">{pedidosFiado.length}</span>
+                </button>
+              </li>
+            )}
           </ul>
         </div>
         <div className="card-body">
@@ -171,13 +166,24 @@ function CustomerDashboard() {
               <OrderList 
                 pedidos={pedidosConcluidos} 
                 onShowDetails={handleShowDetails} 
-                onCancelarPedido={handleCancelarPedido}
+              />
+            </div>
+          )}
+          {/* ✅ 3. CONTEÚDO DA NOVA ABA DE FIADO */}
+          {activeTab === 'fiado' && (
+            <div>
+              <h4 className="card-title">Suas Compras em Aberto (Fiado)</h4>
+              <p className="card-subtitle mb-3 text-muted">Estes são os pedidos que aguardam o pagamento completo.</p>
+              <OrderList 
+                pedidos={pedidosFiado} 
+                onShowDetails={handleShowDetails} 
               />
             </div>
           )}
         </div>
       </div>
-      <OrderDetailsModal 
+      
+      <CustomerOrderDetailsModal 
         show={showDetailsModal}
         onHide={() => setShowDetailsModal(false)}
         pedidoId={selectedPedidoId}

@@ -266,6 +266,8 @@ function AdminDashboard() {
                 <div className="col-md-9">
                   <h5 className="card-title">{user?.nome}</h5>
                   <p className="card-text mb-0"><strong>Email:</strong> {user?.email || 'Não informado'}</p>
+                  <p className="card-text mb-0"><strong>Telefone:</strong> {user?.telefone || 'Não informado'}</p>
+                  <p className="card-text mb-0"><strong>CPF:</strong> {user?.cpf || 'Não informado'}</p>
                   <p className="card-text"><strong>Status:</strong> <span className="badge bg-success text-uppercase">{user?.role}</span></p>
                   <button className="btn btn-secondary btn-sm mt-2" onClick={() => setShowEditProfileModal(true)}>Editar Perfil</button>
                 </div>
@@ -276,17 +278,34 @@ function AdminDashboard() {
         <div className="col-lg-5 mb-4">
           <div className="card h-100">
             <div className="card-header"><h4>Ações Gerais</h4></div>
-            <div className="card-body d-flex flex-column justify-content-center align-items-start">
-              <Link to="/admin/pedidos" className="btn btn-primary mb-3 w-100">Gerenciar Pedidos</Link>
-              <Link to="/admin/venda-fisica" className="btn btn-success mb-3 w-100">Registrar Venda Física</Link>
-              <Link to="/admin/financeiro" className="btn btn-warning mb-3 w-100">Painel Financeiro</Link>
-              <Link to="/admin/boletos" className="btn btn-dark mb-3 w-100">Gerenciar Boletos</Link>
-              <Link to="/admin/clientes" className="btn btn-secondary mb-3 w-100">Informações do Cliente</Link>
-              <button className="btn btn-info w-100 mb-3" onClick={() => setShowCategoryModal(true)}>Gerenciar Categorias</button>
-              <button className="btn btn-outline-success w-100" onClick={() => setShowReactivateModal(true)}>Reativar Produtos</button>
-              <button className="btn btn-outline-info w-100" onClick={() => setShowAdminEditUserModal(true)}>
-                Editar Telefone/Senha de Cliente
-              </button>
+            <div className="card-body">
+                {/* ✅ 2. LÓGICA DE LAYOUT ATUALIZADA */}
+                {/* Visível apenas em telas grandes (lg) para cima */}
+                <div className="d-none d-lg-flex">
+                    <div className="w-50 pe-2">
+                        <Link to="/admin/pedidos" className="btn btn-primary mb-2 w-100">Gerenciar Pedidos</Link>
+                        <Link to="/admin/venda-fisica" className="btn btn-success mb-2 w-100">Registrar Venda Física</Link>
+                        <Link to="/admin/financeiro" className="btn btn-warning mb-2 w-100">Painel Financeiro</Link>
+                        <Link to="/admin/boletos" className="btn btn-dark w-100">Gerenciar Boletos</Link>
+                    </div>
+                    <div className="w-50 ps-2">
+                        <Link to="/admin/clientes" className="btn btn-secondary mb-2 w-100">Info Clientes</Link>
+                        <button className="btn btn-info w-100 mb-2" onClick={() => setShowCategoryModal(true)}>Gerenciar Categorias</button>
+                        <button className="btn btn-outline-success w-100 mb-2" onClick={() => setShowReactivateModal(true)}>Reativar Produtos</button>
+                        <button className="btn btn-outline-info w-100" onClick={() => setShowAdminEditUserModal(true)}>Editar Cliente</button>
+                    </div>
+                </div>
+                {/* Visível apenas em telas pequenas (mobile) */}
+                <div className="d-lg-none d-grid gap-2">
+                    <Link to="/admin/pedidos" className="btn btn-primary w-100">Gerenciar Pedidos</Link>
+                    <Link to="/admin/venda-fisica" className="btn btn-success w-100">Registrar Venda Física</Link>
+                    <Link to="/admin/financeiro" className="btn btn-warning w-100">Painel Financeiro</Link>
+                    <Link to="/admin/boletos" className="btn btn-dark w-100">Gerenciar Boletos</Link>
+                    <Link to="/admin/clientes" className="btn btn-secondary w-100">Info Clientes</Link>
+                    <button className="btn btn-info w-100" onClick={() => setShowCategoryModal(true)}>Gerenciar Categorias</button>
+                    <button className="btn btn-outline-success w-100" onClick={() => setShowReactivateModal(true)}>Reativar Produtos</button>
+                    <button className="btn btn-outline-info w-100" onClick={() => setShowAdminEditUserModal(true)}>Editar Cliente</button>
+                </div>
             </div>
           </div>
         </div>
