@@ -209,17 +209,29 @@ function FinancialDashboardPage() {
 
   useEffect(() => {
     const fetchComparisonData = async () => {
-      if (selectedMonths.length < 2 || !selectedMetric) { setComparisonChartData({ labels: [], datasets: [] }); return; }
+      // 1. A condição agora é 'length < 1', para rodar com apenas um mês selecionado
+      if (selectedMonths.length < 1 || !selectedMetric) {
+        setComparisonChartData({ labels: [], datasets: [] });
+        return;
+      }
       try {
         setComparisonLoading(true);
         const meses = selectedMonths.map(m => m.value).join(',');
         const metrica = selectedMetric.value;
         const response = await api.get(`/api/financials/monthly-comparison?meses=${meses}&metrica=${metrica}`);
+        
         const labels = response.data.map(d => d.mesAno);
         const data = response.data.map(d => d.valor);
+
         setComparisonChartData({
           labels,
-          datasets: [{ label: selectedMetric.label, data, backgroundColor: 'rgba(255, 99, 132, 0.5)' }]
+          datasets: [{
+            label: selectedMetric.label,
+            data,
+            backgroundColor: 'rgba(75, 192, 192, 0.6)',
+            borderColor: 'rgba(75, 192, 192, 1)',
+            borderWidth: 1,
+          }]
         });
       } catch (err) { console.error("Erro ao buscar dados de comparação", err); } 
       finally { setComparisonLoading(false); }
@@ -265,7 +277,7 @@ function FinancialDashboardPage() {
             data: sortedDates.map(dateStr => {
               const dayData = productData.find(d => d.date === dateStr);
               // A API agora retorna 'totalVendido' na função auxiliar
-              return dayData ? dayData.totalVendido : 0; 
+              return dayData ? dayData.valor_calculado : 0; 
             }),
             borderColor: color, backgroundColor: `${color}B3`, tension: 0.1,
           };
@@ -314,7 +326,9 @@ function FinancialDashboardPage() {
                 <div className="col-md-7"><label className="form-label">Selecione 2+ meses para comparar</label><Select isMulti options={availableMonths} value={selectedMonths} onChange={setSelectedMonths} placeholder="Escolha os meses..." noOptionsMessage={() => "Nenhum mês com vendas"} styles={customSelectStyles} /></div>
                 <div className="col-md-5"><label className="form-label">Selecione a Métrica</label><Select options={metricOptions} value={selectedMetric} onChange={setSelectedMetric} /></div>
               </div>
-              {comparisonLoading ? ( <div className="text-center"><div className="spinner-border spinner-border-sm" /></div> ) : selectedMonths.length >= 2 && ( <Bar data={comparisonChartData} options={{ responsive: true, plugins: { legend: { display: false }, title: { display: true, text: `Comparativo de ${selectedMetric.label}` }}}} /> )}
+              {comparisonLoading ? ( <div className="text-center"><div className="spinner-border spinner-border-sm" /></div> ) 
+              : selectedMonths.length >= 1 && ( 
+              <Bar data={comparisonChartData} options={{ responsive: true, plugins: { legend: { display: false }, title: { display: true, text: `Comparativo de ${selectedMetric.label}` }}}} /> )}
             </div>
           </div>
           <div className="card mt-4">

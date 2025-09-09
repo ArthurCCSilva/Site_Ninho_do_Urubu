@@ -137,74 +137,81 @@ exports.getPaymentMethodStats = async (req, res) => {
 
     const stats = {};
 
-    // 1. Receita de Vendas Normais ('Entregue')
+    // 1. Contagem de Vendas por forma de pagamento final
+    const [vendasRows] = await db.query(
+      `SELECT 
+        CASE 
+          WHEN p.status = 'Entregue' AND p.forma_pagamento_original IS NOT NULL THEN p.forma_pagamento_original
+          ELSE p.forma_pagamento 
+        END as f_pagamento,
+        COUNT(p.id) as vendas
+      FROM pedidos p
+      WHERE p.status IN ('Entregue', 'Fiado', 'Boleto em Pagamento') AND p.data_pedido BETWEEN ? AND ?
+      GROUP BY f_pagamento`,
+      [data_inicio, data_fim]
+    );
+    vendasRows.forEach(row => {
+      if (!stats[row.f_pagamento]) stats[row.f_pagamento] = { vendas: 0, receita: 0, custo: 0 };
+      stats[row.f_pagamento].vendas += row.vendas;
+    });
+
+    // 2. Receita de Vendas Normais ('Entregue')
     const [receitaNormalRows] = await db.query(
-      `SELECT forma_pagamento, COUNT(id) as vendas, SUM(valor_total) as receita 
+      `SELECT forma_pagamento as f_pagamento, SUM(valor_total) as receita 
        FROM pedidos 
        WHERE status = 'Entregue' AND forma_pagamento NOT IN ('Boleto Virtual', 'Fiado') 
        AND data_entrega BETWEEN ? AND ? 
-       GROUP BY forma_pagamento`,
+       GROUP BY f_pagamento`,
       [data_inicio, data_fim]
     );
-
     receitaNormalRows.forEach(row => {
-      if (!stats[row.forma_pagamento]) {
-        stats[row.forma_pagamento] = { vendas: 0, receita: 0, custo: 0, lucro: 0 };
-      }
-      stats[row.forma_pagamento].vendas += row.vendas;
-      stats[row.forma_pagamento].receita += parseFloat(row.receita);
+      if (!stats[row.f_pagamento]) stats[row.f_pagamento] = { vendas: 0, receita: 0, custo: 0 };
+      stats[row.f_pagamento].receita += parseFloat(row.receita);
     });
 
-    // 2. Receita de Fiado (pagamentos recebidos)
-    const [receitaFiadoRows] = await db.query(
-      `SELECT p.forma_pagamento, SUM(pf.valor_pago) as receita 
-       FROM pagamentos_fiado pf 
-       JOIN pedidos p ON pf.pedido_id = p.id 
-       WHERE p.status NOT IN ('Cancelado', 'Boleto Negado') AND pf.data_pagamento BETWEEN ? AND ?
-       GROUP BY p.forma_pagamento`,
+    // 3. Receita de Fiado e Boleto (pagamentos recebidos)
+    const [receitaCreditoRows] = await db.query(
+      `SELECT 
+        CASE
+            WHEN p.status = 'Entregue' AND p.forma_pagamento_original IS NOT NULL THEN p.forma_pagamento_original
+            ELSE p.forma_pagamento
+        END as f_pagamento,
+        SUM(sub.valor_pago) as receita
+      FROM (
+        SELECT pedido_id, valor_pago, data_pagamento FROM pagamentos_fiado
+        UNION ALL
+        SELECT bped.pedido_id, bp.valor as valor_pago, bp.data_pagamento 
+        FROM boleto_parcelas bp 
+        JOIN boleto_pedidos bped ON bp.boleto_pedido_id = bped.id
+        WHERE bp.status = 'pago'
+      ) as sub
+      JOIN pedidos p ON sub.pedido_id = p.id
+      WHERE p.status NOT IN ('Cancelado', 'Boleto Negado') AND sub.data_pagamento BETWEEN ? AND ?
+      GROUP BY f_pagamento`,
       [data_inicio, data_fim]
     );
-
-    receitaFiadoRows.forEach(row => {
-      if (!stats[row.forma_pagamento]) {
-        stats[row.forma_pagamento] = { vendas: 0, receita: 0, custo: 0, lucro: 0 };
-      }
-      stats[row.forma_pagamento].receita += parseFloat(row.receita);
-    });
-
-    // 3. Receita de Boleto (parcelas pagas)
-    const [receitaBoletoRows] = await db.query(
-      `SELECT p.forma_pagamento, SUM(bp.valor) as receita 
-       FROM boleto_parcelas bp
-       JOIN boleto_pedidos bped ON bp.boleto_pedido_id = bped.id
-       JOIN pedidos p ON bped.pedido_id = p.id
-       WHERE bp.status = 'pago' AND p.status NOT IN ('Cancelado', 'Boleto Negado') AND bp.data_pagamento BETWEEN ? AND ?
-       GROUP BY p.forma_pagamento`,
-      [data_inicio, data_fim]
-    );
-
-    receitaBoletoRows.forEach(row => {
-      if (!stats[row.forma_pagamento]) {
-        stats[row.forma_pagamento] = { vendas: 0, receita: 0, custo: 0, lucro: 0 };
-      }
-      stats[row.forma_pagamento].receita += parseFloat(row.receita);
+    receitaCreditoRows.forEach(row => {
+      if (!stats[row.f_pagamento]) stats[row.f_pagamento] = { vendas: 0, receita: 0, custo: 0 };
+      stats[row.f_pagamento].receita += parseFloat(row.receita);
     });
 
     // 4. Custo Total por forma de pagamento
     const [custoRows] = await db.query(
-      `SELECT p.forma_pagamento, SUM(pi.custo_unitario * pi.quantidade) as custo 
+      `SELECT 
+        CASE 
+          WHEN p.status = 'Entregue' AND p.forma_pagamento_original IS NOT NULL THEN p.forma_pagamento_original
+          ELSE p.forma_pagamento 
+        END as f_pagamento,
+        SUM(pi.custo_unitario * pi.quantidade) as custo 
        FROM pedido_itens pi 
        JOIN pedidos p ON pi.pedido_id = p.id 
        WHERE p.status IN ('Entregue', 'Fiado', 'Boleto em Pagamento') AND p.data_pedido BETWEEN ? AND ?
-       GROUP BY p.forma_pagamento`,
+       GROUP BY f_pagamento`,
       [data_inicio, data_fim]
     );
-
     custoRows.forEach(row => {
-      if (!stats[row.forma_pagamento]) {
-        stats[row.forma_pagamento] = { vendas: 0, receita: 0, custo: 0, lucro: 0 };
-      }
-      stats[row.forma_pagamento].custo += parseFloat(row.custo);
+      if (!stats[row.f_pagamento]) stats[row.f_pagamento] = { vendas: 0, receita: 0, custo: 0 };
+      stats[row.f_pagamento].custo += parseFloat(row.custo);
     });
 
     // 5. Calcula o lucro e formata para a resposta final
@@ -217,7 +224,7 @@ exports.getPaymentMethodStats = async (req, res) => {
         custo_total: custo,
         lucro_total: receita - custo
       };
-    }).sort((a, b) => b.lucro_total - a.lucro_total);
+    }).sort((a, b) => b.receita_total - a.receita_total);
 
     res.status(200).json(finalStats);
   } catch (error) {
@@ -248,22 +255,26 @@ exports.getMonthlyComparison = async (req, res) => {
       const [ano, mes] = mesAno.split('-');
       let valor = 0;
 
+      // Lógica de cálculo para CADA métrica, agora usando o Regime de Caixa correto
       if (metrica === 'receitaBruta') {
-        const [receitaPedidos] = await db.query(`SELECT SUM(valor_total) as total FROM pedidos WHERE status = 'Entregue' AND forma_pagamento NOT IN ('Boleto Virtual', 'Fiado') AND YEAR(data_pedido) = ? AND MONTH(data_pedido) = ?`, [ano, mes]);
-        const [receitaFiado] = await db.query("SELECT SUM(valor_pago) as total FROM pagamentos_fiado WHERE YEAR(data_pagamento) = ? AND MONTH(data_pagamento) = ?", [ano, mes]);
-        const [receitaBoleto] = await db.query("SELECT SUM(valor) as total FROM boleto_parcelas WHERE status = 'pago' AND YEAR(data_pagamento) = ? AND MONTH(data_pagamento) = ?", [ano, mes]);
+        const [receitaPedidos] = await db.query(`SELECT SUM(valor_total) as total FROM pedidos WHERE status = 'Entregue' AND forma_pagamento NOT IN ('Boleto Virtual', 'Fiado') AND YEAR(data_entrega) = ? AND MONTH(data_entrega) = ?`, [ano, mes]);
+        const [receitaFiado] = await db.query("SELECT SUM(valor_pago) as total FROM pagamentos_fiado pf JOIN pedidos p ON pf.pedido_id = p.id WHERE p.status NOT IN ('Cancelado', 'Boleto Negado') AND YEAR(pf.data_pagamento) = ? AND MONTH(pf.data_pagamento) = ?", [ano, mes]);
+        const [receitaBoleto] = await db.query("SELECT SUM(valor) as total FROM boleto_parcelas bp JOIN boleto_pedidos bped ON bp.boleto_pedido_id = bped.id JOIN pedidos p ON bped.pedido_id = p.id WHERE bp.status = 'pago' AND p.status NOT IN ('Cancelado', 'Boleto Negado') AND YEAR(bp.data_pagamento) = ? AND MONTH(bp.data_pagamento) = ?", [ano, mes]);
         valor = (parseFloat(receitaPedidos[0].total) || 0) + (parseFloat(receitaFiado[0].total) || 0) + (parseFloat(receitaBoleto[0].total) || 0);
+      
       } else if (metrica === 'custoProdutos') {
         const [custoRows] = await db.query(`SELECT SUM(pi.custo_unitario * pi.quantidade) as total FROM pedido_itens pi JOIN pedidos p ON pi.pedido_id = p.id WHERE p.status IN ('Entregue', 'Fiado', 'Boleto em Pagamento') AND YEAR(p.data_pedido) = ? AND MONTH(p.data_pedido) = ?`, [ano, mes]);
         valor = parseFloat(custoRows[0].total) || 0;
+      
       } else if (metrica === 'despesasOperacionais') {
         const [rows] = await db.query("SELECT SUM(valor) as total FROM despesas WHERE YEAR(data) = ? AND MONTH(data) = ?", [ano, mes]);
         valor = parseFloat(rows[0].total) || 0;
+      
       } else if (metrica === 'lucroLiquido') {
-        // Recalcula tudo para o mês específico
-        const [receitaPedidos] = await db.query(`SELECT SUM(valor_total) as total FROM pedidos WHERE status = 'Entregue' AND forma_pagamento NOT IN ('Boleto Virtual', 'Fiado') AND YEAR(data_pedido) = ? AND MONTH(data_pedido) = ?`, [ano, mes]);
-        const [receitaFiado] = await db.query("SELECT SUM(valor_pago) as total FROM pagamentos_fiado WHERE YEAR(data_pagamento) = ? AND MONTH(data_pagamento) = ?", [ano, mes]);
-        const [receitaBoleto] = await db.query("SELECT SUM(valor) as total FROM boleto_parcelas WHERE status = 'pago' AND YEAR(data_pagamento) = ? AND MONTH(data_pagamento) = ?", [ano, mes]);
+        // Recalcula tudo para o mês específico, usando a mesma lógica acima
+        const [receitaPedidos] = await db.query(`SELECT SUM(valor_total) as total FROM pedidos WHERE status = 'Entregue' AND forma_pagamento NOT IN ('Boleto Virtual', 'Fiado') AND YEAR(data_entrega) = ? AND MONTH(data_entrega) = ?`, [ano, mes]);
+        const [receitaFiado] = await db.query("SELECT SUM(valor_pago) as total FROM pagamentos_fiado pf JOIN pedidos p ON pf.pedido_id = p.id WHERE p.status NOT IN ('Cancelado', 'Boleto Negado') AND YEAR(pf.data_pagamento) = ? AND MONTH(pf.data_pagamento) = ?", [ano, mes]);
+        const [receitaBoleto] = await db.query("SELECT SUM(valor) as total FROM boleto_parcelas bp JOIN boleto_pedidos bped ON bp.boleto_pedido_id = bped.id JOIN pedidos p ON bped.pedido_id = p.id WHERE bp.status = 'pago' AND p.status NOT IN ('Cancelado', 'Boleto Negado') AND YEAR(bp.data_pagamento) = ? AND MONTH(bp.data_pagamento) = ?", [ano, mes]);
         const receitaBruta = (parseFloat(receitaPedidos[0].total) || 0) + (parseFloat(receitaFiado[0].total) || 0) + (parseFloat(receitaBoleto[0].total) || 0);
         
         const [custoRows] = await db.query(`SELECT SUM(pi.custo_unitario * pi.quantidade) as total FROM pedido_itens pi JOIN pedidos p ON pi.pedido_id = p.id WHERE p.status IN ('Entregue', 'Fiado', 'Boleto em Pagamento') AND YEAR(p.data_pedido) = ? AND MONTH(p.data_pedido) = ?`, [ano, mes]);
@@ -294,38 +305,121 @@ exports.getProductSalesComparison = async (req, res) => {
     const dateFormat = groupBy === 'day' ? '%Y-%m-%d' : '%Y-%m-01';
     
     let sql;
+    let params;
+
     if (metrica === 'receita') {
-      sql = `
-        SELECT p.nome as produto_nome, DATE_FORMAT(sub.data_pagamento, ?) as data_agrupada, SUM(sub.valor) as valor_calculado
-        FROM (
-          -- Receita de Vendas Normais
-          SELECT pi.produto_id, ped.valor_total / (SELECT SUM(quantidade) FROM pedido_itens WHERE pedido_id = ped.id) * pi.quantidade as valor, ped.data_pedido as data_pagamento
-          FROM pedido_itens pi JOIN pedidos ped ON pi.pedido_id = ped.id
-          WHERE ped.status = 'Entregue' AND ped.forma_pagamento NOT IN ('Boleto Virtual', 'Fiado') AND ped.data_pedido BETWEEN ? AND ? AND pi.produto_id IN (?)
-          UNION ALL
-          -- Receita de Fiado Pago
-          SELECT pi.produto_id, pf.valor_pago * (pi.preco_unitario * pi.quantidade / ped.valor_total) as valor, pf.data_pagamento
-          FROM pagamentos_fiado pf JOIN pedidos ped ON pf.pedido_id = ped.id JOIN pedido_itens pi ON ped.id = pi.pedido_id
-          WHERE pf.data_pagamento BETWEEN ? AND ? AND pi.produto_id IN (?)
-          UNION ALL
-          -- Receita de Boleto Pago
-          SELECT pi.produto_id, bp.valor * (pi.preco_unitario * pi.quantidade / ped.valor_total) as valor, bp.data_pagamento
-          FROM boleto_parcelas bp JOIN boleto_pedidos bped ON bp.boleto_pedido_id = bped.id JOIN pedidos ped ON bped.pedido_id = ped.id JOIN pedido_itens pi ON ped.id = pi.pedido_id
-          WHERE bp.status = 'pago' AND bp.data_pagamento BETWEEN ? AND ? AND pi.produto_id IN (?)
-        ) as sub
-        JOIN produtos p ON sub.produto_id = p.id
-        GROUP BY p.nome, data_agrupada
-        ORDER BY data_agrupada ASC;
-      `;
-      const [rows] = await db.query(sql, [dateFormat, data_inicio, data_fim, idsArray, data_inicio, data_fim, idsArray, data_inicio, data_fim, idsArray]);
-      const result = formatDataForChart(rows);
-      return res.status(200).json(result);
+        sql = `
+            SELECT 
+                p.nome as produto_nome, 
+                DATE_FORMAT(sub.data_pagamento, ?) as data_agrupada, 
+                SUM(sub.valor_recebido) as valor_calculado
+            FROM (
+                -- 1. Receita de Vendas Normais (Entregue, não Fiado/Boleto)
+                SELECT 
+                    pi.produto_id, 
+                    pi.preco_unitario * pi.quantidade as valor_recebido, 
+                    ped.data_entrega as data_pagamento
+                FROM pedido_itens pi JOIN pedidos ped ON pi.pedido_id = ped.id
+                WHERE ped.status = 'Entregue' AND ped.forma_pagamento NOT IN ('Boleto Virtual', 'Fiado') 
+                AND ped.data_entrega BETWEEN ? AND ? AND pi.produto_id IN (?)
+                
+                UNION ALL
+
+                -- 2. Receita de Fiado Pago (distribuída proporcionalmente entre os itens do pedido)
+                SELECT 
+                    pi.produto_id, 
+                    pf.valor_pago * (pi.preco_unitario * pi.quantidade / ped.valor_total) as valor_recebido, 
+                    pf.data_pagamento
+                FROM pagamentos_fiado pf 
+                JOIN pedidos ped ON pf.pedido_id = ped.id 
+                JOIN pedido_itens pi ON ped.id = pi.pedido_id
+                WHERE ped.status NOT IN ('Cancelado', 'Boleto Negado') AND pf.data_pagamento BETWEEN ? AND ? AND pi.produto_id IN (?)
+
+                UNION ALL
+
+                -- 3. Receita de Boleto Pago (distribuída proporcionalmente entre os itens do pedido)
+                SELECT 
+                    pi.produto_id, 
+                    bp.valor * (pi.preco_unitario * pi.quantidade / ped.valor_total) as valor_recebido, 
+                    bp.data_pagamento
+                FROM boleto_parcelas bp
+                JOIN boleto_pedidos bped ON bp.boleto_pedido_id = bped.id
+                JOIN pedidos ped ON bped.pedido_id = ped.id
+                JOIN pedido_itens pi ON ped.id = pi.pedido_id
+                WHERE bp.status = 'pago' AND ped.status NOT IN ('Cancelado', 'Boleto Negado') AND bp.data_pagamento BETWEEN ? AND ? AND pi.produto_id IN (?)
+            ) as sub
+            JOIN produtos p ON sub.produto_id = p.id
+            WHERE sub.valor_recebido IS NOT NULL
+            GROUP BY p.nome, data_agrupada
+            ORDER BY data_agrupada ASC;
+        `;
+        params = [dateFormat, data_inicio, data_fim, idsArray, data_inicio, data_fim, idsArray, data_inicio, data_fim, idsArray];
+    } else if (metrica === 'lucro') {
+        sql = `
+            SELECT 
+                p.nome as produto_nome, 
+                DATE_FORMAT(sub.data_pagamento, ?) as data_agrupada, 
+                SUM(sub.valor_recebido - sub.custo_proporcional) as valor_calculado
+            FROM (
+                -- Lucro de Vendas Normais
+                SELECT 
+                    pi.produto_id, 
+                    pi.preco_unitario * pi.quantidade as valor_recebido, 
+                    pi.custo_unitario * pi.quantidade as custo_proporcional, 
+                    ped.data_entrega as data_pagamento
+                FROM pedido_itens pi JOIN pedidos ped ON pi.pedido_id = ped.id
+                WHERE ped.status = 'Entregue' AND ped.forma_pagamento NOT IN ('Boleto Virtual', 'Fiado') 
+                AND ped.data_entrega BETWEEN ? AND ? AND pi.produto_id IN (?)
+                
+                UNION ALL
+
+                -- Lucro de Fiado Pago
+                SELECT 
+                    pi.produto_id, 
+                    pf.valor_pago as valor_recebido, 
+                    (pf.valor_pago / ped.valor_total) * (pi.custo_unitario * pi.quantidade) as custo_proporcional, 
+                    pf.data_pagamento
+                FROM pagamentos_fiado pf 
+                JOIN pedidos ped ON pf.pedido_id = ped.id 
+                JOIN pedido_itens pi ON ped.id = pi.pedido_id
+                WHERE ped.status NOT IN ('Cancelado', 'Boleto Negado') AND pf.data_pagamento BETWEEN ? AND ? AND pi.produto_id IN (?)
+
+                UNION ALL
+
+                -- Lucro de Boleto Pago
+                SELECT 
+                    pi.produto_id, 
+                    bp.valor as valor_recebido, 
+                    (bp.valor / ped.valor_total) * (pi.custo_unitario * pi.quantidade) as custo_proporcional, 
+                    bp.data_pagamento
+                FROM boleto_parcelas bp
+                JOIN boleto_pedidos bped ON bp.boleto_pedido_id = bped.id
+                JOIN pedidos ped ON bped.pedido_id = ped.id
+                JOIN pedido_itens pi ON ped.id = pi.pedido_id
+                WHERE bp.status = 'pago' AND ped.status NOT IN ('Cancelado', 'Boleto Negado') AND bp.data_pagamento BETWEEN ? AND ? AND pi.produto_id IN (?)
+            ) as sub
+            JOIN produtos p ON sub.produto_id = p.id
+            WHERE sub.valor_recebido IS NOT NULL
+            GROUP BY p.nome, data_agrupada
+            ORDER BY data_agrupada ASC;
+        `;
+        params = [dateFormat, data_inicio, data_fim, idsArray, data_inicio, data_fim, idsArray, data_inicio, data_fim, idsArray];
+    } else { // 'unidades'
+        sql = `
+            SELECT p.nome as produto_nome, DATE_FORMAT(ped.data_pedido, ?) as data_agrupada, SUM(pi.quantidade) as valor_calculado
+            FROM pedido_itens pi
+            JOIN produtos p ON pi.produto_id = p.id
+            JOIN pedidos ped ON pi.pedido_id = ped.id
+            WHERE ped.status IN ('Entregue', 'Fiado', 'Boleto em Pagamento')
+            AND ped.data_pedido BETWEEN ? AND ? AND pi.produto_id IN (?)
+            GROUP BY p.nome, data_agrupada 
+            ORDER BY data_agrupada ASC;
+        `;
+        params = [dateFormat, data_inicio, data_fim, idsArray];
     }
-    // ... (lógicas para 'unidades' e 'lucro' seguem o mesmo padrão) ...
-    // Para simplificar, focamos na correção da receita que afeta o lucro.
     
-    // A lógica de 'lucro' agora precisa ser mais complexa, então por enquanto retornamos a receita
-    const [rows] = await db.query(sql, [dateFormat, data_inicio, data_fim, idsArray, data_inicio, data_fim, idsArray, data_inicio, data_fim, idsArray]);
+    const [rows] = await db.query(sql, params);
+    
     const result = formatDataForChart(rows);
     return res.status(200).json(result);
 
@@ -335,17 +429,11 @@ exports.getProductSalesComparison = async (req, res) => {
   }
 };
 
-// Função auxiliar para formatar os dados para o gráfico
 function formatDataForChart(rows) {
     const result = {};
     rows.forEach(row => {
-      if (!result[row.produto_nome]) {
-        result[row.produto_nome] = [];
-      }
-      result[row.produto_nome].push({
-        date: row.data_agrupada,
-        totalVendido: row.valor_calculado
-      });
+      if (!result[row.produto_nome]) { result[row.produto_nome] = []; }
+      result[row.produto_nome].push({ date: row.data_agrupada, valor_calculado: parseFloat(row.valor_calculado) || 0 });
     });
     return result;
 }

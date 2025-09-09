@@ -131,7 +131,17 @@ function CustomerCartPage() {
               <div className="d-none d-lg-block">
                 <table className="table align-middle">
                   <thead><tr><th scope="col" colSpan="2">Produto</th><th scope="col" className="text-center">Preço</th><th scope="col" className="text-center">Quantidade</th><th scope="col" className="text-end">Subtotal</th><th scope="col"></th></tr></thead>
-                  <tbody>{cartItems.map(item => (<tr key={item.produto_id}><td style={{ width: '120px' }}><img src={item.imagem_produto_url ? `http://localhost:3001/uploads/${item.imagem_produto_url}` : 'https://placehold.co/100'} alt={item.nome} className="cart-product-image rounded" /></td><td>{item.nome}{item.elegivel_boleto && <span className="badge bg-info ms-2">Parcelável</span>}</td><td className="text-center">R$ {parseFloat(item.valor).toFixed(2).replace('.', ',')}</td><td className="text-center"><div className="input-group input-group-sm justify-content-center" style={{ width: '110px', margin: 'auto' }}><button className="btn btn-outline-secondary" type="button" onClick={() => updateQuantity(item.produto_id, item.quantidade - 1)}>-</button><span className="form-control text-center">{item.quantidade}</span><button className="btn btn-outline-secondary" type="button" onClick={() => updateQuantity(item.produto_id, item.quantidade + 1)} disabled={item.quantidade >= item.estoque_total}>+</button></div></td><td className="text-end">R$ {(parseFloat(item.valor) * item.quantidade).toFixed(2).replace('.', ',')}</td><td className="text-center"><button className="btn btn-outline-danger btn-sm" title="Remover item" onClick={() => removeFromCart(item.produto_id)}>&times;</button></td></tr>))}</tbody>
+                  <tbody>{cartItems.map(item => (<tr key={item.produto_id}>
+                    <td style={{ width: '120px' }}><img src={item.imagem_produto_url ? `http://localhost:3001/uploads/${item.imagem_produto_url}` : 'https://placehold.co/100'} alt={item.nome} className="cart-product-image rounded" /></td>
+                    <td>
+                      {item.nome}
+                      {item.elegivel_boleto ? <span className="badge bg-info ms-2">Opção Boleto</span> : null}
+                    </td>
+                    <td className="text-center">R$ {parseFloat(item.valor).toFixed(2).replace('.', ',')}</td>
+                    <td className="text-center"><div className="input-group input-group-sm justify-content-center" style={{ width: '110px', margin: 'auto' }}><button className="btn btn-outline-secondary" type="button" onClick={() => updateQuantity(item.produto_id, item.quantidade - 1)}>-</button><span className="form-control text-center">{item.quantidade}</span><button className="btn btn-outline-secondary" type="button" onClick={() => updateQuantity(item.produto_id, item.quantidade + 1)} disabled={item.quantidade >= item.estoque_total}>+</button></div></td>
+                    <td className="text-end">R$ {(parseFloat(item.valor) * item.quantidade).toFixed(2).replace('.', ',')}</td>
+                    <td className="text-center"><button className="btn btn-outline-danger btn-sm" title="Remover item" onClick={() => removeFromCart(item.produto_id)}>&times;</button></td>
+                  </tr>))}</tbody>
                 </table>
               </div>
               <div className="d-lg-none">
