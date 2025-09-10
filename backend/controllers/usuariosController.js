@@ -165,3 +165,74 @@ exports.adminUpdateUsuario = async (req, res) => {
         res.status(500).json({ message: 'Erro no servidor ao atualizar dados.' });
     }
 };
+
+exports.getStatusFinanceiro = async (req, res) => {
+    const { id: usuarioId } = req.params;
+    try {
+        const [fiados] = await db.query("SELECT COUNT(id) as count FROM pedidos WHERE usuario_id = ? AND status = 'Fiado'", [usuarioId]);
+        const [boletos] = await db.query("SELECT COUNT(id) as count FROM pedidos WHERE usuario_id = ? AND status = 'Boleto em Pagamento'", [usuarioId]);
+        res.status(200).json({
+            temFiado: fiados[0].count > 0,
+            temBoleto: boletos[0].count > 0
+        });
+    } catch (error) { res.status(500).json({ message: 'Erro ao buscar status financeiro.' }); }
+};
+
+// ✅ NOVA FUNÇÃO: Busca todos os pedidos fiado de um cliente
+exports.getPedidosFiado = async (req, res) => {
+    const { id: usuarioId } = req.params;
+    try {
+        const [pedidos] = await db.query("SELECT * FROM pedidos WHERE usuario_id = ? AND status = 'Fiado' ORDER BY data_pedido ASC", [usuarioId]);
+        
+        // Para cada pedido fiado, busca seus pagamentos parciais
+        for (const pedido of pedidos) {
+            const [pagamentos] = await db.query(
+                'SELECT * FROM pagamentos_fiado WHERE pedido_id = ?', 
+                [pedido.id]
+            );
+            pedido.pagamentos_fiado = pagamentos; // Anexa os pagamentos ao objeto do pedido
+        }
+        
+        res.status(200).json(pedidos);
+    } catch (error) { res.status(500).json({ message: 'Erro ao buscar pedidos fiado.' }); }
+};
+
+// ✅ NOVA FUNÇÃO: Processa o pagamento em lote (FIFO)
+exports.pagarFiadoTotal = async (req, res) => {
+    const { id: usuarioId } = req.params;
+    let { valor_pago } = req.body;
+    let valorPagoNumerico = parseFloat(String(valor_pago).replace(',', '.'));
+    const connection = await db.getConnection();
+
+    try {
+        await connection.beginTransaction();
+        const [pedidosFiado] = await connection.query("SELECT * FROM pedidos WHERE usuario_id = ? AND status = 'Fiado' ORDER BY data_pedido ASC FOR UPDATE", [usuarioId]);
+        
+        for (const pedido of pedidosFiado) {
+            if (valorPagoNumerico <= 0) break;
+
+            const [pagamentosAnteriores] = await connection.query('SELECT SUM(valor_pago) as total FROM pagamentos_fiado WHERE pedido_id = ?', [pedido.id]);
+            const saldoDevedorPedido = parseFloat(pedido.valor_total) - (parseFloat(pagamentosAnteriores[0].total) || 0);
+
+            const valorAPagarNestePedido = Math.min(valorPagoNumerico, saldoDevedorPedido);
+
+            if (valorAPagarNestePedido > 0) {
+                await connection.query('INSERT INTO pagamentos_fiado (pedido_id, valor_pago, data_pagamento) VALUES (?, ?, NOW())', [pedido.id, valorAPagarNestePedido]);
+                valorPagoNumerico -= valorAPagarNestePedido;
+            }
+
+            const novoTotalPago = (parseFloat(pagamentosAnteriores[0].total) || 0) + valorAPagarNestePedido;
+            if (novoTotalPago >= parseFloat(pedido.valor_total)) {
+                await connection.query("UPDATE pedidos SET status = 'Entregue' WHERE id = ?", [pedido.id]);
+            }
+        }
+        await connection.commit();
+        res.status(200).json({ message: 'Pagamento de fiado registrado com sucesso!' });
+    } catch (error) {
+        await connection.rollback();
+        console.error("Erro ao pagar fiado total:", error);
+        res.status(500).json({ message: `Erro ao registrar pagamento: ${error.message}` });
+    } finally {
+        connection.release();
+    }
+};

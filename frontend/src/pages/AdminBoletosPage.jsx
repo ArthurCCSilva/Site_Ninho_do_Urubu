@@ -1,5 +1,6 @@
 // src/pages/AdminBoletosPage.jsx
 import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom'; // ✅ Importa o useLocation
 import api from '../services/api';
 import Pagination from '../components/Pagination';
 import BoletoDaysModal from '../components/BoletoDaysModal';
@@ -11,6 +12,7 @@ import ptBR from 'date-fns/locale/pt-BR';
 registerLocale('pt-BR', ptBR);
 
 function AdminBoletosPage() {
+    const location = useLocation(); // ✅ Inicializa o hook
     const [activeTab, setActiveTab] = useState('aprovacao'); // Começa na aba de aprovações
     
     const [pedidosAprovacao, setPedidosAprovacao] = useState([]);
@@ -27,6 +29,13 @@ function AdminBoletosPage() {
     const [showDetailsModal, setShowDetailsModal] = useState(false);
     const [selectedOrderId, setSelectedOrderId] = useState(null);
     const [parcelasSelecionadas, setParcelasSelecionadas] = useState({});
+
+    useEffect(() => {
+        // ✅ Se houver um cliente vindo da navegação, define como termo de busca
+        if (location.state && location.state.clienteNome) {
+            setSearchTerm(location.state.clienteNome);
+        }
+    }, [location.state]);
 
     const fetchAprovacoes = async () => {
         setLoading(true);

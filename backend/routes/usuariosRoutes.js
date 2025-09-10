@@ -14,4 +14,8 @@ router.get('/clientes', [verifyToken, isAdmin], usuariosController.getAllCliente
 // O Admin atualizar um cliente específico
 router.put('/admin/:id', [verifyToken, isAdmin], usuariosController.adminUpdateUsuario);
 
+router.get('/:id/status-financeiro', [verifyToken, isAdmin], usuariosController.getStatusFinanceiro);
+router.get('/:id/fiados', [verifyToken, isAdmin], usuariosController.getPedidosFiado);
+router.post('/:id/pagar-fiado-total', [verifyToken, isAdmin], usuariosController.pagarFiadoTotal);
+
 module.exports = router;
