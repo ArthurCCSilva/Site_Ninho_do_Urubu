@@ -56,7 +56,13 @@ function AdminCustomerInfoPage() {
   };
 
   const handleNavigateToBoletos = () => {
-    navigate('/admin/boletos', { state: { clienteNome: selectedCustomer.nome } });
+    // Agora envia o nome do cliente E a aba que deve ser aberta
+    navigate('/admin/boletos', { 
+      state: { 
+        clienteNome: selectedCustomer.nome,
+        activeTab: 'aberto' 
+      } 
+    });
   };
   
   const handlePayFiado = async () => {
