@@ -184,10 +184,14 @@ exports.cancelarPedido = async (req, res) => {
     
     // 1. Busca os itens do pedido que será cancelado
     const [itensDoPedido] = await connection.query('SELECT produto_id, quantidade FROM pedido_itens WHERE pedido_id = ?', [pedidoId]);
+    if (itensDoPedido.length === 0) {
+        // Se não há itens, ainda assim o pedido deve ser cancelado.
+        // Isso pode acontecer se houver um erro no processo de criação.
+        console.warn(`Aviso: Pedido #${pedidoId} sendo cancelado sem itens associados.`);
+    }
 
     // 2. Devolve cada item ao estoque
     for (const item of itensDoPedido) {
-      // ✅ CORREÇÃO AQUI: de 'estoque' para 'estoque_total'
       await connection.query(
         'UPDATE produtos SET estoque_total = estoque_total + ? WHERE id = ?',
         [item.quantidade, item.produto_id]
@@ -195,9 +199,17 @@ exports.cancelarPedido = async (req, res) => {
     }
 
     // 3. Atualiza o status do pedido
-    const [result] = await connection.query("UPDATE pedidos SET status = 'Cancelado', cancelado_por = 'cliente' WHERE id = ? AND usuario_id = ? AND status = 'Processando'", [pedidoId, usuarioId]);
+    // A condição agora aceita os dois status
+    const sql = `
+        UPDATE pedidos 
+        SET status = 'Cancelado', cancelado_por = 'cliente' 
+        WHERE id = ? AND usuario_id = ? 
+        AND status IN ('Processando', 'Aguardando Aprovação Boleto')
+    `;
+    const [result] = await connection.query(sql, [pedidoId, usuarioId]);
+
     if (result.affectedRows === 0) {
-      throw new Error('Pedido não pode ser cancelado.');
+      throw new Error('Este pedido não pode mais ser cancelado pelo cliente.');
     }
     
     await connection.commit();
@@ -205,7 +217,7 @@ exports.cancelarPedido = async (req, res) => {
 
   } catch (error) {
     await connection.rollback();
-    res.status(500).json({ message: 'Erro ao cancelar pedido.', error: error.message });
+    res.status(500).json({ message: `Erro ao cancelar pedido: ${error.message}` });
   } finally {
     connection.release();
   }
@@ -529,5 +541,25 @@ exports.getBoletoPlansForCart = async (req, res) => {
   } catch (error) {
     console.error("Erro ao buscar planos de boleto para o carrinho:", error);
     res.status(500).json({ message: 'Erro ao buscar planos de boleto.' });
+  }
+};
+
+exports.getBoletosAprovadosUsuario = async (req, res) => {
+  const usuarioId = req.user.id;
+  try {
+    // Busca pedidos que são 'Boleto Virtual' e estão em pagamento ou já foram entregues
+    const sql = `
+      SELECT id, data_pedido, valor_total, status 
+      FROM pedidos 
+      WHERE usuario_id = ? 
+      AND forma_pagamento = 'Boleto Virtual'
+      AND status IN ('Boleto em Pagamento', 'Entregue')
+      ORDER BY data_pedido DESC
+    `;
+    const [pedidos] = await db.query(sql, [usuarioId]);
+    res.status(200).json(pedidos);
+  } catch (error) {
+    console.error("Erro ao buscar boletos do usuário:", error);
+    res.status(500).json({ message: 'Erro ao buscar seus boletos.' });
   }
 };

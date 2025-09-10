@@ -16,6 +16,8 @@ router.get('/carnes-em-aberto', ctrl.getCarnesEmAberto);
 // ✅ ROTA QUE FALTAVA: para buscar os boletos que foram negados
 router.get('/negados', ctrl.getBoletosNegados);
 
+router.get('/pagos', ctrl.getBoletosPagos);
+
 router.post('/parcelas/marcar-pagas', ctrl.marcarMultiplasParcelasPagas);
 
 // PATCH /api/boletos/parcela/:id/marcar-paga -> Marca uma parcela específica como paga

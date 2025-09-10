@@ -168,3 +168,38 @@ exports.marcarMultiplasParcelasPagas = async (req, res) => {
         connection.release();
     }
 };
+
+exports.getBoletosPagos = async (req, res) => {
+    try {
+        const { page = 1, limit = 10, search } = req.query;
+        let params = [];
+        let whereClause = "p.forma_pagamento = 'Boleto Virtual' AND p.status = 'Entregue'";
+        if (search) {
+            whereClause += ' AND (u.nome LIKE ? OR u.email LIKE ? OR u.cpf LIKE ?)';
+            const searchTerm = `%${search}%`;
+            params.push(searchTerm, searchTerm, searchTerm);
+        }
+
+        const countSql = `SELECT COUNT(p.id) as total FROM pedidos p JOIN usuarios u ON p.usuario_id = u.id WHERE ${whereClause}`;
+        const [countRows] = await db.query(countSql, params);
+        const totalItems = countRows[0].total;
+        const totalPages = Math.ceil(totalItems / limit);
+
+        const sql = `
+            SELECT p.id, p.data_pedido, p.valor_total, u.nome as cliente_nome
+            FROM pedidos p
+            JOIN usuarios u ON p.usuario_id = u.id
+            WHERE ${whereClause}
+            ORDER BY p.data_pedido DESC
+            LIMIT ? OFFSET ?
+        `;
+        const offset = (page - 1) * limit;
+        const finalParams = [...params, parseInt(limit), parseInt(offset)];
+        const [pedidos] = await db.query(sql, finalParams);
+        
+        res.status(200).json({ pedidos, totalPages, currentPage: parseInt(page) });
+    } catch (error) { 
+        console.error("Erro ao buscar boletos pagos:", error);
+        res.status(500).json({ message: 'Erro ao buscar boletos pagos.' }); 
+    }
+};

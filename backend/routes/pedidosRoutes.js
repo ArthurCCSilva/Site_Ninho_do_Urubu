@@ -12,6 +12,8 @@ router.post('/', [verifyToken], pedidosController.criarPedido);
 // Busca o histórico de pedidos do usuário logado
 router.get('/meus-pedidos', [verifyToken], pedidosController.getPedidosUsuario);
 
+router.get('/meus-boletos', [verifyToken], pedidosController.getBoletosAprovadosUsuario);
+
 // Busca os planos de boleto disponíveis para o carrinho atual
 router.get('/boleto-planos-carrinho', [verifyToken], pedidosController.getBoletoPlansForCart);
 

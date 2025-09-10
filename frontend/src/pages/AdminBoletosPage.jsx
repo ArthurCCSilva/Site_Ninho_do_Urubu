@@ -11,26 +11,30 @@ import ptBR from 'date-fns/locale/pt-BR';
 registerLocale('pt-BR', ptBR);
 
 function AdminBoletosPage() {
-    const [activeTab, setActiveTab] = useState('aprovacao');
+    const [activeTab, setActiveTab] = useState('aprovacao'); // Começa na aba de aprovações
+    
     const [pedidosAprovacao, setPedidosAprovacao] = useState([]);
     const [carnesAbertos, setCarnesAbertos] = useState([]);
     const [pedidosNegados, setPedidosNegados] = useState([]);
+    const [pedidosPagos, setPedidosPagos] = useState([]);
+
     const [loading, setLoading] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(0);
     const [searchTerm, setSearchTerm] = useState('');
+    
     const [showBoletoDaysModal, setShowBoletoDaysModal] = useState(false);
     const [showDetailsModal, setShowDetailsModal] = useState(false);
     const [selectedOrderId, setSelectedOrderId] = useState(null);
     const [parcelasSelecionadas, setParcelasSelecionadas] = useState({});
 
-    // Funções de busca separadas para cada aba
     const fetchAprovacoes = async () => {
         setLoading(true);
         try {
             const response = await api.get('/api/boletos/pendentes-aprovacao');
             setPedidosAprovacao(response.data);
-        } catch (err) { console.error("Erro ao buscar aprovações", err); }
+            setTotalPages(1); // Não há paginação nesta aba
+        } catch (err) { console.error("Erro ao buscar aprovações", err); } 
         finally { setLoading(false); }
     };
 
@@ -42,7 +46,7 @@ function AdminBoletosPage() {
             setCarnesAbertos(response.data.carnes);
             setTotalPages(response.data.totalPages);
             setCurrentPage(response.data.currentPage);
-        } catch (err) { console.error("Erro ao buscar carnês", err); }
+        } catch (err) { console.error("Erro ao buscar carnês", err); } 
         finally { setLoading(false); }
     };
 
@@ -51,41 +55,48 @@ function AdminBoletosPage() {
         try {
             const response = await api.get('/api/boletos/negados');
             setPedidosNegados(response.data);
+            setTotalPages(1); // Não há paginação nesta aba
         } catch (err) { console.error("Erro ao buscar boletos negados", err); }
         finally { setLoading(false); }
     };
     
-    // useEffect principal que controla qual dado buscar
+    const fetchPagos = async () => {
+        setLoading(true);
+        try {
+            const params = new URLSearchParams({ page: currentPage, limit: 10, search: searchTerm });
+            const response = await api.get(`/api/boletos/pagos?${params.toString()}`);
+            setPedidosPagos(response.data.pedidos);
+            setTotalPages(response.data.totalPages);
+            setCurrentPage(response.data.currentPage);
+        } catch (err) { console.error("Erro ao buscar boletos pagos", err); }
+        finally { setLoading(false); }
+    }
+
     useEffect(() => {
         const fetchDataForCurrentTab = () => {
-            if (activeTab === 'aprovacao') {
-                fetchAprovacoes();
-            } else if (activeTab === 'aberto') {
-                fetchCarnes();
-            } else if (activeTab === 'negado') {
-                fetchNegados();
-            }
+            if (activeTab === 'aprovacao') fetchAprovacoes();
+            else if (activeTab === 'aberto') fetchCarnes();
+            else if (activeTab === 'negado') fetchNegados();
+            else if (activeTab === 'pago') fetchPagos();
         };
-
         const debounceFetch = setTimeout(() => {
             fetchDataForCurrentTab();
         }, 300);
-
         return () => clearTimeout(debounceFetch);
     }, [activeTab, currentPage, searchTerm]);
 
-    // Reseta a página para 1 quando a aba ou o termo de busca mudam
     useEffect(() => {
-        setCurrentPage(1);
+        if (currentPage !== 1) {
+            setCurrentPage(1);
+        }
     }, [activeTab, searchTerm]);
-
-    // Handlers para as ações
+    
     const handleAprovar = async (pedidoId) => {
         if (window.confirm("Aprovar este pedido de boleto? O status mudará para 'Boleto em Pagamento'.")) {
             try {
                 await api.patch(`/api/pedidos/${pedidoId}/status`, { status: 'Boleto em Pagamento' });
                 alert("Pedido aprovado!");
-                fetchAprovacoes(); // Recarrega a lista da aba atual
+                fetchAprovacoes();
             } catch (err) { alert(err.response?.data?.message || "Erro ao aprovar pedido."); }
         }
     };
@@ -95,7 +106,7 @@ function AdminBoletosPage() {
             try {
                 await api.patch(`/api/pedidos/${pedidoId}/status`, { status: 'Boleto Negado' });
                 alert("Pedido de boleto reprovado.");
-                fetchAprovacoes(); // Recarrega a lista da aba atual
+                fetchAprovacoes();
             } catch (err) { alert(err.response?.data?.message || "Erro ao reprovar pedido."); }
         }
     };
@@ -118,7 +129,7 @@ function AdminBoletosPage() {
                 await api.post('/api/boletos/parcelas/marcar-pagas', { parcelaIds: idsParaPagar });
                 alert("Parcelas pagas com sucesso!");
                 setParcelasSelecionadas({ ...parcelasSelecionadas, [pedidoId]: [] });
-                fetchCarnes(); // Recarrega a lista da aba atual
+                fetchCarnes();
             } catch (err) {
                 alert(err.response?.data?.message || "Erro ao pagar parcelas.");
             }
@@ -133,7 +144,7 @@ function AdminBoletosPage() {
     const handleDateChange = async (parcelaId, novaData) => {
         try {
             await api.patch(`/api/boletos/parcela/${parcelaId}/atualizar-vencimento`, { novaData });
-            fetchCarnes(); // Recarrega a lista da aba atual
+            fetchCarnes();
         } catch (err) {
             alert("Erro ao atualizar data de vencimento.");
         }
@@ -145,7 +156,8 @@ function AdminBoletosPage() {
         if (activeTab === 'aprovacao') fetchAprovacoes();
         else if (activeTab === 'aberto') fetchCarnes();
         else if (activeTab === 'negado') fetchNegados();
-    }
+        else if (activeTab === 'pago') fetchPagos();
+    };
 
     return (
         <div>
@@ -160,6 +172,7 @@ function AdminBoletosPage() {
                 <li className="nav-item"><a className={`nav-link ${activeTab === 'aberto' ? 'active' : ''}`} href="#" onClick={(e) => { e.preventDefault(); setActiveTab('aberto'); }}>Carnês em Aberto</a></li>
                 <li className="nav-item"><a className={`nav-link ${activeTab === 'aprovacao' ? 'active' : ''}`} href="#" onClick={(e) => { e.preventDefault(); setActiveTab('aprovacao'); }}>Aguardando Aprovação</a></li>
                 <li className="nav-item"><a className={`nav-link ${activeTab === 'negado' ? 'active' : ''}`} href="#" onClick={(e) => { e.preventDefault(); setActiveTab('negado'); }}>Boletos Negados</a></li>
+                <li className="nav-item"><a className={`nav-link ${activeTab === 'pago' ? 'active' : ''}`} href="#" onClick={(e) => { e.preventDefault(); setActiveTab('pago'); }}>Boletos Pagos</a></li>
             </ul>
 
             <div className="tab-content">
@@ -249,6 +262,27 @@ function AdminBoletosPage() {
                                         </li>
                                     ))}</ul>
                                 ) : <p className="text-muted">Nenhum boleto negado encontrado.</p>}
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'pago' && (
+                     <div className="card">
+                        <div className="card-header"><h5>Histórico de Boletos Pagos</h5></div>
+                        <div className="card-body">
+                             <input type="text" className="form-control mb-3" placeholder="Pesquisar por cliente..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                            {loading ? <div className="text-center"><div className="spinner-border spinner-border-sm" /></div> :
+                                pedidosPagos.length > 0 ? (
+                                    <ul className="list-group">{pedidosPagos.map(p => (
+                                        <li key={p.id} className="list-group-item d-flex justify-content-between align-items-center flex-wrap">
+                                            <div><strong>Pedido #{p.id}</strong> - {p.cliente_nome} ({formatCurrency(p.valor_total)})</div>
+                                            <button className="btn btn-secondary btn-sm" onClick={() => handleShowDetails(p.id)}>Ver Detalhes</button>
+                                        </li>
+                                    ))}</ul>
+                                ) : <p className="text-muted">Nenhum boleto pago encontrado.</p>}
+                        </div>
+                         <div className="card-footer d-flex justify-content-center">
+                            <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
                         </div>
                     </div>
                 )}

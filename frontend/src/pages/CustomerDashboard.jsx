@@ -9,6 +9,7 @@ import EditProfileModal from '../components/EditProfileModal';
 function CustomerDashboard() {
   const { user, logout, isLoading: isAuthLoading } = useAuth();
   const [pedidos, setPedidos] = useState([]);
+  const [pedidosBoleto, setPedidosBoleto] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('andamento');
@@ -17,24 +18,29 @@ function CustomerDashboard() {
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
 
   useEffect(() => {
-    const fetchPedidos = async () => {
-      try {
-        setLoading(true);
-        const response = await api.get('/api/pedidos/meus-pedidos');
-        setPedidos(response.data);
-      } catch (err) {
-        setError('Não foi possível carregar seus pedidos.');
-        console.error(err);
-      } finally {
+    const fetchAllData = async () => {
+      if (!isAuthLoading && user) {
+        try {
+          setLoading(true);
+          const [pedidosRes, boletosRes] = await Promise.all([
+            api.get('/api/pedidos/meus-pedidos'),
+            api.get('/api/pedidos/meus-boletos')
+          ]);
+          setPedidos(pedidosRes.data);
+          setPedidosBoleto(boletosRes.data);
+        } catch (err) {
+          setError('Não foi possível carregar seus dados.');
+          console.error(err);
+        } finally {
+          setLoading(false);
+        }
+      } else if (!isAuthLoading && !user) {
         setLoading(false);
+        setPedidos([]);
+        setPedidosBoleto([]);
       }
     };
-    if (!isAuthLoading && user) {
-      fetchPedidos();
-    } else if (!isAuthLoading && !user) {
-      setLoading(false);
-      setPedidos([]);
-    }
+    fetchAllData();
   }, [user, isAuthLoading]);
 
   const handleCancelarPedido = async (pedidoId) => {
@@ -42,8 +48,13 @@ function CustomerDashboard() {
       try {
         await api.patch(`/api/pedidos/${pedidoId}/cancelar`);
         alert('Pedido cancelado com sucesso.');
-        const response = await api.get('/api/pedidos/meus-pedidos');
-        setPedidos(response.data);
+        // Re-busca todos os dados para atualizar todas as listas
+        const [pedidosRes, boletosRes] = await Promise.all([
+            api.get('/api/pedidos/meus-pedidos'),
+            api.get('/api/pedidos/meus-boletos')
+        ]);
+        setPedidos(pedidosRes.data);
+        setPedidosBoleto(boletosRes.data);
       } catch (err) {
         alert(err.response?.data?.message || 'Não foi possível cancelar o pedido.');
       }
@@ -74,11 +85,10 @@ function CustomerDashboard() {
     ? `http://localhost:3001/uploads/${user.imagem_perfil_url}`
     : 'https://placehold.co/150';
 
-  // ✅ 1. LÓGICA DE FILTRAGEM ATUALIZADA
   const pedidosEmAndamento = pedidos.filter(p => p.status === 'Processando' || p.status === 'Enviado' || p.status === 'Aguardando Aprovação Boleto' || p.status === 'Boleto em Pagamento');
   const pedidosConcluidos = pedidos.filter(p => p.status === 'Entregue' || p.status === 'Cancelado' || p.status === 'Boleto Negado');
-  const pedidosFiado = pedidos.filter(p => p.status === 'Fiado'); // Nova lista para fiados
-
+  const pedidosFiado = pedidos.filter(p => p.status === 'Fiado');
+  
   if (isAuthLoading || loading) {
     return (
       <div className="text-center my-5">
@@ -102,7 +112,7 @@ function CustomerDashboard() {
             <div className="card-body">
               <div className="row align-items-center">
                 <div className="col-md-3 text-center">
-                  <img src={profileImageUrl} alt="Foto de Perfil" className="img-fluid rounded-circle" style={{ maxWidth: '100px' }}/>
+                  <img src={profileImageUrl} alt="Foto de Perfil" className="img-fluid rounded-circle" style={{ maxWidth: '100px', height: '100px', objectFit: 'cover' }}/>
                 </div>
                 <div className="col-md-9">
                   <h5 className="card-title">{user?.nome}</h5>
@@ -137,7 +147,6 @@ function CustomerDashboard() {
                 Histórico de Compras ({pedidosConcluidos.length})
               </button>
             </li>
-            {/* ✅ 2. NOVA ABA DE FIADO (só aparece se houver pedidos fiado) */}
             {pedidosFiado.length > 0 && (
               <li className="nav-item">
                 <button className={`nav-link ${activeTab === 'fiado' ? 'active' : ''}`} onClick={() => setActiveTab('fiado')}>
@@ -169,7 +178,6 @@ function CustomerDashboard() {
               />
             </div>
           )}
-          {/* ✅ 3. CONTEÚDO DA NOVA ABA DE FIADO */}
           {activeTab === 'fiado' && (
             <div>
               <h4 className="card-title">Suas Compras em Aberto (Fiado)</h4>
@@ -182,6 +190,39 @@ function CustomerDashboard() {
           )}
         </div>
       </div>
+
+      {pedidosBoleto.length > 0 && (
+        <div className="card mt-4">
+          <div className="card-header">
+            <h4>Meus Boletos (Carnês)</h4>
+          </div>
+          <div className="card-body">
+            <p className="card-subtitle mb-3 text-muted">Acompanhe aqui o pagamento dos seus parcelamentos.</p>
+            <div className="list-group">
+              {pedidosBoleto.map(pedido => (
+                <div key={pedido.id} className="list-group-item list-group-item-action">
+                  <div className="d-flex w-100 justify-content-between">
+                    <h5 className="mb-1">Pedido #{pedido.id}</h5>
+                    <small>{new Date(pedido.data_pedido).toLocaleDateString('pt-BR')}</small>
+                  </div>
+                  <p className="mb-1">
+                    <strong>Status:</strong> 
+                    <span className={`badge ${pedido.status === 'Entregue' ? 'bg-success' : 'bg-primary'}`}>{pedido.status}</span>
+                  </p>
+                  <p className="mb-1">
+                    <strong>Valor Total:</strong> {parseFloat(pedido.valor_total).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </p>
+                  <div className="mt-2">
+                    <button className="btn btn-info btn-sm" onClick={() => handleShowDetails(pedido.id)}>
+                      Ver Carnê
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
       
       <CustomerOrderDetailsModal 
         show={showDetailsModal}
