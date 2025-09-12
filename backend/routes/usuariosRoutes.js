@@ -5,6 +5,8 @@ const usuariosController = require('../controllers/usuariosController');
 const { verifyToken, isAdmin } = require('../middleware/authMiddleware');
 const upload = require('../config/multerConfig');
 
+router.get('/minhas-comandas', [verifyToken], usuariosController.getMinhasComandas);
+
 // Rota para o usuário logado atualizar seu próprio perfil
 router.put('/perfil', [verifyToken, upload.single('imagem_perfil')], usuariosController.updateProfile);
 

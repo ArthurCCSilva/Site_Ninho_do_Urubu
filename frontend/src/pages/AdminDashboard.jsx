@@ -285,6 +285,7 @@ function AdminDashboard() {
                     <div className="w-50 pe-2">
                         <Link to="/admin/pedidos" className="btn btn-primary mb-2 w-100">Gerenciar Pedidos</Link>
                         <Link to="/admin/venda-fisica" className="btn btn-success mb-2 w-100">Registrar Venda Física</Link>
+                        <Link to="/admin/comandas" className="btn btn-info mb-2 w-100">Gerenciar Comandas</Link>
                         <Link to="/admin/financeiro" className="btn btn-warning mb-2 w-100">Painel Financeiro</Link>
                         <Link to="/admin/boletos" className="btn btn-dark w-100">Gerenciar Boletos</Link>
                     </div>

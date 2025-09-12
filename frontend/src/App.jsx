@@ -19,6 +19,8 @@ import PhysicalSalePage from './pages/PhysicalSalePage';
 import FinancialDashboardPage from './pages/FinancialDashboardPage';
 import AdminCustomerInfoPage from './pages/AdminCustomerInfoPage';
 import AdminBoletosPage from './pages/AdminBoletosPage';
+import AdminComandaPage from './pages/AdminComandaPage';
+import MinhasComandasPage from './pages/MinhasComandasPage';
 
 function App() {
   return (
@@ -31,65 +33,23 @@ function App() {
               {/* --- Rotas Públicas --- */}
               <Route path="/" element={<HomePage />} />
               <Route path="/login" element={<LoginPage />} />
-
               <Route path="/produtos/:id" element={<ProductDetailPage />} />
               
               {/* --- Rotas Protegidas para Admin --- */}
-              <Route 
-                path="/admin/dashboard" 
-                element={
-                  <ProtectedRoute role="admin">
-                    <AdminDashboard />
-                  </ProtectedRoute>
-                } 
-              />
-              {/* ✅ ROTA DE PEDIDOS DO ADMIN ADICIONADA */}
-              <Route 
-                path="/admin/pedidos" 
-                element={
-                  <ProtectedRoute role="admin">
-                    <AdminOrdersPage />
-                  </ProtectedRoute>
-                } 
-              />
-
-              <Route 
-                path="/admin/venda-fisica" 
-                element={<ProtectedRoute role="admin"><PhysicalSalePage /></ProtectedRoute>} 
-              />
-
-              {/* ✅ 2. ADICIONE A NOVA ROTA FINANCEIRA AQUI */}
-              <Route 
-                path="/admin/financeiro" 
-                element={<ProtectedRoute role="admin"><FinancialDashboardPage /></ProtectedRoute>} 
-              />
-
-              {/* --- Rota Protegida para Usuários Logados (Qualquer Role) --- */}
-              {/* ✅ ROTA DO CARRINHO ADICIONADA */}
-              <Route 
-                path="/carrinho" 
-                element={
-                  <ProtectedRoute> {/* Sem a prop 'role', apenas verifica se o usuário está logado */}
-                    <CustomerCartPage />
-                  </ProtectedRoute>
-                } 
-              />
+              <Route path="/admin/dashboard" element={<ProtectedRoute role="admin"><AdminDashboard /></ProtectedRoute>} />
+              <Route path="/admin/pedidos" element={<ProtectedRoute role="admin"><AdminOrdersPage /></ProtectedRoute>} />
+              <Route path="/admin/venda-fisica" element={<ProtectedRoute role="admin"><PhysicalSalePage /></ProtectedRoute>} />
+              <Route path="/admin/financeiro" element={<ProtectedRoute role="admin"><FinancialDashboardPage /></ProtectedRoute>} />
+              <Route path="/admin/clientes" element={<ProtectedRoute role="admin"><AdminCustomerInfoPage /></ProtectedRoute>} />
+              <Route path="/admin/boletos" element={<ProtectedRoute role="admin"><AdminBoletosPage /></ProtectedRoute>} />
               
-              {/* ✅ NOVA ROTA PARA O PAINEL DO CLIENTE */}
-              <Route
-                path="/meus-pedidos"
-                element={<ProtectedRoute><CustomerDashboard /></ProtectedRoute>}
-              />
-
-              <Route
-                path="/admin/clientes"
-                element={<ProtectedRoute role="admin"><AdminCustomerInfoPage /></ProtectedRoute>}
-              />
-
-              <Route
-                path="/admin/boletos"
-                element={<ProtectedRoute role="admin"><AdminBoletosPage /></ProtectedRoute>} />
+              {/* ✅ ROTA QUE FALTAVA ADICIONADA AQUI */}
+              <Route path="/admin/comandas" element={<ProtectedRoute role="admin"><AdminComandaPage /></ProtectedRoute>} />
               
+              {/* --- Rotas Protegidas para Clientes --- */}
+              <Route path="/carrinho" element={<ProtectedRoute><CustomerCartPage /></ProtectedRoute>} />
+              <Route path="/meus-pedidos" element={<ProtectedRoute><CustomerDashboard /></ProtectedRoute>} />
+              <Route path="/minhas-comandas" element={<ProtectedRoute><MinhasComandasPage /></ProtectedRoute>} />
             </Routes>
           </main>
         </CartProvider>

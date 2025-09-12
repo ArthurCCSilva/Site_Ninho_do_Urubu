@@ -5,11 +5,13 @@ import api from '../services/api';
 import OrderList from '../components/OrderList';
 import CustomerOrderDetailsModal from '../components/CustomerOrderDetailsModal';
 import EditProfileModal from '../components/EditProfileModal';
+import { Link } from 'react-router-dom'; // ✅ 1. Garante que o Link está importado
 
 function CustomerDashboard() {
   const { user, logout, isLoading: isAuthLoading } = useAuth();
   const [pedidos, setPedidos] = useState([]);
   const [pedidosBoleto, setPedidosBoleto] = useState([]);
+  const [comandasAbertas, setComandasAbertas] = useState([]); // ✅ 2. Novo estado para comandas
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('andamento');
@@ -22,12 +24,15 @@ function CustomerDashboard() {
       if (!isAuthLoading && user) {
         try {
           setLoading(true);
-          const [pedidosRes, boletosRes] = await Promise.all([
+          // ✅ 3. Busca todos os dados do cliente em paralelo
+          const [pedidosRes, boletosRes, comandasRes] = await Promise.all([
             api.get('/api/pedidos/meus-pedidos'),
-            api.get('/api/pedidos/meus-boletos')
+            api.get('/api/pedidos/meus-boletos'),
+            api.get('/api/usuarios/minhas-comandas')
           ]);
           setPedidos(pedidosRes.data);
           setPedidosBoleto(boletosRes.data);
+          setComandasAbertas(comandasRes.data);
         } catch (err) {
           setError('Não foi possível carregar seus dados.');
           console.error(err);
@@ -38,6 +43,7 @@ function CustomerDashboard() {
         setLoading(false);
         setPedidos([]);
         setPedidosBoleto([]);
+        setComandasAbertas([]);
       }
     };
     fetchAllData();
@@ -48,31 +54,17 @@ function CustomerDashboard() {
       try {
         await api.patch(`/api/pedidos/${pedidoId}/cancelar`);
         alert('Pedido cancelado com sucesso.');
-        // Re-busca todos os dados para atualizar todas as listas
-        const [pedidosRes, boletosRes] = await Promise.all([
+        const [pedidosRes, boletosRes, comandasRes] = await Promise.all([
             api.get('/api/pedidos/meus-pedidos'),
-            api.get('/api/pedidos/meus-boletos')
+            api.get('/api/pedidos/meus-boletos'),
+            api.get('/api/usuarios/minhas-comandas')
         ]);
         setPedidos(pedidosRes.data);
         setPedidosBoleto(boletosRes.data);
+        setComandasAbertas(comandasRes.data);
       } catch (err) {
         alert(err.response?.data?.message || 'Não foi possível cancelar o pedido.');
       }
-    }
-  };
-
-  const handleProfileImageChange = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-    const data = new FormData();
-    data.append('imagem_perfil', file);
-    try {
-      await api.put(`/api/auth/${user.id}/imagem`, data);
-      alert('Imagem de perfil atualizada! Por favor, faça login novamente para ver a alteração.');
-      logout();
-    } catch (error) {
-      alert('Erro ao atualizar a imagem.');
-      console.error(error);
     }
   };
 
@@ -124,11 +116,18 @@ function CustomerDashboard() {
         </div>
         <div className="col-lg-5 mb-4">
           <div className="card h-100">
-            <div className="card-header"><h4>Configurações</h4></div>
+            {/* ✅ 4. TÍTULO DO CARD ATUALIZADO */}
+            <div className="card-header"><h4>Informações e Ações</h4></div>
             <div className="card-body d-flex flex-column justify-content-center align-items-start">
-              <button className="btn btn-secondary" onClick={() => setShowEditProfileModal(true)}>
+              <button className="btn btn-secondary mb-3" onClick={() => setShowEditProfileModal(true)}>
                 Editar Perfil e Senha
               </button>
+              {/* ✅ 5. BOTÃO COMANDA (só aparece se tiver comanda) */}
+              {comandasAbertas.length > 0 && (
+                <Link to="/minhas-comandas" className="btn btn-info">
+                  Comandas em Aberto <span className="badge bg-danger">{comandasAbertas.length}</span>
+                </Link>
+              )}
             </div>
           </div>
         </div>

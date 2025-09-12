@@ -236,3 +236,36 @@ exports.pagarFiadoTotal = async (req, res) => {
         connection.release();
     }
 };
+
+exports.getMinhasComandas = async (req, res) => {
+    const usuarioId = req.user.id;
+    try {
+        const sql = `
+            SELECT c.id, c.data_criacao, COUNT(ci.id) as total_itens, 
+                   SUM(ci.quantidade * ci.preco_unitario) as valor_total
+            FROM comandas c
+            LEFT JOIN comanda_itens ci ON c.id = ci.comanda_id
+            WHERE c.usuario_id = ? AND c.status = 'aberta'
+            GROUP BY c.id
+            ORDER BY c.data_criacao DESC
+        `;
+        const [comandas] = await db.query(sql, [usuarioId]);
+
+        // Para cada comanda, busca os seus itens
+        for (const comanda of comandas) {
+            const [itens] = await db.query(
+                `SELECT ci.quantidade, ci.preco_unitario, p.nome as produto_nome, p.imagem_produto_url 
+                 FROM comanda_itens ci 
+                 JOIN produtos p ON ci.produto_id = p.id 
+                 WHERE ci.comanda_id = ?`, 
+                [comanda.id]
+            );
+            comanda.itens = itens;
+        }
+
+        res.status(200).json(comandas);
+    } catch (error) {
+        console.error("Erro ao buscar comandas do usuário:", error);
+        res.status(500).json({ message: 'Erro ao buscar suas comandas.' });
+    }
+};
