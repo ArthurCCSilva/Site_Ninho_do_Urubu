@@ -77,7 +77,7 @@ function CustomerDashboard() {
     ? `http://localhost:3001/uploads/${user.imagem_perfil_url}`
     : 'https://placehold.co/150';
 
-  const pedidosEmAndamento = pedidos.filter(p => p.status === 'Processando' || p.status === 'Enviado' || p.status === 'Aguardando Aprovação Boleto' || p.status === 'Boleto em Pagamento');
+  const pedidosEmAndamento = pedidos.filter(p => p.status === 'Processando' || p.status === 'Enviado' || p.status === 'Aguardando Aprovação Boleto');
   const pedidosConcluidos = pedidos.filter(p => p.status === 'Entregue' || p.status === 'Cancelado' || p.status === 'Boleto Negado');
   const pedidosFiado = pedidos.filter(p => p.status === 'Fiado');
   
