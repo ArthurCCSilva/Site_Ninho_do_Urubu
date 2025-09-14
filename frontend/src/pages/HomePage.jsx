@@ -10,13 +10,14 @@ import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation } from 'swiper/modules';
 import 'swiper/css';
 import 'swiper/css/navigation';
+import { useFeatureFlags } from '../context/FeatureFlagContext';
 
 function HomePage() {
   const [products, setProducts] = useState([]);
   const [featuredProducts, setFeaturedProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
   // Estados para os filtros
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
@@ -48,9 +49,9 @@ function HomePage() {
         if (filterCategory) params.append('category', filterCategory.value);
         // Se sortOrder for uma string (dos botões), usa diretamente
         if (sortOrder) params.append('sort', sortOrder);
-        
+
         const response = await api.get(`/api/produtos?${params.toString()}`);
-        
+
         setProducts(response.data.produtos || []);
         setTotalPages(response.data.totalPages);
         setError(null);
@@ -63,7 +64,7 @@ function HomePage() {
     };
     fetchProducts();
   }, [currentPage, debouncedSearchTerm, filterCategory, sortOrder, limit]);
-  
+
   // useEffect para buscar categorias e destaques (apenas uma vez)
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -89,34 +90,40 @@ function HomePage() {
       setCurrentPage(1);
     }
   };
+  const { isEnabled } = useFeatureFlags();
 
   if (error) return <div className="alert alert-danger">{error}</div>;
 
   return (
     <div>
-      {featuredProducts.length > 0 && (
-        <div className="mb-5">
-          <h2 className="homepage-title">Produtos em Destaque</h2>
-          <div className="product-carousel">
-            <Swiper
-              modules={[Navigation]}
-              navigation
-              spaceBetween={20}
-              autoHeight={false}
-              breakpoints={{
-                0: { slidesPerView: 1 }, 576: { slidesPerView: 2 },
-                992: { slidesPerView: 4 }, 1200: { slidesPerView: 6 },
-              }}
-            >
-              {featuredProducts.map(product => (
-                <SwiperSlide key={product.id} className="h-100">
-                  <ProductCard product={product} />
-                </SwiperSlide>
-              ))}
-            </Swiper>
-          </div>
-          <hr className="my-5" />
-        </div>
+      {isEnabled('produtos_destaque') && (
+ 
+        // Condição interna que você já tinha, para só mostrar se houver produtos
+        featuredProducts.length > 0 && (
+          <section className="mb-5">
+            <h2 className="homepage-title">Produtos em Destaque</h2>
+            <div className="product-carousel">
+              <Swiper
+                modules={[Navigation]}
+                navigation
+                spaceBetween={20}
+                autoHeight={false}
+                breakpoints={{
+                  0: { slidesPerView: 1 }, 576: { slidesPerView: 2 },
+                  992: { slidesPerView: 4 }, 1200: { slidesPerView: 6 },
+                }}
+              >
+                {featuredProducts.map(product => (
+                  <SwiperSlide key={product.id} className="h-100">
+                    <ProductCard product={product} />
+                  </SwiperSlide>
+                ))}
+              </Swiper>
+            </div>
+            <hr className="my-5" />
+          </section>
+        )
+
       )}
 
       <h1 className="homepage-title">Nossos Produtos</h1>
@@ -150,7 +157,7 @@ function HomePage() {
           </div>
         </div>
       </div>
-      
+
       {loading ? (
         <div className="text-center my-5"><div className="spinner-border" /></div>
       ) : (

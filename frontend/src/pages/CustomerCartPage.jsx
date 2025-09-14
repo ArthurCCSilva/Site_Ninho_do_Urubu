@@ -5,8 +5,10 @@ import { useState, useEffect, useMemo } from 'react';
 import api from '../services/api';
 import WarningModal from '../components/WarningModal';
 import './CustomerCartPage.css';
+import { useFeatureFlags } from '../context/FeatureFlagContext';
 
 function CustomerCartPage() {
+  const { isEnabled } = useFeatureFlags();
   const { cartItems, removeFromCart, checkout, updateQuantity } = useCart();
   const navigate = useNavigate();
   
@@ -135,7 +137,7 @@ function CustomerCartPage() {
                     <td style={{ width: '120px' }}><img src={item.imagem_produto_url ? `http://localhost:3001/uploads/${item.imagem_produto_url}` : 'https://placehold.co/100'} alt={item.nome} className="cart-product-image rounded" /></td>
                     <td>
                       {item.nome}
-                      {item.elegivel_boleto ? <span className="badge bg-info ms-2">Opção Boleto</span> : null}
+                      {item.elegivel_boleto && isEnabled('sistema_boleto') ? ( <span className="badge bg-info ms-2">Opção Boleto</span> ) : null}
                     </td>
                     <td className="text-center">R$ {parseFloat(item.valor).toFixed(2).replace('.', ',')}</td>
                     <td className="text-center"><div className="input-group input-group-sm justify-content-center" style={{ width: '110px', margin: 'auto' }}><button className="btn btn-outline-secondary" type="button" onClick={() => updateQuantity(item.produto_id, item.quantidade - 1)}>-</button><span className="form-control text-center">{item.quantidade}</span><button className="btn btn-outline-secondary" type="button" onClick={() => updateQuantity(item.produto_id, item.quantidade + 1)} disabled={item.quantidade >= item.estoque_total}>+</button></div></td>
@@ -160,7 +162,7 @@ function CustomerCartPage() {
                 <label htmlFor="forma-pagamento" className="form-label fw-bold">Forma de Pagamento</label>
                 <select id="forma-pagamento" className="form-select" value={formaPagamento} onChange={(e) => setFormaPagamento(e.target.value)}>
                   <option value="Cartão de Crédito">Cartão de Crédito</option><option value="Cartão de Débito">Cartão de Débito</option><option value="PIX">PIX</option><option value="Dinheiro">Dinheiro</option>
-                  {boletoInfo.elegivel && (<option value="Boleto Virtual">Boleto Virtual</option>)}
+                  {boletoInfo.elegivel && isEnabled('sistema_boleto') && (<option value="Boleto Virtual">Boleto Virtual</option>)}
                 </select>
               </div>
               {formaPagamento === 'Boleto Virtual' && boletoInfo.elegivel && (

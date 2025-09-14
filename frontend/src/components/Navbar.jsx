@@ -4,7 +4,8 @@ import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 
-function AppNavbar() {
+// O nome do componente deve ser consistente, vamos usar Navbar
+function Navbar() {
   const { user, logout } = useAuth();
   const { cartItems } = useCart();
   const [isNavExpanded, setIsNavExpanded] = useState(false);
@@ -28,71 +29,125 @@ function AppNavbar() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [navRef, togglerRef]);
+  
+  const handleNavLinkClick = () => {
+    setIsNavExpanded(false);
+  };
+
+  useEffect(() => {
+    if (isNavExpanded) {
+      document.body.classList.add('nav-open');
+    } else {
+      document.body.classList.remove('nav-open');
+    }
+  }, [isNavExpanded]);
+
+  // ✅ LÓGICA DE VERIFICAÇÃO DE ROLE CORRIGIDA
+  // Usamos 'user.role', que agora é uma string simples ('admin', 'dev', etc.)
+  const isAdmin = user?.role === 'admin';
+  const isDev = user?.role === 'dev';
+  const isFuncionario = user?.role === 'funcionario';
+  const isClient = user && !isAdmin && !isDev && !isFuncionario;
 
   return (
-    <nav className="navbar navbar-expand-lg navbar-dark bg-dark">
+    <nav className="navbar navbar-expand-lg navbar-dark bg-dark"> 
       <div className="container">
         <Link className="navbar-brand" to="/">Ninho do Urubu Store</Link>
-        <button ref={togglerRef} className="navbar-toggler" type="button" aria-expanded={isNavExpanded} aria-label="Toggle navigation" onClick={() => setIsNavExpanded(!isNavExpanded)}>
+        <button 
+          ref={togglerRef} 
+          className="navbar-toggler" 
+          type="button" 
+          aria-expanded={isNavExpanded} 
+          aria-label="Toggle navigation" 
+          onClick={() => setIsNavExpanded(!isNavExpanded)}
+        >
           <span className={`toggler-icon ${isNavExpanded ? 'close-icon' : 'hamburger-icon'}`}></span>
         </button>
-        <div ref={navRef} className={`collapse navbar-collapse ${isNavExpanded ? 'show' : ''}`} id="navbarNav">
+
+        {isNavExpanded && <div className="nav-overlay" onClick={() => setIsNavExpanded(false)}></div>}
+
+        <div 
+          ref={navRef} 
+          className={`collapse navbar-collapse ${isNavExpanded ? 'show nav-full-screen' : ''}`} 
+          id="navbarNav"
+        >
           <ul className="navbar-nav ms-auto align-items-center">
-            <li className="nav-item">
-              <NavLink className="nav-link" to="/" onClick={() => setIsNavExpanded(false)}>Home</NavLink>
-            </li>
-            
-            {user ? (
-              // SE o usuário estiver logado...
+            {/* Links de Home e Carrinho não aparecem para Dev */}
+            {!isDev && (
               <>
                 <li className="nav-item">
-                  <NavLink className="nav-link position-relative" to="/carrinho" onClick={() => setIsNavExpanded(false)}>
-                    Carrinho
-                    {cartItems.length > 0 && (
-                      <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
-                        {cartItems.length}
-                      </span>
-                    )}
-                  </NavLink>
+                  <NavLink className="nav-link" to="/" onClick={handleNavLinkClick}>Home</NavLink>
                 </li>
-
-                {/* --- ✅ ATUALIZAÇÃO PARA O MENU DROPDOWN UNIFICADO --- */}
-                <li className="nav-item dropdown">
-                  <a className="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                    Olá, {user?.nome?.split(' ')[0] || 'Usuário'}
-                  </a>
-                  <ul className="dropdown-menu dropdown-menu-dark dropdown-menu-end">
-                    
-                    {/* Link de Dashboard só aparece se for admin */}
-                    {user.role === 'admin' && (
-                      <li>
-                        <Link className="dropdown-item" to="/admin/dashboard" onClick={() => setIsNavExpanded(false)}>
-                          Dashboard
-                        </Link>
-                      </li>
-                    )}
-
-                    {/* Link do Painel do Cliente aparece para todos os usuários logados */}
+                {/* Carrinho só para clientes logados */}
+                {isClient && (
+                  <li className="nav-item">
+                    <NavLink className="nav-link position-relative" to="/carrinho" onClick={handleNavLinkClick}>
+                      Carrinho
+                      {cartItems.length > 0 && (
+                        <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                          {cartItems.length}
+                        </span>
+                      )}
+                    </NavLink>
+                  </li>
+                )}
+              </>
+            )}
+            
+            {user ? (
+              // Se o usuário estiver logado...
+              <li className="nav-item dropdown">
+                <a className="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                  {/* ✅ CORREÇÃO DO NOME: Usamos 'nomeCompleto' */}
+                  Olá, {user?.nomeCompleto?.split(' ')[0] || 'Usuário'}
+                </a>
+                <ul className="dropdown-menu dropdown-menu-dark dropdown-menu-end">
+                  
+                  {isDev && (
                     <li>
-                      <Link className="dropdown-item" to="/meus-pedidos" onClick={() => setIsNavExpanded(false)}>
+                      <Link className="dropdown-item" to="/dev/dashboard" onClick={handleNavLinkClick}>
+                        Painel do Desenvolvedor
+                      </Link>
+                    </li>
+                  )}
+
+                  {isAdmin && (
+                    <li>
+                      <Link className="dropdown-item" to="/admin/dashboard" onClick={handleNavLinkClick}>
+                        Dashboard Admin
+                      </Link>
+                    </li>
+                  )}
+
+                  {isFuncionario && (
+                    <li>
+                      <Link className="dropdown-item" to="/funcionario/dashboard" onClick={handleNavLinkClick}>
+                        Painel do Funcionário
+                      </Link>
+                    </li>
+                  )}
+                  
+                  {isClient && (
+                    <li>
+                      <Link className="dropdown-item" to="/meus-pedidos" onClick={handleNavLinkClick}>
                         Painel do Cliente
                       </Link>
                     </li>
-                    
-                    <li><hr className="dropdown-divider" /></li>
-                    <li>
-                      <button className="dropdown-item" onClick={() => { logout(); setIsNavExpanded(false); }}>
-                        Sair
-                      </button>
-                    </li>
-                  </ul>
-                </li>
-                {/* --- FIM DA ATUALIZAÇÃO --- */}
-              </>
+                  )}
+                  
+                  <li><hr className="dropdown-divider" /></li>
+
+                  <li>
+                    <button className="dropdown-item" onClick={() => { logout(); handleNavLinkClick(); }}>
+                      Sair
+                    </button>
+                  </li>
+                </ul>
+              </li>
             ) : (
-              // SE o usuário NÃO estiver logado...
+              // Se não estiver logado...
               <li className="nav-item">
-                <NavLink className="nav-link" to="/login" onClick={() => setIsNavExpanded(false)}>Login</NavLink>
+                <NavLink className="nav-link" to="/login" onClick={handleNavLinkClick}>Login</NavLink>
               </li>
             )}
           </ul>
@@ -102,4 +157,5 @@ function AppNavbar() {
   );
 }
 
-export default AppNavbar;
+// Lembre-se de exportar com o nome correto
+export default Navbar;

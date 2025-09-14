@@ -1,21 +1,26 @@
-// /routes/authRoutes.js
-
 const express = require('express');
 const router = express.Router();
-const authcontroller = require('../controllers/authController');
-const { verifyToken, isOwnerOrAdmin } = require('../middleware/authMiddleware'); // <--- IMPORTE o isOwnerOrAdmin
-const upload = require('../config/multerConfig'); // <--- IMPORTE o upload
+const authController = require('../controllers/authController');
 
-router.post('/register', upload.single('imagem_perfil'), authcontroller.register);//colocado: upload.single('imagem_perfil')
-router.post('/login', authcontroller.login);
+// ✅ Unificamos os imports do middleware e do multer
+const { verifyToken, isOwnerOrAdmin } = require('../middleware/authMiddleware'); 
+const upload = require('../config/multerConfig'); 
 
-// --- NOVA ROTA AQUI ---
-// Rota para atualizar a imagem de perfil de um usuário
-// PUT /api/auth/:id/imagem
+// ✅ Rota de registro mantida com o middleware de upload
+router.post('/register', upload.single('imagem_perfil'), authController.register);
+
+// Rota de login
+router.post('/login', authController.login);
+
+// ✅ ESSA É A NOVA ROTA QUE ADICIONAMOS
+// Retorna os dados completos do usuário autenticado
+router.get('/me', verifyToken, authController.getMe);
+
+// ✅ Rota para atualizar a imagem de perfil foi mantida
 router.put(
   '/:id/imagem',
-  [verifyToken, isOwnerOrAdmin, upload.single('imagem_perfil')], // <-- Middlewares em ação
-  authcontroller.updateProfileImage // <-- Nova função que vamos criar
+  [verifyToken, isOwnerOrAdmin, upload.single('imagem_perfil')],
+  authController.updateProfileImage
 );
 
 module.exports = router;

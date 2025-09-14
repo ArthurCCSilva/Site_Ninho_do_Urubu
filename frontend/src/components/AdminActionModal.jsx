@@ -1,10 +1,12 @@
 // src/components/AdminActionModal.jsx
 import { useEffect, useRef } from 'react';
 import { Modal } from 'bootstrap';
+import { useFeatureFlags } from '../context/FeatureFlagContext';
 
 // ✅ 1. RECEBA a nova prop 'onShowDetails'
 function AdminActionModal({ show, onHide, pedido, onUpdateStatus, onShowCancelModal, onShowDetails }) {
   const modalRef = useRef();
+  const { isEnabled } = useFeatureFlags();
 
   useEffect(() => {
     const modalElement = modalRef.current;
@@ -62,9 +64,7 @@ function AdminActionModal({ show, onHide, pedido, onUpdateStatus, onShowCancelMo
               <button className="btn btn-danger" onClick={handleCancelClick}>
                 Cancelar Pedido (Admin)
               </button>
-              <button className="btn btn-outline-dark" onClick={() => handleUpdateClick('Fiado')}>
-                Marcar como "Fiado"
-              </button>
+              {isEnabled('sistema_fiado') && <button className="btn btn-outline-dark" onClick={() => handleUpdateClick('Fiado')}>Marcar como "Fiado"</button>}
             </div>
           </div>
           <div className="modal-footer">

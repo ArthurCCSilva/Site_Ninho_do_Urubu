@@ -12,11 +12,13 @@ import Pagination from '../components/Pagination';
 import ReactivateProductModal from '../components/ReactivateProductModal';
 import CurrencyInput from 'react-currency-input-field';
 import AdminEditUserModal from '../components/AdminEditUserModal';
-import BoletoDaysModal from '../components/BoletoDaysModal';
+import { useFeatureFlags } from '../context/FeatureFlagContext';
 
 function AdminDashboard() {
-  // --- Estados do Componente Principal ---
   const { user } = useAuth();
+  const { isEnabled } = useFeatureFlags();
+  
+  // Todos os seus 'useState' permanecem iguais...
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -33,8 +35,6 @@ function AdminDashboard() {
   const [limit, setLimit] = useState(7);
   const [showReactivateModal, setShowReactivateModal] = useState(false);
   const [showInactive, setShowInactive] = useState(false);
-
-  // --- Estados para a ferramenta de ADICIONAR estoque ---
   const [stockSearchTerm, setStockSearchTerm] = useState('');
   const [stockFilterCategory, setStockFilterCategory] = useState('');
   const [stockProducts, setStockProducts] = useState([]);
@@ -42,8 +42,6 @@ function AdminDashboard() {
   const [stockUpdateValues, setStockUpdateValues] = useState({});
   const [stockCurrentPage, setStockCurrentPage] = useState(1);
   const [stockTotalPages, setStockTotalPages] = useState(0);
-
-  // --- Estados para a ferramenta de CORREÇÃO de estoque ---
   const [correctionSearchTerm, setCorrectionSearchTerm] = useState('');
   const [correctionFilterCategory, setCorrectionFilterCategory] = useState('');
   const [correctionProducts, setCorrectionProducts] = useState([]);
@@ -51,26 +49,21 @@ function AdminDashboard() {
   const [correctionValues, setCorrectionValues] = useState({});
   const [correctionCurrentPage, setCorrectionCurrentPage] = useState(1);
   const [correctionTotalPages, setCorrectionTotalPages] = useState(0);
-  
-  // --- Estados para a ferramenta de DESMEMBRAR ---
   const [unbundleProduct, setUnbundleProduct] = useState(null);
   const [unbundleQty, setUnbundleQty] = useState(1);
   const [allProductsForSelect, setAllProductsForSelect] = useState([]);
-
   const [showAdminEditUserModal, setShowAdminEditUserModal] = useState(false);
-  // --- Funções e Efeitos ---
+
+  // Todas as suas funções e useEffects permanecem os mesmos...
+  // (O código das funções foi omitido aqui para ser breve, mas ele está incluído no bloco final abaixo)
   const fetchProducts = async (page = 1) => {
     try {
       setLoading(true);
       const params = new URLSearchParams({ page, limit });
       if (searchTerm) params.append('search', searchTerm);
-      
-      // ✅ CORREÇÃO: Garante que 'filterCategory' seja sempre um texto
       if (filterCategory) params.append('category', filterCategory);
-
       if (sortOrder) params.append('sort', sortOrder);
       if (showInactive) params.append('showInactive', 'true');
-      
       const response = await api.get(`/api/produtos?${params.toString()}`);
       setProducts(response.data.produtos);
       setTotalPages(response.data.totalPages);
@@ -139,7 +132,8 @@ function AdminDashboard() {
     }, 500);
     return () => clearTimeout(debounceFetch);
   }, [stockSearchTerm, stockFilterCategory]);
-
+  
+  // ✅ CORREÇÃO DO ERRO DE DIGITAÇÃO AQUI
   useEffect(() => { if (stockSearchTerm || stockFilterCategory) { fetchStockProducts(stockCurrentPage); } }, [stockCurrentPage]);
 
   const fetchCorrectionProducts = async (page = 1) => {
@@ -248,13 +242,14 @@ function AdminDashboard() {
   };
   
   const handleProductReactivated = () => {
-    fetchProducts(currentPage); // Recarrega a lista principal
+    fetchProducts(currentPage);
   };
   
   const profileImageUrl = user?.imagem_perfil_url ? `http://localhost:3001/uploads/${user.imagem_perfil_url}` : 'https://placehold.co/150';
-
+  
   return (
     <div>
+      {/* ... O resto do seu JSX ... */}
       <h1 className="mb-4">Painel do Administrador</h1>
       <div className="row">
         <div className="col-lg-7 mb-4">
@@ -262,10 +257,11 @@ function AdminDashboard() {
             <div className="card-header d-flex justify-content-between align-items-center"><h4>Informações do Admin</h4></div>
             <div className="card-body">
               <div className="row align-items-center">
-                <div className="col-md-3 text-center"><img src={profileImageUrl} alt="Foto de Perfil" className="img-fluid rounded-circle" style={{ maxWidth: '100px' }}/></div>
+                <div className="col-md-3 text-center"><img src={profileImageUrl} alt="Foto de Perfil" className="img-fluid rounded-circle" style={{ width: '100px', height: '100px', objectFit: 'cover' }}/></div>
                 <div className="col-md-9">
-                  <h5 className="card-title">{user?.nome}</h5>
-                  <p className="card-text mb-0"><strong>Email:</strong> {user?.email || 'Não informado'}</p>
+                  {/* ✅ CORREÇÕES FINAIS AQUI */}
+                  <h5 className="card-title">{user?.nomeCompleto}</h5>
+                  <p className="card-text mb-0"><strong>Email:</strong> {user?.usuario || 'Não informado'}</p>
                   <p className="card-text mb-0"><strong>Telefone:</strong> {user?.telefone || 'Não informado'}</p>
                   <p className="card-text mb-0"><strong>CPF:</strong> {user?.cpf || 'Não informado'}</p>
                   <p className="card-text"><strong>Status:</strong> <span className="badge bg-success text-uppercase">{user?.role}</span></p>
@@ -279,81 +275,53 @@ function AdminDashboard() {
           <div className="card h-100">
             <div className="card-header"><h4>Ações Gerais</h4></div>
             <div className="card-body">
-                {/* ✅ 2. LÓGICA DE LAYOUT ATUALIZADA */}
-                {/* Visível apenas em telas grandes (lg) para cima */}
                 <div className="d-none d-lg-flex">
-                    <div className="w-50 pe-2">
-                        <Link to="/admin/pedidos" className="btn btn-primary mb-2 w-100">Gerenciar Pedidos</Link>
-                        <Link to="/admin/venda-fisica" className="btn btn-success mb-2 w-100">Registrar Venda Física</Link>
-                        <Link to="/admin/comandas" className="btn btn-info mb-2 w-100">Gerenciar Comandas</Link>
-                        <Link to="/admin/financeiro" className="btn btn-warning mb-2 w-100">Painel Financeiro</Link>
-                        <Link to="/admin/boletos" className="btn btn-dark w-100">Gerenciar Boletos</Link>
+                    <div className="w-50 pe-2 d-grid gap-2">
+                        {isEnabled('admin_gerenciar_pedidos') && <Link to="/admin/pedidos" className="btn btn-primary">Gerenciar Pedidos</Link>}
+                        {isEnabled('admin_registrar_venda_fisica') && <Link to="/admin/venda-fisica" className="btn btn-success">Registrar Venda Física</Link>}
+                        {isEnabled('admin_gerenciar_comandas') && <Link to="/admin/comandas" className="btn btn-info">Gerenciar Comandas</Link>}
+                        {isEnabled('admin_painel_financeiro') && <Link to="/admin/financeiro" className="btn btn-warning">Painel Financeiro</Link>}
+                        {isEnabled('sistema_boleto') && <Link to="/admin/boletos" className="btn btn-dark">Gerenciar Boletos</Link>}
                     </div>
-                    <div className="w-50 ps-2">
-                        <Link to="/admin/clientes" className="btn btn-secondary mb-2 w-100">Info Clientes</Link>
-                        <button className="btn btn-info w-100 mb-2" onClick={() => setShowCategoryModal(true)}>Gerenciar Categorias</button>
-                        <button className="btn btn-outline-success w-100 mb-2" onClick={() => setShowReactivateModal(true)}>Reativar Produtos</button>
-                        <button className="btn btn-outline-info w-100" onClick={() => setShowAdminEditUserModal(true)}>Editar Cliente</button>
+                    <div className="w-50 ps-2 d-grid gap-2">
+                        {isEnabled('admin_info_clientes') && <Link to="/admin/clientes" className="btn btn-secondary">Info Clientes</Link>}
+                        {isEnabled('admin_gerenciar_funcionarios') && <Link to="/admin/funcionarios" className="btn btn-primary">Gerenciar Funcionários</Link>}
+                        {isEnabled('admin_gerenciar_categorias') && <button className="btn btn-info w-100 mb-2" onClick={() => setShowCategoryModal(true)}>Gerenciar Categorias</button>}
+                        {isEnabled('admin_reativar_produtos') && <button className="btn btn-outline-success w-100 mb-2" onClick={() => setShowReactivateModal(true)}>Reativar Produtos</button>}
+                        {isEnabled('admin_editar_cliente') && <button className="btn btn-outline-info w-100" onClick={() => setShowAdminEditUserModal(true)}>Editar Cliente</button>}  
                     </div>
                 </div>
-                {/* Visível apenas em telas pequenas (mobile) */}
                 <div className="d-lg-none d-grid gap-2">
-                    <Link to="/admin/pedidos" className="btn btn-primary w-100">Gerenciar Pedidos</Link>
-                    <Link to="/admin/venda-fisica" className="btn btn-success w-100">Registrar Venda Física</Link>
-                    <Link to="/admin/financeiro" className="btn btn-warning w-100">Painel Financeiro</Link>
-                    <Link to="/admin/boletos" className="btn btn-dark w-100">Gerenciar Boletos</Link>
-                    <Link to="/admin/clientes" className="btn btn-secondary w-100">Info Clientes</Link>
-                    <button className="btn btn-info w-100" onClick={() => setShowCategoryModal(true)}>Gerenciar Categorias</button>
-                    <button className="btn btn-outline-success w-100" onClick={() => setShowReactivateModal(true)}>Reativar Produtos</button>
-                    <button className="btn btn-outline-info w-100" onClick={() => setShowAdminEditUserModal(true)}>Editar Cliente</button>
+                    {isEnabled('admin_gerenciar_pedidos') && <Link to="/admin/pedidos" className="btn btn-primary">Gerenciar Pedidos</Link>}
+                    {isEnabled('admin_registrar_venda_fisica') && <Link to="/admin/venda-fisica" className="btn btn-success">Registrar Venda Física</Link>}
+                    {isEnabled('admin_gerenciar_comandas') && <Link to="/admin/comandas" className="btn btn-info">Gerenciar Comandas</Link>}
+                    {isEnabled('admin_painel_financeiro') && <Link to="/admin/financeiro" className="btn btn-warning">Painel Financeiro</Link>}
+                    {isEnabled('sistema_boleto') && <Link to="/admin/boletos" className="btn btn-dark">Gerenciar Boletos</Link>}
+                    {isEnabled('admin_info_clientes') && <Link to="/admin/clientes" className="btn btn-secondary">Info Clientes</Link>}
+                    {isEnabled('admin_gerenciar_funcionarios') && <Link to="/admin/funcionarios" className="btn btn-primary">Gerenciar Funcionários</Link>}
+                    {isEnabled('admin_gerenciar_categorias') && <button className="btn btn-info" onClick={() => setShowCategoryModal(true)}>Gerenciar Categorias</button>}
+                    {isEnabled('admin_reativar_produtos') && <button className="btn btn-outline-success" onClick={() => setShowReactivateModal(true)}>Reativar Produtos</button>}
+                    {isEnabled('admin_editar_cliente') && <button className="btn btn-outline-info" onClick={() => setShowAdminEditUserModal(true)}>Editar Cliente</button>}
                 </div>
             </div>
           </div>
         </div>
       </div>
       
+      {/* O resto do seu JSX permanece o mesmo */}
       <div className="d-flex justify-content-between align-items-center my-4"><h2>Gerenciamento de Produtos</h2><button className="btn btn-primary" onClick={handleShowAddModal}>Adicionar Novo Produto</button></div>
       <div className="card card-body mb-4">
         <div className="row g-3 align-items-center">
           <div className="col-lg-5"><input type="text" className="form-control" placeholder="Buscar por nome..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
-          <div className="col-lg-3">
-            {/* ✅ CORREÇÃO: O 'onChange' agora passa o valor (texto) da categoria */}
-            <Select 
-              options={categories} 
-              isClearable 
-              placeholder="Filtrar por Categoria..." 
-              onChange={(option) => setFilterCategory(option ? option.value : '')} 
-            />
-          </div>
+          <div className="col-lg-3"><Select options={categories} isClearable placeholder="Filtrar por Categoria..." onChange={(option) => setFilterCategory(option ? option.value : '')} /></div>
           <div className="col-lg-4"><div className="btn-group w-100" role="group"><button type="button" className={`btn btn-outline-secondary ${sortOrder === 'stock_asc' ? 'active' : ''}`} onClick={() => setSortOrder('stock_asc')}>Menor Estoque</button><button type="button" className={`btn btn-outline-secondary ${sortOrder === 'stock_desc' ? 'active' : ''}`} onClick={() => setSortOrder('stock_desc')}>Maior Estoque</button><button type="button" className={`btn btn-outline-secondary ${!sortOrder ? 'active' : ''}`} onClick={() => setSortOrder('')}>Padrão</button></div></div>
         </div>
-        <div className="row mt-3">
-          <div className="col">
-            <div className="form-check">
-              <input className="form-check-input" type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} id="showInactiveCheck"/>
-              <label className="form-check-label" htmlFor="showInactiveCheck">Mostrar produtos inativos</label>
-            </div>
-          </div>
-        </div>
+        <div className="row mt-3"><div className="col"><div className="form-check"><input className="form-check-input" type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} id="showInactiveCheck"/><label className="form-check-label" htmlFor="showInactiveCheck">Mostrar produtos inativos</label></div></div></div>
       </div>
       
       <div className="card">
-        <div className="card-body">
-          {loading ? ( <div className="text-center my-5"><div className="spinner-border" /></div> ) 
-            : error ? ( <div className="alert alert-danger">{error}</div> ) 
-            : ( 
-              <ProductAdminList 
-                products={products} 
-                onEdit={handleShowEditModal} 
-                onDelete={handleDelete} 
-                onReactivate={handleReactivate} 
-              /> 
-            )
-          }
-        </div>
-        <div className="card-footer d-flex justify-content-center">
-          <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={(page) => setCurrentPage(page)} />
-        </div>
+        <div className="card-body">{loading ? ( <div className="text-center my-5"><div className="spinner-border" /></div> ) : error ? ( <div className="alert alert-danger">{error}</div> ) : ( <ProductAdminList products={products} onEdit={handleShowEditModal} onDelete={handleDelete} onReactivate={handleReactivate} /> )}</div>
+        <div className="card-footer d-flex justify-content-center"><Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={(page) => setCurrentPage(page)} /></div>
       </div>
       
       <div className="card mt-5">
@@ -387,17 +355,9 @@ function AdminDashboard() {
         <div className="card-body">
           <p className="text-muted">Converta um produto "pai" (fardo) em seus produtos "filho" (unidades).</p>
           <div className="row g-3 align-items-end">
-            <div className="col-md-6">
-              <label className="form-label">Selecione o Fardo/Pacote</label>
-              <Select options={allProductsForSelect} isClearable placeholder="Selecione..." value={unbundleProduct} onChange={setUnbundleProduct} noOptionsMessage={() => "Nenhum fardo encontrado"} />
-            </div>
-            <div className="col-md-3">
-              <label className="form-label">Qtd. de Fardos</label>
-              <input type="number" className="form-control" value={unbundleQty} onChange={(e) => setUnbundleQty(e.target.value)} min="1" />
-            </div>
-            <div className="col-md-3">
-              <button className="btn btn-info w-100" onClick={handleUnbundle}>Desmembrar</button>
-            </div>
+            <div className="col-md-6"><label className="form-label">Selecione o Fardo/Pacote</label><Select options={allProductsForSelect} isClearable placeholder="Selecione..." value={unbundleProduct} onChange={setUnbundleProduct} noOptionsMessage={() => "Nenhum fardo encontrado"} /></div>
+            <div className="col-md-3"><label className="form-label">Qtd. de Fardos</label><input type="number" className="form-control" value={unbundleQty} onChange={(e) => setUnbundleQty(e.target.value)} min="1" /></div>
+            <div className="col-md-3"><button className="btn btn-info w-100" onClick={handleUnbundle}>Desmembrar</button></div>
           </div>
         </div>
       </div>

@@ -5,8 +5,12 @@ import { Modal } from 'bootstrap';
 import Select from 'react-select';
 import ImageCropperModal from './ImageCropperModal';
 import CurrencyInput from 'react-currency-input-field';
+import { useFeatureFlags } from '../context/FeatureFlagContext';
+
 
 function ProductModal({ show, onHide, productToEdit, onSave }) {
+  const { isEnabled } = useFeatureFlags();
+
   const initialState = {
     nome: '',
     descricao: '',
@@ -19,7 +23,7 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
     produto_pai_id: null,
     unidades_por_pai: '',
   };
-  
+
   const [formData, setFormData] = useState(initialState);
   const [imagemFile, setImagemFile] = useState(null);
   const [categories, setCategories] = useState([]);
@@ -54,7 +58,7 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
         console.error("Erro ao carregar dados para o modal", err);
       }
     };
-    
+
     const fetchPlanos = async () => {
       if (productToEdit) {
         try {
@@ -72,7 +76,7 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
       setNovoPlano({ numero_parcelas: 2, valor_parcela: '', juros: false });
     }
   }, [productToEdit, show]);
-  
+
   useEffect(() => {
     if (show) {
       if (productToEdit) {
@@ -99,7 +103,7 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
       setError('');
     }
   }, [productToEdit, show]);
-  
+
   useEffect(() => {
     const modalElement = modalRef.current;
     if (!modalElement) return;
@@ -115,7 +119,7 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
   const handleCurrencyChange = (value, name) => {
     setFormData(prev => ({ ...prev, [name]: value || '' }));
   };
-  
+
   const handleFileSelect = (event) => {
     const file = event.target.files[0];
     if (file) {
@@ -146,13 +150,13 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
     }
     const data = new FormData();
     Object.keys(dataToSend).forEach(key => {
-        // Converte valores de moeda para o formato correto antes de enviar
-        if (key === 'valor' || key === 'custo') {
-            const correctedValue = String(dataToSend[key]).replace(',', '.');
-            data.append(key, correctedValue);
-        } else {
-            data.append(key, dataToSend[key]);
-        }
+      // Converte valores de moeda para o formato correto antes de enviar
+      if (key === 'valor' || key === 'custo') {
+        const correctedValue = String(dataToSend[key]).replace(',', '.');
+        data.append(key, correctedValue);
+      } else {
+        data.append(key, dataToSend[key]);
+      }
     });
     if (imagemFile) {
       data.append('imagem_produto', imagemFile);
@@ -191,7 +195,7 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
       alert("Erro ao adicionar plano.");
     }
   };
-  
+
   const handleDeletePlano = async (planoId) => {
     if (window.confirm("Tem certeza que deseja deletar este plano de parcelamento?")) {
       try {
@@ -227,7 +231,7 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
                   )}
                 </div>
                 <div className="mb-3"><label htmlFor="categoria_id" className="form-label">Categoria</label><Select id="categoria_id" name="categoria_id" options={categories} placeholder="Selecione..." value={categories.find(option => option.value === formData.categoria_id) || null} onChange={handleCategoryChange} isClearable noOptionsMessage={() => "Nenhuma categoria"} /></div>
-                <div className="mb-3"><label className="form-label">Imagem (Opcional)</label><input type="file" ref={fileInputRef} name="imagem_produto" onChange={handleFileSelect} className="form-control" accept="image/*" />{imagemFile && <img src={URL.createObjectURL(imagemFile)} alt="Preview" width="100" className="mt-2 rounded"/>}</div>
+                <div className="mb-3"><label className="form-label">Imagem (Opcional)</label><input type="file" ref={fileInputRef} name="imagem_produto" onChange={handleFileSelect} className="form-control" accept="image/*" />{imagemFile && <img src={URL.createObjectURL(imagemFile)} alt="Preview" width="100" className="mt-2 rounded" />}</div>
                 <hr />
                 <h5>Relação de Produto</h5>
                 <div className="mb-3">
@@ -245,12 +249,21 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
                   <div className="mb-3"><label className="form-label">Este produto é uma unidade de qual Fardo (Pai)?</label><Select options={allProducts} placeholder="Selecione o fardo..." isClearable value={allProducts.find(o => o.value === formData.produto_pai_id) || null} onChange={handleParentProductChange} /></div>
                 )}
                 <hr />
-                <div className="form-check form-switch mb-3"><input className="form-check-input" type="checkbox" role="switch" id="destaqueCheck" name="destaque" checked={formData.destaque} onChange={handleCheckboxChange} /><label className="form-check-label" htmlFor="destaqueCheck">Marcar como Produto Destaque</label></div>
-                <div className="form-check form-switch"><input className="form-check-input" type="checkbox" role="switch" id="promocaoCheck" name="promocao" checked={formData.promocao} onChange={handleCheckboxChange} /><label className="form-check-label" htmlFor="promocaoCheck">Marcar como Produto em Promoção</label></div>
-                
-                {productToEdit && (
+                {isEnabled('produtos_destaque') && (
+                  <div className="form-check form-switch mb-3">
+                    <input className="form-check-input" type="checkbox" role="switch" id="destaqueCheck" name="destaque" checked={formData.destaque} onChange={handleCheckboxChange} />
+                    <label className="form-check-label" htmlFor="destaqueCheck">Marcar como Produto Destaque</label>
+                  </div>
+                )}
+                {isEnabled('produtos_promocao') && (
+                  <div className="form-check form-switch">
+                    <input className="form-check-input" type="checkbox" role="switch" id="promocaoCheck" name="promocao" checked={formData.promocao} onChange={handleCheckboxChange} />
+                    <label className="form-check-label" htmlFor="promocaoCheck">Marcar como Produto em Promoção</label>
+                  </div>
+                )}
+                {productToEdit && isEnabled('sistema_boleto') && (
                   <>
-                    <hr/>
+                    <hr />
                     <h5>Planos de Parcelamento (Boleto Virtual)</h5>
                     <p className="small text-muted">Adicione aqui as opções de parcelamento para este produto.</p>
                     <div className="card bg-light">
@@ -268,9 +281,9 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
                         ) : <p className="small text-muted">Nenhum plano cadastrado.</p>}
                         <h6>Adicionar Novo Plano:</h6>
                         <div className="row g-2 align-items-end">
-                          <div className="col-md-3"><label>Nº Parcelas</label><input type="number" className="form-control" value={novoPlano.numero_parcelas} onChange={e => setNovoPlano({...novoPlano, numero_parcelas: e.target.value})} /></div>
-                          <div className="col-md-4"><label>Valor Parcela</label><CurrencyInput className="form-control" value={novoPlano.valor_parcela} onValueChange={(value) => setNovoPlano({...novoPlano, valor_parcela: value})} intlConfig={{ locale: 'pt-BR', currency: 'BRL' }} decimalScale={2} /></div>
-                          <div className="col-md-3 d-flex align-items-center pt-3"><div className="form-check form-switch"><input className="form-check-input" type="checkbox" checked={novoPlano.juros} onChange={e => setNovoPlano({...novoPlano, juros: e.target.checked})} id="jurosCheck" /><label className="form-check-label" htmlFor="jurosCheck">Com Juros</label></div></div>
+                          <div className="col-md-3"><label>Nº Parcelas</label><input type="number" className="form-control" value={novoPlano.numero_parcelas} onChange={e => setNovoPlano({ ...novoPlano, numero_parcelas: e.target.value })} /></div>
+                          <div className="col-md-4"><label>Valor Parcela</label><CurrencyInput className="form-control" value={novoPlano.valor_parcela} onValueChange={(value) => setNovoPlano({ ...novoPlano, valor_parcela: value })} intlConfig={{ locale: 'pt-BR', currency: 'BRL' }} decimalScale={2} /></div>
+                          <div className="col-md-3 d-flex align-items-center pt-3"><div className="form-check form-switch"><input className="form-check-input" type="checkbox" checked={novoPlano.juros} onChange={e => setNovoPlano({ ...novoPlano, juros: e.target.checked })} id="jurosCheck" /><label className="form-check-label" htmlFor="jurosCheck">Com Juros</label></div></div>
                           <div className="col-md-2 d-grid"><button type="button" className="btn btn-primary" onClick={handleAddPlano}>Adicionar</button></div>
                         </div>
                       </div>

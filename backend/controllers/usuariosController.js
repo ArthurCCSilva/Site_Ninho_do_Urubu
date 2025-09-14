@@ -6,140 +6,148 @@ const path = require('path');     // Importa o módulo Path (para criar caminhos
 
 // FUNÇÃO ATUALIZADA para deletar a foto de perfil antiga ao trocar
 exports.updateProfile = async (req, res) => {
-  const usuarioId = req.user.id;
-  const { nome, email, telefone, senhaAtual, novaSenha } = req.body;
-  const imagemFile = req.file;
-  const connection = await db.getConnection();
+    const usuarioId = req.user.id;
+    const { nome, email, telefone, senhaAtual, novaSenha } = req.body;
+    const imagemFile = req.file;
+    const connection = await db.getConnection();
 
-  try {
-    await connection.beginTransaction();
+    try {
+        await connection.beginTransaction();
 
-    // 1. Busca o usuário atual para pegar informações antigas (como a URL da imagem)
-    const [rows] = await connection.query('SELECT * FROM usuarios WHERE id = ?', [usuarioId]);
-    if (rows.length === 0) { 
-      throw new Error('Usuário não encontrado.'); 
-    }
-    const usuario = rows[0];
-    const imagemAntiga = usuario.imagem_perfil_url; // Guarda o nome do arquivo da imagem antiga
-    
-    const updateFields = [];
-    const params = [];
+        // 1. Busca o usuário atual para pegar informações antigas (como a URL da imagem)
+        const [rows] = await connection.query('SELECT * FROM usuarios WHERE id = ?', [usuarioId]);
+        if (rows.length === 0) { 
+            throw new Error('Usuário não encontrado.'); 
+        }
+        const usuario = rows[0];
+        const imagemAntiga = usuario.imagem_perfil_url; // Guarda o nome do arquivo da imagem antiga
+        
+        const updateFields = [];
+        const params = [];
 
-    // --- Lógica de atualização individual ---
-    if (nome && nome !== usuario.nome) { 
-      updateFields.push('nome = ?'); 
-      params.push(nome); 
-    }
-    if (email && email !== usuario.email) { 
-      updateFields.push('email = ?'); 
-      params.push(email); 
-    }
-    if (telefone) {
-      const telefoneSanitizado = telefone.replace(/\D/g, '');
-      if (telefoneSanitizado !== usuario.telefone) {
-        updateFields.push('telefone = ?');
-        params.push(telefoneSanitizado);
-      }
-    }
-    
-    // Lógica para atualização de senha
-    if (novaSenha) {
-      if (!senhaAtual) { throw new Error('A senha atual é necessária para definir uma nova senha.'); }
-      const senhaValida = await bcrypt.compare(senhaAtual, usuario.senha_hash);
-      if (!senhaValida) { throw new Error('A senha atual está incorreta.'); }
-      const novaSenhaHash = await bcrypt.hash(novaSenha, 10);
-      updateFields.push('senha_hash = ?');
-      params.push(novaSenhaHash);
-    }
+        // --- Lógica de atualização individual ---
+        if (nome && nome !== usuario.nome) { 
+            updateFields.push('nome = ?'); 
+            params.push(nome); 
+        }
+        if (email && email !== usuario.email) { 
+            updateFields.push('email = ?'); 
+            params.push(email); 
+        }
+        if (telefone) {
+            const telefoneSanitizado = telefone.replace(/\D/g, '');
+            if (telefoneSanitizado !== usuario.telefone) {
+                updateFields.push('telefone = ?');
+                params.push(telefoneSanitizado);
+            }
+        }
+        
+        // Lógica para atualização de senha
+        if (novaSenha) {
+            if (!senhaAtual) { throw new Error('A senha atual é necessária para definir uma nova senha.'); }
+            const senhaValida = await bcrypt.compare(senhaAtual, usuario.senha_hash);
+            if (!senhaValida) { throw new Error('A senha atual está incorreta.'); }
+            const novaSenhaHash = await bcrypt.hash(novaSenha, 10);
+            updateFields.push('senha_hash = ?');
+            params.push(novaSenhaHash);
+        }
 
-    // Lógica para atualização da imagem no banco de dados
-    if (imagemFile) {
-      updateFields.push('imagem_perfil_url = ?');
-      params.push(imagemFile.filename);
-    }
+        // Lógica para atualização da imagem no banco de dados
+        if (imagemFile) {
+            updateFields.push('imagem_perfil_url = ?');
+            params.push(imagemFile.filename);
+        }
 
-    // Apenas executa a query se houver campos para atualizar
-    if (updateFields.length > 0) {
-      params.push(usuarioId);
-      const sql = `UPDATE usuarios SET ${updateFields.join(', ')} WHERE id = ?`;
-      await connection.query(sql, params);
-    }
-    
-    await connection.commit(); // Confirma as alterações no banco
+        // Apenas executa a query se houver campos para atualizar
+        if (updateFields.length > 0) {
+            params.push(usuarioId);
+            const sql = `UPDATE usuarios SET ${updateFields.join(', ')} WHERE id = ?`;
+            await connection.query(sql, params);
+        }
+        
+        await connection.commit(); // Confirma as alterações no banco
 
-    // --- Lógica para apagar o arquivo antigo do disco ---
-    // Isso acontece DEPOIS que o banco de dados foi atualizado com sucesso
-    if (imagemFile && imagemAntiga) {
-      // ✅ CORREÇÃO DO CAMINHO AQUI
-      const caminhoImagemAntiga = path.join(__dirname, '..', 'uploads', imagemAntiga);
-      try {
-        await fs.unlink(caminhoImagemAntiga);
-        console.log(`Foto de perfil antiga ${imagemAntiga} deletada.`);
-      } catch (fileErr) {
-        console.error("Erro ao deletar foto de perfil antiga:", fileErr.code);
-      }
-    }
-    
-    res.status(200).json({ message: 'Perfil atualizado com sucesso!' });
+        // --- Lógica para apagar o arquivo antigo do disco ---
+        // Isso acontece DEPOIS que o banco de dados foi atualizado com sucesso
+        if (imagemFile && imagemAntiga) {
+            const caminhoImagemAntiga = path.join(__dirname, '..', 'uploads', imagemAntiga);
+            try {
+                await fs.unlink(caminhoImagemAntiga);
+                console.log(`Foto de perfil antiga ${imagemAntiga} deletada.`);
+            } catch (fileErr) {
+                console.error("Erro ao deletar foto de perfil antiga:", fileErr.code);
+            }
+        }
+        
+        res.status(200).json({ message: 'Perfil atualizado com sucesso!' });
 
-  } catch (error) {
-    await connection.rollback(); // Desfaz tudo se der algum erro
-    if (error.code === 'ER_DUP_ENTRY') {
-      return res.status(409).json({ message: 'Este e-mail já está em uso.' });
+    } catch (error) {
+        await connection.rollback(); // Desfaz tudo se der algum erro
+        if (error.code === 'ER_DUP_ENTRY') {
+            return res.status(409).json({ message: 'Este e-mail já está em uso.' });
+        }
+        res.status(400).json({ message: error.message });
+    } finally {
+        connection.release(); // Sempre libera a conexão no final
     }
-    res.status(400).json({ message: error.message });
-  } finally {
-    connection.release(); // Sempre libera a conexão no final
-  }
 };
 
 exports.getAllClientes = async (req, res) => {
-  try {
-    const { search, page = 1, limit = 10 } = req.query; 
-    
-    let params = [];
-    let whereConditions = "role = 'cliente'";
+    try {
+        const { search, page = 1, limit = 10 } = req.query; 
+        
+        let params = [];
+        let whereConditions = "role = 'cliente'"; // Assumindo que você tem uma coluna 'role' na tabela 'usuarios'
 
-    // Se houver um termo de busca, agora ele procura em 3 colunas
-    if (search) {
-      whereConditions += ' AND (id = ? OR nome LIKE ? OR email LIKE ? OR telefone LIKE ? OR cpf LIKE ?)';
-      const searchTerm = `%${search}%`;
-      params.push(search, searchTerm, searchTerm, searchTerm, searchTerm);
+        // Se houver um termo de busca, agora ele procura em 3 colunas
+        if (search) {
+            whereConditions += ' AND (id = ? OR nome LIKE ? OR email LIKE ? OR telefone LIKE ? OR cpf LIKE ?)';
+            const searchTerm = `%${search}%`;
+            params.push(search, searchTerm, searchTerm, searchTerm, searchTerm);
+        }
+
+        // Contagem para paginação (mantida por consistência)
+        const countSql = `SELECT COUNT(id) as total FROM usuarios WHERE ${whereConditions}`;
+        const [countRows] = await db.query(countSql, params);
+        const totalItems = countRows[0].total;
+        const totalPages = Math.ceil(totalItems / limit);
+
+        // Busca dos dados paginados
+        const offset = (page - 1) * limit;
+        const finalParams = [...params, parseInt(limit), parseInt(offset)];
+        const sql = `SELECT id, nome, email, telefone, cpf, imagem_perfil_url, role, is_active FROM usuarios WHERE ${whereConditions} ORDER BY nome ASC LIMIT ? OFFSET ?`;
+        
+        const [clientes] = await db.query(sql, finalParams);
+        res.status(200).json({ clientes, totalPages, currentPage: parseInt(page) });
+
+    } catch (error) {
+        console.error("Erro ao buscar clientes:", error);
+        res.status(500).json({ message: 'Erro ao buscar clientes.', error: error.message });
     }
-
-    // Contagem para paginação (mantida por consistência)
-    const countSql = `SELECT COUNT(id) as total FROM usuarios WHERE ${whereConditions}`;
-    const [countRows] = await db.query(countSql, params);
-    const totalItems = countRows[0].total;
-    const totalPages = Math.ceil(totalItems / limit);
-
-    // Busca dos dados paginados
-    const offset = (page - 1) * limit;
-    const finalParams = [...params, parseInt(limit), parseInt(offset)];
-    const sql = `SELECT id, nome, email, telefone, cpf, imagem_perfil_url FROM usuarios WHERE ${whereConditions} ORDER BY nome ASC LIMIT ? OFFSET ?`;
-    
-    const [clientes] = await db.query(sql, finalParams);
-    res.status(200).json({ clientes, totalPages, currentPage: parseInt(page) });
-
-  } catch (error) {
-    console.error("Erro ao buscar clientes:", error);
-    res.status(500).json({ message: 'Erro ao buscar clientes.', error: error.message });
-  }
 };
 
-// ✅ NOVA FUNÇÃO SEGURA para o Admin editar um usuário
+// ✅ FUNÇÃO SEGURA para o Admin editar um usuário (AGORA EM MySQL)
 exports.adminUpdateUsuario = async (req, res) => {
     const { id } = req.params; // ID do usuário a ser editado
-    const { telefone, senha } = req.body;
+    const { nome, email, telefone, senha, role, is_active } = req.body; // Adicionado 'nome', 'email', 'role' e 'is_active' para edição completa
 
-    if (!telefone && !senha) {
-        return res.status(400).json({ message: 'Pelo menos um campo (telefone ou senha) deve ser fornecido.' });
+    // Se nenhum campo foi fornecido, retorna um erro
+    if (!nome && !email && !telefone && !senha && !role && is_active === undefined) { // Verifica is_active especificamente
+        return res.status(400).json({ message: 'Pelo menos um campo (nome, email, telefone, senha, role ou is_active) deve ser fornecido.' });
     }
 
     try {
         let updateFields = [];
         const params = [];
 
+        if (nome) {
+            updateFields.push('nome = ?');
+            params.push(nome);
+        }
+        if (email) {
+            updateFields.push('email = ?');
+            params.push(email);
+        }
         if (telefone) {
             updateFields.push('telefone = ?');
             params.push(telefone.replace(/\D/g, ''));
@@ -148,6 +156,14 @@ exports.adminUpdateUsuario = async (req, res) => {
             const senhaHash = await bcrypt.hash(senha, 10);
             updateFields.push('senha_hash = ?');
             params.push(senhaHash);
+        }
+        if (role) { // Para atualizar a função do usuário
+            updateFields.push('role = ?');
+            params.push(role);
+        }
+        if (is_active !== undefined) { // Para atualizar o status de ativo/inativo
+            updateFields.push('is_active = ?');
+            params.push(is_active ? 1 : 0); // MySQL usa 1 para TRUE, 0 para FALSE
         }
 
         if (updateFields.length === 0) {
@@ -162,7 +178,10 @@ exports.adminUpdateUsuario = async (req, res) => {
         res.status(200).json({ message: 'Dados do cliente atualizados com sucesso!' });
     } catch (error) {
         console.error("Erro ao atualizar dados do usuário pelo admin:", error);
-        res.status(500).json({ message: 'Erro no servidor ao atualizar dados.' });
+        if (error.code === 'ER_DUP_ENTRY') {
+            return res.status(409).json({ message: 'Este e-mail já está em uso.' });
+        }
+        res.status(500).json({ message: 'Erro no servidor ao atualizar dados.', error: error.message });
     }
 };
 
@@ -175,10 +194,13 @@ exports.getStatusFinanceiro = async (req, res) => {
             temFiado: fiados[0].count > 0,
             temBoleto: boletos[0].count > 0
         });
-    } catch (error) { res.status(500).json({ message: 'Erro ao buscar status financeiro.' }); }
+    } catch (error) { 
+        console.error("Erro ao buscar status financeiro:", error);
+        res.status(500).json({ message: 'Erro ao buscar status financeiro.' }); 
+    }
 };
 
-// ✅ NOVA FUNÇÃO: Busca todos os pedidos fiado de um cliente
+// ✅ FUNÇÃO: Busca todos os pedidos fiado de um cliente
 exports.getPedidosFiado = async (req, res) => {
     const { id: usuarioId } = req.params;
     try {
@@ -194,10 +216,13 @@ exports.getPedidosFiado = async (req, res) => {
         }
         
         res.status(200).json(pedidos);
-    } catch (error) { res.status(500).json({ message: 'Erro ao buscar pedidos fiado.' }); }
+    } catch (error) { 
+        console.error("Erro ao buscar pedidos fiado:", error);
+        res.status(500).json({ message: 'Erro ao buscar pedidos fiado.' }); 
+    }
 };
 
-// ✅ NOVA FUNÇÃO: Processa o pagamento em lote (FIFO)
+// ✅ FUNÇÃO: Processa o pagamento em lote (FIFO)
 exports.pagarFiadoTotal = async (req, res) => {
     const { id: usuarioId } = req.params;
     let { valor_pago } = req.body;
@@ -267,5 +292,78 @@ exports.getMinhasComandas = async (req, res) => {
     } catch (error) {
         console.error("Erro ao buscar comandas do usuário:", error);
         res.status(500).json({ message: 'Erro ao buscar suas comandas.' });
+    }
+};
+
+// ✅ FUNÇÃO ADICIONADA: Para listar TODOS os usuários (clientes, funcionários, admins, devs)
+// AGORA CORRETAMENTE IMPLEMENTADA PARA MySQL COM SUAS COLUNAS
+exports.getAllUsers = async (req, res) => {
+    try {
+        // Seleciona todas as colunas relevantes da tabela 'usuarios'
+        const sql = "SELECT id, nome, email, telefone, cpf, imagem_perfil_url, role, is_active FROM usuarios ORDER BY nome ASC";
+        const [users] = await db.query(sql);
+
+        // Formata o resultado para ter um objeto 'role' e `_id` para compatibilidade com o frontend
+        const formattedUsers = users.map(user => ({
+            _id: user.id, // Mapeia id para _id (padrão Mongoose que o frontend pode esperar)
+            nomeCompleto: user.nome, // Sua coluna 'nome' agora é 'nomeCompleto' no frontend
+            email: user.email,
+            telefone: user.telefone,
+            cpf: user.cpf,
+            // 'usuario' não está na sua tabela. Se o frontend espera 'usuario', considere usar 'email' ou adicionar uma coluna
+            // usuario: user.email, // Ou user.nome, dependendo do que você usa como "usuário" para login/exibição
+            imagem_perfil: user.imagem_perfil_url, // Mapeia para imagem_perfil
+            role: { name: user.role }, // Cria um objeto 'role' com a propriedade 'name'
+            is_active: user.is_active // Adiciona a coluna is_active
+        }));
+
+        res.status(200).json(formattedUsers);
+    } catch (error) {
+        console.error("Erro ao buscar todos os usuários (getAllUsers - MySQL):", error);
+        res.status(500).json({ message: "Erro interno do servidor ao buscar usuários." });
+    }
+};
+
+// ✅ FUNÇÃO ADICIONADA: Para excluir um usuário/funcionário (AGORA EM MySQL)
+exports.deleteUser = async (req, res) => {
+    const { id } = req.params; // ID do usuário a ser excluído
+    const connection = await db.getConnection();
+
+    try {
+        await connection.beginTransaction();
+
+        // 1. Opcional: Busca o usuário para pegar a imagem de perfil antes de deletar
+        const [userRows] = await connection.query('SELECT imagem_perfil_url FROM usuarios WHERE id = ?', [id]);
+        const userToDelete = userRows[0];
+        
+        // 2. Exclui o usuário da tabela 'usuarios'
+        const [result] = await connection.query('DELETE FROM usuarios WHERE id = ?', [id]);
+
+        if (result.affectedRows === 0) {
+            await connection.rollback();
+            return res.status(404).json({ message: "Usuário não encontrado." });
+        }
+        
+        await connection.commit(); // Confirma a exclusão no banco
+
+        // 3. Se o usuário tinha uma imagem de perfil, exclua o arquivo físico (depois do commit)
+        if (userToDelete && userToDelete.imagem_perfil_url) {
+            const imagePath = path.join(__dirname, '..', 'uploads', userToDelete.imagem_perfil_url);
+            try {
+                await fs.unlink(imagePath);
+                console.log(`Imagem de perfil ${userToDelete.imagem_perfil_url} deletada do disco.`);
+            } catch (fileErr) {
+                console.error("Erro ao deletar arquivo de imagem de perfil:", fileErr.code);
+                // Não precisa retornar erro 500 aqui, a exclusão do usuário já foi bem-sucedida
+            }
+        }
+
+        res.status(200).json({ message: "Usuário excluído com sucesso." });
+    } catch (error) {
+        await connection.rollback();
+        console.error("Erro ao excluir usuário (deleteUser - MySQL):", error);
+        res.status(500).json({ message: "Erro interno do servidor ao excluir usuário.", error: error.message });
+    } finally {
+        connection.release();
     }
 };

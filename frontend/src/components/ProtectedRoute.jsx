@@ -3,29 +3,45 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 function ProtectedRoute({ children, role }) {
-  // ✅ 1. PEGUE O 'isLoading' JUNTO COM OS OUTROS DADOS
-  const { user, token, isLoading } = useAuth();
+  const { user, isLoading } = useAuth();
   const location = useLocation();
 
-  // ✅ 2. A REGRA MAIS IMPORTANTE: SE AINDA ESTIVER CARREGANDO, NÃO FAÇA NADA
+  // 1. Mantemos o spinner de carregamento enquanto o AuthContext valida o usuário.
+  // Isso é crucial para evitar que a página quebre.
   if (isLoading) {
-    // Pode ser um spinner de carregamento ou simplesmente não renderizar nada
-    return <div className="text-center my-5"><div className="spinner-border" /></div>;
+    return (
+      <div className="d-flex justify-content-center align-items-center" style={{ height: '100vh' }}>
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Carregando...</span>
+        </div>
+      </div>
+    );
   }
 
-  // A partir daqui, isLoading é false, então podemos tomar uma decisão segura.
-
-  if (!token) {
-    // Se não há token, redireciona para o login
+  // 2. Após o carregamento, se não houver um objeto 'user',
+  // o usuário não está autenticado. Redirecionamos para o login.
+  if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (role && user?.role !== role) {
-    // Se há uma role exigida e o usuário não a tem, redireciona para a Home
-    return <Navigate to="/" replace />;
+  // 3. Se a rota exige uma permissão ('role') específica...
+  if (role) {
+    // ✅ LÓGICA UNIFICADA E SIMPLIFICADA:
+    // Usamos diretamente 'user.role', que agora é uma string (ex: 'admin').
+    
+    // Regra especial: se a rota é para 'admin' e o usuário é 'dev', permite o acesso.
+    if (role === 'admin' && user.role === 'dev') {
+      return children; // Acesso permitido
+    }
+
+    // Regra geral: se a 'role' do usuário for diferente da exigida, nega o acesso.
+    if (user.role !== role) {
+      return <Navigate to="/" replace />; // Redireciona para a página inicial
+    }
   }
 
-  // Se tudo estiver ok, renderiza a página solicitada
+  // 4. Se o usuário está logado e passou por todas as verificações,
+  // renderiza a página solicitada.
   return children;
 }
 

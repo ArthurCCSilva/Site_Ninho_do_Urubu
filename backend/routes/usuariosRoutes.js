@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const usuariosController = require('../controllers/usuariosController');
-const { verifyToken, isAdmin } = require('../middleware/authMiddleware');
+const { verifyToken, isAdmin, isAdminOrDev, isOwnerOrAdminOrDev, isOwnerOrAdmin } = require('../middleware/authMiddleware'); 
 const upload = require('../config/multerConfig');
 
 router.get('/minhas-comandas', [verifyToken], usuariosController.getMinhasComandas);
@@ -19,5 +19,12 @@ router.put('/admin/:id', [verifyToken, isAdmin], usuariosController.adminUpdateU
 router.get('/:id/status-financeiro', [verifyToken, isAdmin], usuariosController.getStatusFinanceiro);
 router.get('/:id/fiados', [verifyToken, isAdmin], usuariosController.getPedidosFiado);
 router.post('/:id/pagar-fiado-total', [verifyToken, isAdmin], usuariosController.pagarFiadoTotal);
+
+// ✅ ADIÇÃO DA ROTA: Esta rota atenderá a '/api/usuarios' (que é o que o frontend irá chamar).
+router.get('/', [verifyToken, isAdminOrDev], usuariosController.getAllUsers);
+
+// ✅ ADIÇÃO DA ROTA: Para exclusão de usuário/funcionário (Admin ou Dev)
+// Use esta para o botão "Excluir" no frontend.
+router.delete('/:id', [verifyToken, isAdminOrDev], usuariosController.deleteUser); 
 
 module.exports = router;

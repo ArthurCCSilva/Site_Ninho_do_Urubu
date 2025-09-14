@@ -32,6 +32,9 @@ app.use('/api/boleto-planos', require('./routes/boletoPlanosRoutes'));
 app.use('/api/boletos', require('./routes/boletosRoutes'));
 app.use('/api/boleto-dias', require('./routes/boletoDiasRoutes'));
 app.use('/api/comandas', require('./routes/comandaRoutes'));
+app.use('/api/feature-flags', require('./routes/featureFlagsRoutes'));
+app.use('/api/funcoes', require('./routes/funcoesRoutes'));
+app.use('/api/funcionarios', require('./routes/funcionariosRoutes'));
 app.use('/uploads', express.static('uploads'));//adicionado depois para as imagens
 
 const PORT = process.env.PORT || 3001;
