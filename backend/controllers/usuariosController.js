@@ -299,27 +299,38 @@ exports.getMinhasComandas = async (req, res) => {
 // AGORA CORRETAMENTE IMPLEMENTADA PARA MySQL COM SUAS COLUNAS
 exports.getAllUsers = async (req, res) => {
     try {
-        // Seleciona todas as colunas relevantes da tabela 'usuarios'
-        const sql = "SELECT id, nome, email, telefone, cpf, imagem_perfil_url, role, is_active FROM usuarios ORDER BY nome ASC";
-        const [users] = await db.query(sql);
+        // Pega o parâmetro 'role' da URL (ex: /api/usuarios?role=funcionario)
+        const { role } = req.query;
 
-        // Formata o resultado para ter um objeto 'role' e `_id` para compatibilidade com o frontend
+        let sql = "SELECT u.id, u.nome, u.email, u.telefone, u.cpf, u.imagem_perfil_url, u.role, u.is_active, f.nome_funcao FROM usuarios u LEFT JOIN funcoes f ON u.funcao_id = f.id";
+        const params = [];
+
+        // Se um filtro de role foi passado, adiciona a condição WHERE
+        if (role) {
+            sql += " WHERE u.role = ?";
+            params.push(role);
+        }
+
+        sql += " ORDER BY u.nome ASC";
+        
+        const [users] = await db.query(sql, params);
+        
+        // Formata o resultado para o frontend
         const formattedUsers = users.map(user => ({
-            _id: user.id, // Mapeia id para _id (padrão Mongoose que o frontend pode esperar)
-            nomeCompleto: user.nome, // Sua coluna 'nome' agora é 'nomeCompleto' no frontend
-            email: user.email,
-            telefone: user.telefone,
+            _id: user.id,
+            nomeCompleto: user.nome,
+            usuario: user.email, // O frontend usa 'usuario' como login
             cpf: user.cpf,
-            // 'usuario' não está na sua tabela. Se o frontend espera 'usuario', considere usar 'email' ou adicionar uma coluna
-            // usuario: user.email, // Ou user.nome, dependendo do que você usa como "usuário" para login/exibição
-            imagem_perfil: user.imagem_perfil_url, // Mapeia para imagem_perfil
-            role: { name: user.role }, // Cria um objeto 'role' com a propriedade 'name'
-            is_active: user.is_active // Adiciona a coluna is_active
+            role: { 
+              name: user.role === 'funcionario' ? user.nome_funcao : user.role, // Para funcionários, mostra o nome da função
+              originalRole: user.role // Mantém a role original
+            },
+            is_active: user.is_active
         }));
 
         res.status(200).json(formattedUsers);
     } catch (error) {
-        console.error("Erro ao buscar todos os usuários (getAllUsers - MySQL):", error);
+        console.error("Erro ao buscar todos os usuários:", error);
         res.status(500).json({ message: "Erro interno do servidor ao buscar usuários." });
     }
 };
