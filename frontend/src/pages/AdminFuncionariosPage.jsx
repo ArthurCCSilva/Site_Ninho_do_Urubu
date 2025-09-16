@@ -1,8 +1,6 @@
-// src/pages/AdminFuncionariosPage.jsx
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
-
 import FuncoesModal from '../components/FuncoesModal';
 import AdicionarFuncionarioModal from '../components/AdicionarFuncionarioModal';
 import EditarFuncionarioModal from '../components/EditarFuncionarioModal';
@@ -57,21 +55,13 @@ function AdminFuncionariosPage() {
     <div className="container mt-4">
       <h2 className="mb-4">Gerenciar Funcionários</h2>
       <div className="d-flex justify-content-between mb-4">
-        
         {user?.permissoes?.includes('gerenciarFuncoes') && (
           <button type="button" className="btn btn-primary" data-bs-toggle="modal" data-bs-target="#funcoesModal">
             Gerenciar Funções
           </button>
         )}
-        
         {user?.permissoes?.includes('admin_gerenciar_funcionarios') && (
-          <button
-            type="button"
-            className="btn btn-success"
-            data-bs-toggle="modal"
-            data-bs-target="#adicionarFuncionarioModal"
-            onClick={() => setFuncionarioToEdit(null)}
-          >
+          <button type="button" className="btn btn-success" data-bs-toggle="modal" data-bs-target="#adicionarFuncionarioModal" onClick={() => setFuncionarioToEdit(null)}>
             Adicionar Funcionário
           </button>
         )}
@@ -111,10 +101,7 @@ function AdminFuncionariosPage() {
                       >
                         Editar
                       </button>
-                      <button 
-                        type="button" 
-                        className="btn btn-sm btn-danger" 
-                        onClick={() => handleDeleteFuncionario(func._id)}>
+                      <button type="button" className="btn btn-sm btn-danger" onClick={() => handleDeleteFuncionario(func._id)}>
                         Excluir
                       </button>
                     </>
@@ -136,10 +123,6 @@ function AdminFuncionariosPage() {
         onSave={() => setRefreshKey(prev => prev + 1)}
         funcionario={funcionarioToEdit}
       />
-
-      {/* ✅ CORREÇÃO FINAL AQUI */}
-      {/* O modal de edição agora é renderizado sempre, para que o Bootstrap o encontre. */}
-      {/* A prop 'funcionario' (que pode ser null) garantirá que ele mostre os dados corretos ou fique "vazio". */}
       <EditarFuncionarioModal
         key={`edit-func-modal-${refreshKey}`}
         onSave={() => setRefreshKey(prev => prev + 1)}

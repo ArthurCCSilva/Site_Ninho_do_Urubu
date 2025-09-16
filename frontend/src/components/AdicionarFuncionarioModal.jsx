@@ -63,6 +63,8 @@ function AdicionarFuncionarioModal({ onSave, funcionario }) {
       }
       onSave(); // Avisa a página principal para recarregar a lista
       
+      document.querySelector('#adicionarFuncionarioModal .btn-close').click();
+
       // Fecha o modal via JS do Bootstrap
       const modalElement = document.getElementById('adicionarFuncionarioModal');
       const bootstrapModal = window.bootstrap.Modal.getInstance(modalElement);

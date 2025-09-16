@@ -126,6 +126,9 @@ function FuncoesModal({ onUpdateRoles, adminPermissions }) {
       }
       fetchFuncoes(); 
       if (onUpdateRoles) onUpdateRoles(); 
+
+      document.querySelector('#funcoesModal .btn-close').click();
+      
       resetForm();
     } catch (err) {
       console.error("Erro ao salvar função:", err);
