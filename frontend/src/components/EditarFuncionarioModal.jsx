@@ -1,35 +1,27 @@
-// frontend/src/components/EditarFuncionarioModal.jsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 
 function EditarFuncionarioModal({ onSave, funcionario }) {
-  // Estados para cada seção do formulário
   const [details, setDetails] = useState({ nome: '', usuario: '' });
   const [selectedFuncaoId, setSelectedFuncaoId] = useState('');
   const [novaSenha, setNovaSenha] = useState('');
   const [isActive, setIsActive] = useState(true);
-
-  // Estados de controle
   const [allFunctions, setAllFunctions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  
-  // Preenche os formulários quando o 'funcionario' (prop) muda
+
   useEffect(() => {
     if (funcionario) {
-      setDetails({ nome: funcionario.nomeCompleto, usuario: funcionario.usuario });
-      // Acessa o ID da função de forma segura
+      setDetails({ nome: funcionario.nomeCompleto || '', usuario: funcionario.usuario || '' });
       setSelectedFuncaoId(funcionario.role?.id || '');
       setIsActive(funcionario.is_active);
-      // Limpa as mensagens ao abrir
       setError('');
       setSuccess('');
       setNovaSenha('');
     }
   }, [funcionario]);
 
-  // Busca a lista de todas as funções disponíveis
   useEffect(() => {
     const fetchFuncoes = async () => {
       try {
@@ -41,16 +33,16 @@ function EditarFuncionarioModal({ onSave, funcionario }) {
     };
     fetchFuncoes();
   }, []);
-  
+
   const handleUpdate = async (endpoint, data, successMessage) => {
+    if (!funcionario) return; // Segurança extra
     setLoading(true);
     setError('');
     setSuccess('');
     try {
-      // Acessa o ID do funcionário de forma segura
-      await api.patch(`/api/usuarios/${funcionario?._id}/${endpoint}`, data);
+      await api.patch(`/api/usuarios/${funcionario._id}/${endpoint}`, data);
       setSuccess(successMessage);
-      onSave(); // Avisa a página principal para recarregar a lista
+      onSave();
     } catch (err) {
       setError(err.response?.data?.message || `Erro ao atualizar.`);
     } finally {
@@ -64,16 +56,13 @@ function EditarFuncionarioModal({ onSave, funcionario }) {
   const handleResetPassword = () => handleUpdate('password', { novaSenha }, 'Senha redefinida!');
   const handleUpdateStatus = () => handleUpdate('status', { is_active: !isActive }, `Funcionário ${!isActive ? 'ativado' : 'desativado'}!`);
 
-  if (!funcionario) return null;
-
   return (
-    // O id="editarFuncionarioModal" é crucial para o data-bs-target funcionar
     <div className="modal fade" id="editarFuncionarioModal" tabIndex="-1">
       <div className="modal-dialog modal-lg">
         <div className="modal-content">
           <div className="modal-header">
-            <h5 className="modal-title">Editar Funcionário: {funcionario.nomeCompleto}</h5>
-            {/* ✅ CORREÇÃO AQUI */}
+            {/* ✅ CORREÇÃO: Lida com 'funcionario' sendo null inicialmente */}
+            <h5 className="modal-title">Editar Funcionário: {funcionario?.nomeCompleto || ''}</h5>
             <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div className="modal-body">
@@ -86,11 +75,11 @@ function EditarFuncionarioModal({ onSave, funcionario }) {
                 <h6 className="card-title">Dados Cadastrais</h6>
                 <div className="mb-3">
                   <label>Nome Completo</label>
-                  <input type="text" className="form-control" value={details.nome} onChange={e => setDetails({...details, nome: e.target.value})} />
+                  <input type="text" className="form-control" value={details.nome} onChange={e => setDetails({ ...details, nome: e.target.value })} />
                 </div>
                 <div className="mb-3">
                   <label>Email (Usuário de Login)</label>
-                  <input type="email" className="form-control" value={details.usuario} onChange={e => setDetails({...details, usuario: e.target.value})} />
+                  <input type="email" className="form-control" value={details.usuario} onChange={e => setDetails({ ...details, usuario: e.target.value })} />
                 </div>
                 <button className="btn btn-primary btn-sm" onClick={handleUpdateDetails} disabled={loading}>Salvar Dados</button>
               </div>
@@ -133,10 +122,8 @@ function EditarFuncionarioModal({ onSave, funcionario }) {
                 </div>
               </div>
             </div>
-
           </div>
           <div className="modal-footer">
-            {/* ✅ CORREÇÃO AQUI */}
             <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
           </div>
         </div>
