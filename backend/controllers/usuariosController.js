@@ -422,3 +422,90 @@ exports.registerEmployee = async (req, res) => {
     res.status(500).json({ message: 'Erro no servidor ao registrar funcionário.' });
   }
 };
+
+exports.updateEmployeeDetails = async (req, res) => {
+    const { id } = req.params;
+    const { nome, email, cpf, telefone } = req.body;
+
+    try {
+        const updateFields = [];
+        const params = [];
+
+        if (nome) { updateFields.push('nome = ?'); params.push(nome); }
+        if (email) { updateFields.push('email = ?'); params.push(email); }
+        if (cpf) { updateFields.push('cpf = ?'); params.push(cpf.replace(/\D/g, '')); }
+        if (telefone) { updateFields.push('telefone = ?'); params.push(telefone.replace(/\D/g, '')); }
+
+        if (updateFields.length === 0) {
+            return res.status(400).json({ message: 'Nenhum dado para atualizar.' });
+        }
+
+        params.push(id);
+        const sql = `UPDATE usuarios SET ${updateFields.join(', ')} WHERE id = ?`;
+        
+        await db.query(sql, params);
+        res.status(200).json({ message: 'Dados atualizados com sucesso!' });
+
+    } catch (error) {
+        console.error("Erro ao atualizar detalhes do funcionário:", error);
+        if (error.code === 'ER_DUP_ENTRY') {
+            return res.status(409).json({ message: 'Email, CPF ou telefone já em uso.' });
+        }
+        res.status(500).json({ message: 'Erro no servidor ao atualizar dados.' });
+    }
+};
+
+// 2. Altera o cargo (funcao_id) de um funcionário
+exports.updateEmployeeFunction = async (req, res) => {
+    const { id } = req.params;
+    const { funcao_id } = req.body;
+
+    if (!funcao_id) {
+        return res.status(400).json({ message: 'O cargo (funcao_id) é obrigatório.' });
+    }
+
+    try {
+        await db.query('UPDATE usuarios SET funcao_id = ? WHERE id = ?', [funcao_id, id]);
+        res.status(200).json({ message: 'Cargo do funcionário atualizado com sucesso!' });
+    } catch (error) {
+        console.error("Erro ao atualizar cargo do funcionário:", error);
+        res.status(500).json({ message: 'Erro no servidor ao atualizar cargo.' });
+    }
+};
+
+// 3. Redefine a senha de um funcionário
+exports.resetEmployeePassword = async (req, res) => {
+    const { id } = req.params;
+    const { novaSenha } = req.body;
+
+    if (!novaSenha || novaSenha.length < 6) {
+        return res.status(400).json({ message: 'A nova senha é obrigatória e deve ter pelo menos 6 caracteres.' });
+    }
+
+    try {
+        const senhaHash = await bcrypt.hash(novaSenha, 10);
+        await db.query('UPDATE usuarios SET senha_hash = ? WHERE id = ?', [senhaHash, id]);
+        res.status(200).json({ message: 'Senha do funcionário redefinida com sucesso!' });
+    } catch (error) {
+        console.error("Erro ao redefinir senha do funcionário:", error);
+        res.status(500).json({ message: 'Erro no servidor ao redefinir senha.' });
+    }
+};
+
+// 4. Ativa ou desativa um funcionário
+exports.updateEmployeeStatus = async (req, res) => {
+    const { id } = req.params;
+    const { is_active } = req.body;
+
+    if (is_active === undefined) {
+        return res.status(400).json({ message: 'O status (is_active) é obrigatório.' });
+    }
+
+    try {
+        await db.query('UPDATE usuarios SET is_active = ? WHERE id = ?', [is_active, id]);
+        res.status(200).json({ message: `Funcionário ${is_active ? 'ativado' : 'desativado'} com sucesso!` });
+    } catch (error) {
+        console.error("Erro ao atualizar status do funcionário:", error);
+        res.status(500).json({ message: 'Erro no servidor ao atualizar status.' });
+    }
+};

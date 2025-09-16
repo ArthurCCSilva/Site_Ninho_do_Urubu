@@ -5,6 +5,7 @@ import api from '../services/api';
 
 import FuncoesModal from '../components/FuncoesModal';
 import AdicionarFuncionarioModal from '../components/AdicionarFuncionarioModal';
+import EditarFuncionarioModal from '../components/EditarFuncionarioModal';
 
 function AdminFuncionariosPage() {
   const { user } = useAuth();
@@ -58,20 +59,18 @@ function AdminFuncionariosPage() {
       <div className="d-flex justify-content-between mb-4">
         
         {user?.permissoes?.includes('gerenciarFuncoes') && (
-          // ✅ VOLTAMOS A USAR O MÉTODO DO BOOTSTRAP
           <button type="button" className="btn btn-primary" data-bs-toggle="modal" data-bs-target="#funcoesModal">
             Gerenciar Funções
           </button>
         )}
         
         {user?.permissoes?.includes('admin_gerenciar_funcionarios') && (
-          // ✅ VOLTAMOS A USAR O MÉTODO DO BOOTSTRAP
           <button
             type="button"
             className="btn btn-success"
             data-bs-toggle="modal"
             data-bs-target="#adicionarFuncionarioModal"
-            onClick={() => setFuncionarioToEdit(null)} // Limpa para garantir que é um novo cadastro
+            onClick={() => setFuncionarioToEdit(null)}
           >
             Adicionar Funcionário
           </button>
@@ -103,13 +102,12 @@ function AdminFuncionariosPage() {
                 <td>
                   {user?.permissoes?.includes('admin_gerenciar_funcionarios') && (
                     <>
-                      {/* ✅ O botão de editar agora usa data-bs-toggle também */}
                       <button 
                         type="button" 
                         className="btn btn-sm btn-info me-2" 
                         onClick={() => handleEditFuncionario(func)}
                         data-bs-toggle="modal"
-                        data-bs-target="#adicionarFuncionarioModal"
+                        data-bs-target="#editarFuncionarioModal" 
                       >
                         Editar
                       </button>
@@ -128,7 +126,6 @@ function AdminFuncionariosPage() {
         </table>
       </div>
 
-      {/* Os modais são renderizados, mas controlados pelo Bootstrap */}
       <FuncoesModal
         key={`funcoes-modal-${refreshKey}`}
         onUpdateRoles={() => setRefreshKey(prev => prev + 1)}
@@ -136,6 +133,15 @@ function AdminFuncionariosPage() {
       />
       <AdicionarFuncionarioModal
         key={`add-func-modal-${refreshKey}`}
+        onSave={() => setRefreshKey(prev => prev + 1)}
+        funcionario={funcionarioToEdit}
+      />
+
+      {/* ✅ CORREÇÃO FINAL AQUI */}
+      {/* O modal de edição agora é renderizado sempre, para que o Bootstrap o encontre. */}
+      {/* A prop 'funcionario' (que pode ser null) garantirá que ele mostre os dados corretos ou fique "vazio". */}
+      <EditarFuncionarioModal
+        key={`edit-func-modal-${refreshKey}`}
         onSave={() => setRefreshKey(prev => prev + 1)}
         funcionario={funcionarioToEdit}
       />

@@ -31,4 +31,9 @@ router.post('/register-employee', [verifyToken, isAdmin], usuariosController.reg
 // Rota para exclusão de usuário/funcionário (Admin ou Dev)
 router.delete('/:id', [verifyToken, isAdminOrDev], usuariosController.deleteUser); 
 
+router.patch('/:id/details', [verifyToken, hasPermission('admin_gerenciar_funcionarios')], usuariosController.updateEmployeeDetails);
+router.patch('/:id/function', [verifyToken, hasPermission('admin_gerenciar_funcionarios')], usuariosController.updateEmployeeFunction);
+router.patch('/:id/password', [verifyToken, hasPermission('admin_gerenciar_funcionarios')], usuariosController.resetEmployeePassword);
+router.patch('/:id/status', [verifyToken, hasPermission('admin_gerenciar_funcionarios')], usuariosController.updateEmployeeStatus);
+
 module.exports = router;
