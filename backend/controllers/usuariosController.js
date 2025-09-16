@@ -299,13 +299,19 @@ exports.getMinhasComandas = async (req, res) => {
 // AGORA CORRETAMENTE IMPLEMENTADA PARA MySQL COM SUAS COLUNAS
 exports.getAllUsers = async (req, res) => {
     try {
-        // Pega o parâmetro 'role' da URL (ex: /api/usuarios?role=funcionario)
         const { role } = req.query;
 
-        let sql = "SELECT u.id, u.nome, u.email, u.telefone, u.cpf, u.imagem_perfil_url, u.role, u.is_active, f.nome_funcao FROM usuarios u LEFT JOIN funcoes f ON u.funcao_id = f.id";
+        // ✅ QUERY CORRIGIDA: Adicionamos a junção com a tabela 'funcoes'
+        // e pegamos 'f.nome_funcao' para cada usuário.
+        let sql = `
+            SELECT 
+                u.id, u.nome, u.email, u.cpf, u.role, u.is_active,
+                f.nome_funcao 
+            FROM usuarios u 
+            LEFT JOIN funcoes f ON u.funcao_id = f.id
+        `;
         const params = [];
 
-        // Se um filtro de role foi passado, adiciona a condição WHERE
         if (role) {
             sql += " WHERE u.role = ?";
             params.push(role);
@@ -315,17 +321,19 @@ exports.getAllUsers = async (req, res) => {
         
         const [users] = await db.query(sql, params);
         
-        // Formata o resultado para o frontend
+        // Formata os dados para o frontend, garantindo que 'funcaoNome' seja incluído
         const formattedUsers = users.map(user => ({
             _id: user.id,
             nomeCompleto: user.nome,
-            usuario: user.email, // O frontend usa 'usuario' como login
+            usuario: user.email,
             cpf: user.cpf,
+            funcaoNome: user.nome_funcao, // <-- A propriedade que estava faltando
+            is_active: user.is_active,
+            // Mantemos o objeto 'role' para consistência, caso outras partes precisem
             role: { 
-              name: user.role === 'funcionario' ? user.nome_funcao : user.role, // Para funcionários, mostra o nome da função
-              originalRole: user.role // Mantém a role original
-            },
-            is_active: user.is_active
+              name: user.role === 'funcionario' ? user.nome_funcao : user.role,
+              originalRole: user.role
+            }
         }));
 
         res.status(200).json(formattedUsers);
@@ -380,26 +388,37 @@ exports.deleteUser = async (req, res) => {
 };
 
 exports.registerEmployee = async (req, res) => {
-  const { nome, email, senha, cpf, funcao_id } = req.body;
+  console.log("--- ROTA /register-employee ATINGIDA ---");
+  console.log("Dados recebidos:", req.body);
 
-  if (!nome || !email || !senha || !funcao_id) {
-    return res.status(400).json({ message: 'Nome, email, senha e função são obrigatórios.' });
+  // O frontend enviará: nome, usuario (que é o email), senha, funcao_id
+  const { nome, usuario, senha, funcao_id } = req.body;
+
+  if (!nome || !usuario || !senha || !funcao_id) {
+    console.error("Erro: Campos obrigatórios faltando.");
+    return res.status(400).json({ message: 'Nome, usuário (email), senha e cargo são obrigatórios.' });
   }
 
   try {
     const senhaHash = await bcrypt.hash(senha, 10);
     const sql = `
-      INSERT INTO usuarios (nome, email, senha_hash, cpf, role, funcao_id, is_active) 
-      VALUES (?, ?, ?, ?, 'funcionario', ?, 1)
+      INSERT INTO usuarios (nome, email, senha_hash, role, funcao_id, is_active) 
+      VALUES (?, ?, ?, 'funcionario', ?, 1)
     `;
-    const params = [nome, email, senhaHash, cpf ? cpf.replace(/\D/g, '') : null, funcao_id];
+    
+    // O 'usuario' do formulário é salvo na coluna 'email'
+    const params = [nome, usuario, senhaHash, funcao_id];
+
     const [result] = await db.query(sql, params);
-    res.status(201).json({ message: 'Funcionário cadastrado com sucesso!', userId: result.insertId });
+    console.log("Funcionário inserido no banco com ID:", result.insertId);
+
+    res.status(201).json({ message: 'Funcionário cadastrado com sucesso!' });
+
   } catch (error) {
+    console.error("!!! ERRO NO BACKEND AO SALVAR !!!", error);
     if (error.code === 'ER_DUP_ENTRY') {
-      return res.status(409).json({ message: 'Este e-mail ou CPF já está cadastrado.' });
+      return res.status(409).json({ message: 'Este email de usuário já está cadastrado.' });
     }
-    console.error("Erro ao registrar funcionário:", error);
-    res.status(500).json({ message: 'Erro no servidor ao registrar funcionário.', error: error.message });
+    res.status(500).json({ message: 'Erro no servidor ao registrar funcionário.' });
   }
 };
