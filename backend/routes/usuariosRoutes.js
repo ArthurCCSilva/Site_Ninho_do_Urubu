@@ -22,7 +22,7 @@ router.post('/:id/pagar-fiado-total', [verifyToken, isAdmin], usuariosController
 
 // ✅ ADIÇÃO DA ROTA: Esta rota atenderá a '/api/usuarios' (que é o que o frontend irá chamar).
 router.get('/', [verifyToken, isAdminOrDev], usuariosController.getAllUsers);
-
+router.post('/register-employee', [verifyToken, isAdmin], usuariosController.registerEmployee);
 // ✅ ADIÇÃO DA ROTA: Para exclusão de usuário/funcionário (Admin ou Dev)
 // Use esta para o botão "Excluir" no frontend.
 router.delete('/:id', [verifyToken, isAdminOrDev], usuariosController.deleteUser); 

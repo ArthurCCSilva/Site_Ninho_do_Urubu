@@ -86,8 +86,7 @@ exports.login = async (req, res) => {
 // Essencial para o novo sistema de permissões.
 exports.getMe = async (req, res) => {
   try {
-    const userId = req.user.id; // Vem do token, via middleware
-
+    const userId = req.user.id;
     const [userRows] = await db.query('SELECT id, nome, email, cpf, role, funcao_id, telefone, imagem_perfil_url FROM usuarios WHERE id = ?', [userId]);
 
     if (userRows.length === 0) {
@@ -96,41 +95,54 @@ exports.getMe = async (req, res) => {
 
     const userData = userRows[0];
     let permissoesArray = [];
-    
+    let nomeFuncao = userData.role; // O nome da função padrão é a própria role
+
+    // ✅ CORREÇÃO PRINCIPAL AQUI:
+    // Se a role for 'dev' OU 'admin', damos todas as permissões.
     if (userData.role === 'dev' || userData.role === 'admin') {
       const [allPermissions] = await db.query("SELECT GROUP_CONCAT(chave_permissao) as permissoes FROM permissoes");
       if (allPermissions[0].permissoes) {
         permissoesArray = allPermissions[0].permissoes.split(',');
       }
-    } else if (userData.role === 'funcionario' && userData.funcao_id) {
+    } 
+    // Somente se for 'funcionario' E tiver uma funcao_id, buscamos as permissões específicas.
+    else if (userData.role === 'funcionario' && userData.funcao_id) {
       const query = `
-        SELECT GROUP_CONCAT(p.chave_permissao) as permissoes
-        FROM funcao_permissoes fp
-        JOIN permissoes p ON fp.permissao_id = p.id
-        WHERE fp.funcao_id = ?
+        SELECT f.nome_funcao, GROUP_CONCAT(p.chave_permissao) as permissoes
+        FROM funcoes f
+        LEFT JOIN funcao_permissoes fp ON f.id = fp.funcao_id
+        LEFT JOIN permissoes p ON fp.permissao_id = p.id
+        WHERE f.id = ?
+        GROUP BY f.id
       `;
       const [funcaoRows] = await db.query(query, [userData.funcao_id]);
-      if (funcaoRows[0] && funcaoRows[0].permissoes) {
-        permissoesArray = funcaoRows[0].permissoes.split(',');
+
+      if (funcaoRows.length > 0) {
+        const funcaoData = funcaoRows[0];
+        nomeFuncao = funcaoData.nome_funcao;
+        if (funcaoData.permissoes) {
+          permissoesArray = funcaoData.permissoes.split(',');
+        }
       }
     }
 
-    // ✅ MONTA O OBJETO HÍBRIDO E SIMPLIFICADO
     const userProfile = {
       id: userData.id,
       nomeCompleto: userData.nome,
-      usuario: userData.email, // Frontend usa 'usuario' para o campo de email
+      usuario: userData.email,
       cpf: userData.cpf,
       role: userData.role,
+      funcaoNome: nomeFuncao,
       permissoes: permissoesArray,
       telefone: userData.telefone,
       imagem_perfil_url: userData.imagem_perfil_url
     };
 
+    console.log("--> Backend enviando perfil (versão final com hierarquia correta):", userProfile);
     res.status(200).json(userProfile);
 
   } catch (error) {
-    console.error("Erro na função getMe:", error);
+    console.error("Erro na função getMe (versão final):", error);
     res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };

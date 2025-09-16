@@ -378,3 +378,28 @@ exports.deleteUser = async (req, res) => {
         connection.release();
     }
 };
+
+exports.registerEmployee = async (req, res) => {
+  const { nome, email, senha, cpf, funcao_id } = req.body;
+
+  if (!nome || !email || !senha || !funcao_id) {
+    return res.status(400).json({ message: 'Nome, email, senha e função são obrigatórios.' });
+  }
+
+  try {
+    const senhaHash = await bcrypt.hash(senha, 10);
+    const sql = `
+      INSERT INTO usuarios (nome, email, senha_hash, cpf, role, funcao_id, is_active) 
+      VALUES (?, ?, ?, ?, 'funcionario', ?, 1)
+    `;
+    const params = [nome, email, senhaHash, cpf ? cpf.replace(/\D/g, '') : null, funcao_id];
+    const [result] = await db.query(sql, params);
+    res.status(201).json({ message: 'Funcionário cadastrado com sucesso!', userId: result.insertId });
+  } catch (error) {
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ message: 'Este e-mail ou CPF já está cadastrado.' });
+    }
+    console.error("Erro ao registrar funcionário:", error);
+    res.status(500).json({ message: 'Erro no servidor ao registrar funcionário.', error: error.message });
+  }
+};

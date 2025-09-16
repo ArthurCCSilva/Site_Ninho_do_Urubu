@@ -7,24 +7,24 @@ import FuncoesModal from '../components/FuncoesModal';
 import AdicionarFuncionarioModal from '../components/AdicionarFuncionarioModal';
 
 function AdminFuncionariosPage() {
-  const { user } = useAuth();
+  // ✅ PASSO 1: Pegamos também o 'isLoading' do nosso contexto
+  const { user, isLoading: authLoading } = useAuth();
+  
   const [funcionarios, setFuncionarios] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // Loading dos dados da PÁGINA
   const [error, setError] = useState(null);
   const [funcionarioToEdit, setFuncionarioToEdit] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // ✅ ADICIONADO: console.log para verificar as permissões do usuário logado
   useEffect(() => {
-    if (user) {
-      // Agora ele mostra o conteúdo do array
-      console.log("Conteúdo das Permissões:", user.permissoes);
+    // A busca só acontece APÓS a autenticação terminar E se o usuário tiver permissão
+    if (!authLoading && user?.permissoes?.includes('admin_gerenciar_funcionarios')) {
+      fetchFuncionarios();
+    } else if (!authLoading) {
+        // Se o carregamento terminou e não tem permissão, paramos o loading da página
+        setLoading(false);
     }
-  }, [user]);
-
-  useEffect(() => {
-    fetchFuncionarios();
-  }, [refreshKey]);
+  }, [refreshKey, user, authLoading]); // Adicionamos 'authLoading'
 
   const fetchFuncionarios = async () => {
     setLoading(true);
@@ -46,9 +46,8 @@ function AdminFuncionariosPage() {
   };
 
   const handleDeleteFuncionario = async (funcionarioId) => {
-    if (!user?.permissoes?.includes('gerenciarUsuarios')) {
-      alert('Você não tem permissão para excluir funcionários.');
-      return;
+    if (!user?.permissoes?.includes('admin_gerenciar_funcionarios')) {
+        return alert('Você não tem permissão para excluir funcionários.');
     }
     if (window.confirm("Tem certeza que deseja excluir este funcionário?")) {
       try {
@@ -61,28 +60,40 @@ function AdminFuncionariosPage() {
       }
     }
   };
-
-  if (loading) return <div className="text-center mt-5"><div className="spinner-border text-primary" role="status"><span className="visually-hidden">Carregando...</span></div></div>;
+  
+  // ✅ PASSO 2: Verificação de carregamento da AUTENTICAÇÃO
+  // Essa verificação vem primeiro e resolve o erro da página em branco/bloqueada
+  if (authLoading) {
+    return <div className="text-center mt-5"><div className="spinner-border text-primary" role="status"><span className="visually-hidden">Verificando autenticação...</span></div></div>;
+  }
+  
+  // ✅ PASSO 3: Verificação de PERMISSÃO
+  // Agora que sabemos que a autenticação terminou, esta verificação é segura
+  if (!user?.permissoes?.includes('admin_gerenciar_funcionarios')) {
+    return <div className="alert alert-warning text-center mt-5">Você não tem permissão para acessar esta página.</div>;
+  }
+  
+  // Se passou pelas verificações acima, continua com o loading dos dados da PÁGINA
+  if (loading) return <div className="text-center mt-5"><div className="spinner-border text-primary" role="status"><span className="visually-hidden">Carregando funcionários...</span></div></div>;
   if (error) return <div className="alert alert-danger text-center mt-5">{error}</div>;
 
   return (
     <div className="container mt-4">
       <h2 className="mb-4">Gerenciar Funcionários</h2>
       <div className="d-flex justify-content-between mb-4">
-        {/* Botão de Gerenciar Funções */}
+        
         {user?.permissoes?.includes('gerenciarFuncoes') && (
-          <button
-            type="button"
-            className="btn btn-primary"
-            data-bs-toggle="modal"
-            data-bs-target="#funcoesModal"
-          >
-            Gerenciar Funções
-          </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              data-bs-toggle="modal"
+              data-bs-target="#funcoesModal"
+            >
+              Gerenciar Funções
+            </button>
         )}
-
-        {/* Botão de Adicionar Funcionário */}
-        {user?.permissoes?.includes('gerenciarUsuarios') && (
+        
+        {(user?.permissoes?.includes('admin_gerenciar_funcionarios') || user?.permissoes?.includes('gerenciarUsuarios')) && (
           <button
             type="button"
             className="btn btn-success"
@@ -95,7 +106,6 @@ function AdminFuncionariosPage() {
         )}
       </div>
 
-      { /* O resto do seu JSX permanece igual */}
       {funcionarios.length === 0 ? (
         <div className="alert alert-info text-center">Nenhum funcionário encontrado.</div>
       ) : (
@@ -115,30 +125,31 @@ function AdminFuncionariosPage() {
                 <tr key={func._id}>
                   <td>{func.nomeCompleto}</td>
                   <td>{func.usuario}</td>
-                  <td>{func.role?.name || 'Não definida'}</td>
+                  {/* ✅ CORREÇÃO FINAL: Usamos func.funcaoNome que vem da API de usuários */}
+                  <td>{func.funcaoNome || func.role.name || 'Não definida'}</td>
                   <td>
                     <span className={`badge ${func.is_active ? 'bg-success' : 'bg-danger'}`}>
                       {func.is_active ? 'Ativo' : 'Inativo'}
                     </span>
                   </td>
                   <td>
-                    {user?.permissoes?.includes('admin_gerenciar_usuarios') && (
-                      <>
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-info me-2"
-                          onClick={() => handleEditFuncionario(func)}
-                          data-bs-toggle="modal"
-                          data-bs-target="#adicionarFuncionarioModal">
-                          Editar
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-danger"
-                          onClick={() => handleDeleteFuncionario(func._id)}>
-                          Excluir
-                        </button>
-                      </>
+                    {(user?.permissoes?.includes('admin_gerenciar_funcionarios') || user?.permissoes?.includes('gerenciarUsuarios')) && (
+                        <>
+                            <button 
+                                type="button" 
+                                className="btn btn-sm btn-info me-2" 
+                                onClick={() => handleEditFuncionario(func)} 
+                                data-bs-toggle="modal" 
+                                data-bs-target="#adicionarFuncionarioModal">
+                                Editar
+                            </button>
+                            <button 
+                                type="button" 
+                                className="btn btn-sm btn-danger" 
+                                onClick={() => handleDeleteFuncionario(func._id)}>
+                                Excluir
+                            </button>
+                        </>
                     )}
                   </td>
                 </tr>

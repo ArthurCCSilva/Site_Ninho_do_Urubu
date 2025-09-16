@@ -1,34 +1,53 @@
 // src/components/FuncoesModal.jsx
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
+import { useFeatureFlags } from '../context/FeatureFlagContext';
 
-// Lista estática de permissões disponíveis no frontend
-const ALL_AVAILABLE_PERMISSIONS = [
-  { key: 'gerenciarProdutos', name: 'Gerenciar Produtos', description: 'Permite adicionar, editar e remover produtos.' },
-  { key: 'verPedidos', name: 'Visualizar Pedidos', description: 'Permite ver a lista de todos os pedidos.' },
-  { key: 'editarPedidos', name: 'Editar Pedidos', description: 'Permite mudar o status e detalhes dos pedidos.' },
-  { key: 'gerenciarUsuarios', name: 'Gerenciar Usuários', description: 'Permite criar, editar e excluir contas de usuários (clientes e funcionários).' },
-  { key: 'gerenciarFuncoes', name: 'Gerenciar Funções', description: 'Permite criar, editar e excluir funções de acesso.' },
-  { key: 'acessoRelatorios', name: 'Acesso a Relatórios', description: 'Permite visualizar relatórios de vendas e desempenho.' },
-  // ✅ Adicione outras permissões conforme a necessidade do seu sistema
-];
+// A lista MESTRA de todas as permissões possíveis no sistema
+const PERMISSIONS_BY_CATEGORY = {
+  globais: {
+    name: 'Permissões Globais (Painel Admin)',
+    permissions: [
+      { key: 'admin_gerenciar_pedidos', name: 'Gerenciar Pedidos', description: 'Permite acesso ao botão "Gerenciar Pedidos".' },
+      { key: 'admin_registrar_venda_fisica', name: 'Registrar Venda Física', description: 'Permite acesso ao botão "Registrar Venda Física".' },
+      { key: 'admin_gerenciar_comandas', name: 'Gerenciar Comandas', description: 'Permite acesso ao botão "Gerenciar Comandas".' },
+      { key: 'admin_painel_financeiro', name: 'Acessar Painel Financeiro', description: 'Permite acesso ao botão "Painel Financeiro".' },
+      { key: 'admin_info_clientes', name: 'Acessar Info Clientes', description: 'Permite acesso ao botão "Info Clientes".' },
+      { key: 'admin_gerenciar_funcionarios', name: 'Gerenciar Funcionários', description: 'Permite acesso ao botão "Gerenciar Funcionários".' },
+      { key: 'admin_gerenciar_categorias', name: 'Gerenciar Categorias', description: 'Permite acesso ao modal "Gerenciar Categorias".' },
+      { key: 'admin_reativar_produtos', name: 'Reativar Produtos', description: 'Permite acesso ao modal "Reativar Produtos".' },
+      { key: 'admin_editar_cliente', name: 'Editar Cliente', description: 'Permite acesso ao modal "Editar Cliente".' },
+    ]
+  },
+  pagamentos: {
+    name: 'Permissões de Pagamento',
+    permissions: [
+      { key: 'sistema_fiado', name: 'Habilitar Sistema Fiado', description: 'Permite fechar comandas ou alterar status de pedidos para "Fiado".' },
+      { key: 'sistema_boleto', name: 'Habilitar Boleto Virtual', description: 'Permite que clientes paguem com Boleto e admins gerenciem os carnês.' },
+    ]
+  },
+  financeiras: {
+    name: 'Permissões do Painel Financeiro',
+    permissions: [
+      { key: 'financeiro_analise_pagamentos', name: 'Análise de Pagamentos', description: 'Permite ver a análise de vendas por formas de pagamento.' },
+      { key: 'financeiro_comparativo_mensal', name: 'Comparativo Mensal', description: 'Permite ver o comparativo mensal de vendas.' },
+      { key: 'financeiro_comparativo_produto', name: 'Comparativo por Produto', description: 'Permite ver o comparativo de vendas por produto.' },
+      { key: 'financeiro_top10_clientes', name: 'Top 10 Clientes', description: 'Permite ver os Top 10 Clientes Mais Lucrativos.' },
+      { key: 'financeiro_top10_produtos', name: 'Top 10 Produtos', description: 'Permite ver os Top 10 Produtos Mais Lucrativos.' },
+    ]
+  }
+};
 
 function FuncoesModal({ onUpdateRoles, adminPermissions }) {
+  const { isEnabled, flagsLoading } = useFeatureFlags();
   const [funcoes, setFuncoes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
   const [editingFuncao, setEditingFuncao] = useState(null); 
-  const [funcaoForm, setFuncaoForm] = useState({ nome: '', permissoes: [] });
+  const [funcaoForm, setFuncaoForm] = useState({ nome_funcao: '', lista_permissoes: [] });
   const [formError, setFormError] = useState(null);
 
-  const adminAllowedPermissionKeys = Array.isArray(adminPermissions) 
-    ? adminPermissions.map(p => typeof p === 'string' ? p : p.key) 
-    : [];
-
   useEffect(() => {
-    // Quando o modal é aberto (assumindo que ele é montado/remontado), carregamos as funções
-    // ou quando o modal é exibido (via JS do Bootstrap)
     const modalElement = document.getElementById('funcoesModal');
     if (modalElement) {
       modalElement.addEventListener('shown.bs.modal', fetchFuncoes);
@@ -41,6 +60,21 @@ function FuncoesModal({ onUpdateRoles, adminPermissions }) {
       }
     };
   }, []);
+
+  // ✅ LÓGICA DE FILTRO CORRIGIDA E CENTRALIZADA
+  // Cria a lista de permissões que o admin pode atribuir.
+  // Uma permissão só aparece aqui se:
+  // 1. A feature flag correspondente estiver ATIVA (ligada pelo dev).
+  // 2. O admin logado TIVER essa permissão.
+  const permissionsAdminCanAssign = Object.entries(PERMISSIONS_BY_CATEGORY)
+    .map(([categoryKey, categoryData]) => ({
+      ...categoryData,
+      key: categoryKey,
+      permissions: categoryData.permissions.filter(perm => 
+        isEnabled(perm.key) && adminPermissions.includes(perm.key)
+      )
+    }))
+    .filter(category => category.permissions.length > 0);
 
   const fetchFuncoes = async () => {
     setLoading(true);
@@ -58,7 +92,7 @@ function FuncoesModal({ onUpdateRoles, adminPermissions }) {
 
   const resetForm = () => {
     setEditingFuncao(null);
-    setFuncaoForm({ nome: '', permissoes: [] });
+    setFuncaoForm({ nome_funcao: '', lista_permissoes: [] });
     setFormError(null);
   };
 
@@ -67,176 +101,139 @@ function FuncoesModal({ onUpdateRoles, adminPermissions }) {
   };
 
   const handlePermissionToggle = (permissionKey) => {
-    if (!adminAllowedPermissionKeys.includes(permissionKey)) {
-      setFormError(`Você não tem permissão para gerenciar a permissão '${permissionKey}'.`);
-      return;
-    }
-
     setFuncaoForm(prevForm => {
-      const newPermissions = prevForm.permissoes.includes(permissionKey)
-        ? prevForm.permissoes.filter(p => p !== permissionKey)
-        : [...prevForm.permissoes, permissionKey];
-      return { ...prevForm, permissoes: newPermissions };
+      const newPermissions = prevForm.lista_permissoes.includes(permissionKey)
+        ? prevForm.lista_permissoes.filter(p => p !== permissionKey)
+        : [...prevForm.lista_permissoes, permissionKey];
+      return { ...prevForm, lista_permissoes: newPermissions };
     });
   };
 
   const handleSaveFuncao = async (e) => {
     e.preventDefault();
     setFormError(null);
-
-    if (!funcaoForm.nome.trim()) {
+    if (!funcaoForm.nome_funcao.trim()) {
       setFormError("O nome da função é obrigatório.");
       return;
     }
-
     try {
       if (editingFuncao) {
-        await api.put(`/admin/funcoes/${editingFuncao._id}`, funcaoForm); 
+        await api.put(`/api/funcoes/${editingFuncao.id}`, funcaoForm); 
         alert("Função atualizada com sucesso!");
       } else {
-        await api.post('/admin/funcoes', funcaoForm); 
+        await api.post('/api/funcoes', funcaoForm); 
         alert("Função criada com sucesso!");
       }
       fetchFuncoes(); 
-      onUpdateRoles(); 
+      if (onUpdateRoles) onUpdateRoles(); 
       resetForm();
     } catch (err) {
       console.error("Erro ao salvar função:", err);
-      setFormError("Erro ao salvar função. " + (err.response?.data?.message || err.message));
+      setFormError(err.response?.data?.message || "Erro ao salvar função.");
     }
   };
 
   const handleEditClick = (funcao) => {
     setEditingFuncao(funcao);
-    setFuncaoForm({ nome: funcao.nome, permissoes: funcao.permissoes || [] });
+    setFuncaoForm({ nome_funcao: funcao.nome_funcao, lista_permissoes: funcao.permissoes || [] });
     setFormError(null);
   };
 
   const handleDeleteFuncao = async (funcaoId) => {
-    if (window.confirm("Tem certeza que deseja excluir esta função? Isso só será possível se nenhum funcionário estiver atualmente atribuído a ela.")) {
+    if (window.confirm("Tem certeza que deseja excluir esta função?")) {
       try {
-        await api.delete(`/admin/funcoes/${funcaoId}`); 
+        await api.delete(`/api/funcoes/${funcaoId}`); 
         fetchFuncoes(); 
-        onUpdateRoles(); 
+        if (onUpdateRoles) onUpdateRoles(); 
         alert("Função excluída com sucesso!");
       } catch (err) {
         console.error("Erro ao excluir função:", err);
-        setFormError("Erro ao excluir função. " + (err.response?.data?.message || "Verifique se não há funcionários usando esta função."));
+        setFormError(err.response?.data?.message || "Erro ao excluir função.");
       }
     }
   };
-  
-  const permissionsAdminCanAssign = ALL_AVAILABLE_PERMISSIONS.filter(
-    p => adminAllowedPermissionKeys.includes(p.key)
-  );
+
+  if (loading || flagsLoading) {
+    return (
+        <div className="modal fade" id="funcoesModal" tabIndex="-1">
+            <div className="modal-dialog modal-lg"><div className="modal-content"><div className="modal-body text-center p-5">
+                <div className="spinner-border text-primary" /><p className="mt-3">Carregando...</p>
+            </div></div></div>
+        </div>
+    );
+  }
 
   return (
-    // ✅ Estrutura de modal Bootstrap puro
     <div className="modal fade" id="funcoesModal" tabIndex="-1" aria-labelledby="funcoesModalLabel" aria-hidden="true">
       <div className="modal-dialog modal-lg">
         <div className="modal-content">
           <div className="modal-header">
             <h5 className="modal-title" id="funcoesModalLabel">Gerenciar Funções</h5>
-            <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close" onClick={resetForm}></button>
           </div>
           <div className="modal-body">
-            {loading && <div className="text-center"><div className="spinner-border spinner-border-sm text-primary" role="status"><span className="visually-hidden">Carregando...</span></div> Carregando funções...</div>}
             {error && <div className="alert alert-danger">{error}</div>}
             {formError && <div className="alert alert-danger">{formError}</div>}
 
-            {/* Formulário de Criação/Edição de Função */}
             <form onSubmit={handleSaveFuncao} className="mb-4 p-3 border rounded">
-              <h4>{editingFuncao ? `Editar Função: ${editingFuncao.nome}` : "Criar Nova Função"}</h4>
+              <h4>{editingFuncao ? `Editar Função: ${editingFuncao.nome_funcao}` : "Criar Nova Função"}</h4>
               <div className="mb-3">
-                <label htmlFor="nomeFuncao" className="form-label">Nome da Função</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  id="nomeFuncao"
-                  name="nome"
-                  value={funcaoForm.nome}
-                  onChange={handleFormChange}
-                  placeholder="Ex: Gerente, Atendente"
-                  required
-                />
+                <label htmlFor="nome_funcao" className="form-label">Nome da Função</label>
+                <input type="text" className="form-control" id="nome_funcao" name="nome_funcao" value={funcaoForm.nome_funcao} onChange={handleFormChange} placeholder="Ex: Gerente, Atendente" required />
               </div>
 
               <div className="mb-3">
-                <label className="form-label">Permissões</label>
-                <ul className="list-group">
-                  {permissionsAdminCanAssign.length === 0 && (
-                    <li className="list-group-item list-group-item-warning">
-                      Nenhuma permissão disponível para você gerenciar.
-                    </li>
-                  )}
-                  {permissionsAdminCanAssign.map(perm => (
-                    <li key={perm.key} className="list-group-item d-flex justify-content-between align-items-center">
-                      <div className="form-check">
-                        <input
-                          className="form-check-input"
-                          type="checkbox"
-                          id={`perm-${perm.key}`}
-                          checked={funcaoForm.permissoes.includes(perm.key)}
-                          onChange={() => handlePermissionToggle(perm.key)}
-                          disabled={!adminAllowedPermissionKeys.includes(perm.key)}
-                        />
-                        <label className="form-check-label" htmlFor={`perm-${perm.key}`}>
-                          {perm.name}
-                        </label>
-                        {perm.description && <small className="d-block text-muted">{perm.description}</small>}
+                <label className="form-label">Permissões para Atribuir</label>
+                <div className="accordion" id="accordionPermissions">
+                  {permissionsAdminCanAssign.map((categoryData) => (
+                    <div className="accordion-item" key={categoryData.key}>
+                      <h2 className="accordion-header" id={`heading-${categoryData.key}`}>
+                        <button className="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target={`#collapse-${categoryData.key}`}>{categoryData.name}</button>
+                      </h2>
+                      <div id={`collapse-${categoryData.key}`} className="accordion-collapse collapse" data-bs-parent="#accordionPermissions">
+                        <div className="accordion-body">
+                          <ul className="list-group">
+                            {categoryData.permissions.map(perm => (
+                              <li key={perm.key} className="list-group-item border-0">
+                                <div className="form-check">
+                                  <input type="checkbox" className="form-check-input" id={`perm-${perm.key}`} checked={funcaoForm.lista_permissoes.includes(perm.key)} onChange={() => handlePermissionToggle(perm.key)} />
+                                  <label className="form-check-label" htmlFor={`perm-${perm.key}`}>{perm.name}</label>
+                                  {perm.description && <small className="d-block text-muted">{perm.description}</small>}
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
                       </div>
-                      {!adminAllowedPermissionKeys.includes(perm.key) && (
-                        <span className="badge bg-warning text-dark">Permissão Admin Insuficiente</span>
-                      )}
-                    </li>
+                    </div>
                   ))}
-                </ul>
+                  {permissionsAdminCanAssign.length === 0 && (
+                      <div className="alert alert-info small">Nenhuma permissão disponível para você gerenciar no momento.</div>
+                  )}
+                </div>
               </div>
-
-              <button type="submit" className="btn btn-primary me-2">
-                {editingFuncao ? "Salvar Edição" : "Criar Função"}
-              </button>
-              {editingFuncao && (
-                <button type="button" className="btn btn-secondary" onClick={resetForm}>
-                  Cancelar Edição
-                </button>
-              )}
+              
+              <button type="submit" className="btn btn-primary me-2">{editingFuncao ? "Salvar Edição" : "Criar Função"}</button>
+              {editingFuncao && (<button type="button" className="btn btn-secondary" onClick={resetForm}>Cancelar Edição</button>)}
             </form>
 
             <hr />
 
-            {/* Listagem de Funções Existentes */}
             <h4>Funções Criadas</h4>
             {funcoes.length === 0 ? (
               <div className="alert alert-info">Nenhuma função cadastrada.</div>
             ) : (
               <ul className="list-group">
                 {funcoes.map(funcao => (
-                  <li key={funcao._id} className="list-group-item d-flex justify-content-between align-items-center">
+                  <li key={funcao.id} className="list-group-item d-flex justify-content-between align-items-center">
                     <div>
-                      <strong>{funcao.nome}</strong>
+                      <strong>{funcao.nome_funcao}</strong>
                       <br />
-                      <small className="text-muted">
-                        Permissões: {funcao.permissoes && funcao.permissoes.length > 0 
-                          ? funcao.permissoes.map(pKey => ALL_AVAILABLE_PERMISSIONS.find(ap => ap.key === pKey)?.name || pKey).join(', ') 
-                          : 'Nenhuma'}
-                      </small>
+                      <small className="text-muted">Permissões: {funcao.permissoes && funcao.permissoes.length > 0 ? funcao.permissoes.join(', ') : 'Nenhuma'}</small>
                     </div>
                     <div>
-                      <button 
-                        type="button"
-                        className="btn btn-warning btn-sm me-2" 
-                        onClick={() => handleEditClick(funcao)}
-                      >
-                        Editar
-                      </button>
-                      <button 
-                        type="button"
-                        className="btn btn-danger btn-sm" 
-                        onClick={() => handleDeleteFuncao(funcao._id)}
-                      >
-                        Excluir
-                      </button>
+                      <button type="button" className="btn btn-warning btn-sm me-2" onClick={() => handleEditClick(funcao)}>Editar</button>
+                      <button type="button" className="btn btn-danger btn-sm" onClick={() => handleDeleteFuncao(funcao.id)}>Excluir</button>
                     </div>
                   </li>
                 ))}
@@ -244,9 +241,7 @@ function FuncoesModal({ onUpdateRoles, adminPermissions }) {
             )}
           </div>
           <div className="modal-footer">
-            <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">
-              Fechar
-            </button>
+            <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
           </div>
         </div>
       </div>
