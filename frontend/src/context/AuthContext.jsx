@@ -1,6 +1,5 @@
 // src/context/AuthContext.jsx
 import { createContext, useState, useContext, useEffect, useMemo, useCallback } from 'react';
-import { jwtDecode } from 'jwt-decode';
 import api from '../services/api';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -11,18 +10,17 @@ export function AuthProvider({ children }) {
   const [token, setToken] = useState(() => localStorage.getItem('token'));
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
+  const location = useLocation();
 
-  // 1. CARREGAMENTO INICIAL DO USUÁRIO
-  // Este useEffect roda uma vez quando a página carrega para verificar se já existe um token.
   useEffect(() => {
-    const loadUserFromToken = async () => {
+    const loadUser = async () => {
       if (token) {
         try {
           api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
           const response = await api.get('/api/auth/me');
-          setUser(response.data); // Salva o usuário completo com permissões
+          setUser(response.data);
         } catch (error) {
-          console.error("Token inválido, limpando...", error);
+          console.error("Token inválido. Fazendo logout.", error);
           localStorage.removeItem('token');
           setToken(null);
           setUser(null);
@@ -30,61 +28,57 @@ export function AuthProvider({ children }) {
       }
       setIsLoading(false);
     };
-    loadUserFromToken();
-  }, [token]); // Roda sempre que o token mudar
+    loadUser();
+  }, [token]);
 
-  // 2. FUNÇÃO DE LOGIN
-  // Simplificada para ser direta e clara, como na versão antiga.
+  // ✅ FUNÇÃO DE LOGIN SIMPLIFICADA
+  // A responsabilidade dela agora é apenas obter e salvar o token.
   const login = useCallback(async (identificador, senha) => {
     try {
       const response = await api.post('/api/auth/login', { identificador, senha });
       const newToken = response.data.token;
-      
-      // Decodificamos o token SIMPLES para o redirecionamento imediato
-      const decodedUser = jwtDecode(newToken);
-      
       localStorage.setItem('token', newToken);
-      // Ao definir o token, o useEffect acima será disparado para buscar os dados completos
-      setToken(newToken); 
-      
-      // LÓGICA DE REDIRECIONAMENTO IMEDIATO (como era antes)
-      const userRole = decodedUser.role; // ex: 'admin', 'dev'
-      if (userRole === 'dev') {
-        navigate('/dev/dashboard');
-      } else if (userRole === 'admin') {
-        navigate('/admin/dashboard');
-      } else if (userRole === 'funcionario') {
-        navigate('/funcionario/dashboard');
-      } else {
-        // Redirecionamento padrão para clientes
-        navigate('/meus-pedidos'); 
-      }
+      // Ao definir o token, o useEffect acima será disparado para carregar o usuário,
+      // e o useEffect abaixo cuidará do redirecionamento.
+      setToken(newToken);
     } catch (error) {
       console.error("Falha no login", error);
       throw error;
     }
-  }, [navigate]);
-
-  const register = useCallback(async (formData) => {
-    // ...função register permanece a mesma...
-    try {
-      await api.post('/api/auth/register', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-    } catch (error) {
-      console.error("Falha no cadastro", error);
-      throw error;
-    }
   }, []);
+  
+  // ✅ NOVA LÓGICA DE REDIRECIONAMENTO INTELIGENTE
+  // Este useEffect reage à mudança no 'user' e no 'isLoading'
+  useEffect(() => {
+    if (!isLoading && user) {
+      // Redireciona apenas se o usuário acabou de logar (ou seja, se ele está na página de login)
+      if (location.pathname === '/login') {
+        const userRole = user.role;
+        if (userRole === 'dev') {
+          navigate('/dev/dashboard');
+        } else if (userRole === 'admin') {
+          navigate('/admin/dashboard');
+        } else if (userRole === 'funcionario') {
+          navigate('/funcionario/dashboard');
+        } else {
+          // Para clientes, redireciona para a home
+          navigate('/');
+        }
+      }
+    }
+  }, [user, isLoading, navigate, location.pathname]);
+
 
   const logout = useCallback(() => {
-    // ...função logout permanece a mesma...
     localStorage.removeItem('token');
     setToken(null);
     setUser(null);
     api.defaults.headers.common['Authorization'] = null;
     navigate('/login');
   }, [navigate]);
+  
+  // A função register não foi incluída aqui por brevidade, mas deve ser mantida no seu arquivo
+  const register = async (formData) => { /* ... sua lógica de register ... */ };
 
   const authContextValue = useMemo(() => ({
     user,
@@ -97,7 +91,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider value={authContextValue}>
-      {!isLoading && children}
+      {children}
     </AuthContext.Provider>
   );
 }

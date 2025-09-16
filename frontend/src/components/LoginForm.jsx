@@ -1,5 +1,5 @@
 // src/components/LoginForm.jsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 
 function LoginForm() {
@@ -10,13 +10,33 @@ function LoginForm() {
   const { login } = useAuth();
   const [loading, setLoading] = useState(false);
 
+  const [lembrarMe, setLembrarMe] = useState(false);
+
+  useEffect(() => {
+    // Verifica se há um usuário salvo no localStorage
+    const usuarioSalvo = localStorage.getItem('usuarioLembrado');
+    if (usuarioSalvo) {
+      setIdentificador(usuarioSalvo); // Preenche o campo de usuário
+      setLembrarMe(true);          // Marca o checkbox
+    }
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      // ✅ 2. Passa 'identificador' para a função de login
       await login(identificador, senha);
+      
+      // ✅ 3. Lógica para salvar ou remover o usuário
+      if (lembrarMe) {
+        // Se "Lembrar-me" estiver marcado, salva o identificador
+        localStorage.setItem('usuarioLembrado', identificador);
+      } else {
+        // Se não, remove qualquer identificador salvo anteriormente
+        localStorage.removeItem('usuarioLembrado');
+      }
+
     } catch (err) {
       setError('Falha no login. Verifique suas credenciais.');
     } finally {
@@ -51,6 +71,16 @@ function LoginForm() {
           onChange={(e) => setSenha(e.target.value)}
           required 
         />
+      </div>
+      <div className="mb-3 form-check">
+        <input 
+          type="checkbox" 
+          className="form-check-input" 
+          id="lembrarMe"
+          checked={lembrarMe}
+          onChange={(e) => setLembrarMe(e.target.checked)}
+        />
+        <label className="form-check-label" htmlFor="lembrarMe">Lembrar-me</label>
       </div>
       <button type="submit" className="btn btn-primary w-100" disabled={loading}>
         {loading ? 'Entrando...' : 'Entrar'}

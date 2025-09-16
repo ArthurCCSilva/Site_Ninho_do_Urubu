@@ -12,7 +12,6 @@ import CustomerDashboard from './pages/CustomerDashboard';
 import MinhasComandasPage from './pages/MinhasComandasPage';
 
 // Páginas de Funcionário
-import FuncionarioLoginPage from './pages/FuncionarioLoginPage';
 import FuncionarioDashboard from './pages/FuncionarioDashboard';
 
 // Páginas de Admin
@@ -45,7 +44,6 @@ function App() {
                   {/* --- Rotas Públicas --- */}
                   <Route path="/" element={<HomePage />} />
                   <Route path="/login" element={<LoginPage />} />
-                  <Route path="/login-funcionario" element={<FuncionarioLoginPage />} />
                   <Route path="/produtos/:id" element={<ProductDetailPage />} />
 
                   {/* --- Rotas Protegidas para Clientes --- */}
