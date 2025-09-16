@@ -1,5 +1,6 @@
 //backend/middlewere/authMiddlewere.js
 const jwt = require('jsonwebtoken');
+const db = require('../db');
 
 exports.verifyToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
@@ -86,4 +87,54 @@ exports.isOwnerOrAdmin = (req, res, next) => {
     } else {
         return res.status(403).json({ message: 'Acesso negado. Você não tem permissão para alterar este perfil.' });
     }
+};
+
+exports.hasPermission = (requiredPermission) => {
+  return async (req, res, next) => {
+    try {
+      const userId = req.user.id; // ID pego do token pelo 'verifyToken'
+
+      // Busca o usuário e suas permissões ATUAIS no banco de dados
+      const [userRows] = await db.query('SELECT role, funcao_id FROM usuarios WHERE id = ?', [userId]);
+
+      if (userRows.length === 0) {
+        return res.status(403).json({ message: 'Acesso proibido: usuário não encontrado.' });
+      }
+
+      const user = userRows[0];
+      let userPermissions = [];
+
+      // Se for dev ou admin, tem todas as permissões
+      if (user.role === 'dev' || user.role === 'admin') {
+        const [allPermissions] = await db.query("SELECT GROUP_CONCAT(chave_permissao) as permissoes FROM permissoes");
+        if (allPermissions[0].permissoes) {
+          userPermissions = allPermissions[0].permissoes.split(',');
+        }
+      } 
+      // Se for funcionário, busca as permissões da sua função
+      else if (user.role === 'funcionario' && user.funcao_id) {
+        const query = `
+          SELECT GROUP_CONCAT(p.chave_permissao) as permissoes
+          FROM funcao_permissoes fp
+          JOIN permissoes p ON fp.permissao_id = p.id
+          WHERE fp.funcao_id = ?
+        `;
+        const [funcaoRows] = await db.query(query, [user.funcao_id]);
+        if (funcaoRows[0] && funcaoRows[0].permissoes) {
+          userPermissions = funcaoRows[0].permissoes.split(',');
+        }
+      }
+
+      // A verificação final
+      if (userPermissions.includes(requiredPermission)) {
+        next(); // Permissão encontrada, pode prosseguir
+      } else {
+        return res.status(403).json({ message: 'Acesso proibido: permissão insuficiente.' });
+      }
+
+    } catch (error) {
+      console.error("Erro no middleware hasPermission:", error);
+      return res.status(500).json({ message: 'Erro interno no servidor.' });
+    }
+  };
 };

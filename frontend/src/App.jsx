@@ -2,7 +2,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
 // Importando componentes e páginas
-import AppNavbar from './components/Navbar';
+import Navbar from './components/Navbar'; // Nome corrigido para Navbar
 import Footer from './components/Footer';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
@@ -11,7 +11,7 @@ import CustomerCartPage from './pages/CustomerCartPage';
 import CustomerDashboard from './pages/CustomerDashboard';
 import MinhasComandasPage from './pages/MinhasComandasPage';
 
-// Novas páginas de Funcionário
+// Páginas de Funcionário
 import FuncionarioLoginPage from './pages/FuncionarioLoginPage';
 import FuncionarioDashboard from './pages/FuncionarioDashboard';
 
@@ -39,7 +39,7 @@ function App() {
         <FeatureFlagProvider>
           <CartProvider>
             <div className="d-flex flex-column min-vh-100">
-              <AppNavbar />
+              <Navbar />
               <main className="container mt-4 flex-grow-1">
                 <Routes>
                   {/* --- Rotas Públicas --- */}
@@ -56,18 +56,56 @@ function App() {
                   {/* --- Rota Protegida para Funcionários --- */}
                   <Route path="/funcionario/dashboard" element={<ProtectedRoute role="funcionario"><FuncionarioDashboard /></ProtectedRoute>} />
 
-                  {/* ✅ NOVA ROTA EXCLUSIVA PARA DEV */}
+                  {/* --- Rota Exclusiva para Dev --- */}
                   <Route path="/dev/dashboard" element={<ProtectedRoute role="dev"><DevDashboardPage /></ProtectedRoute>} />
                   
-                  {/* --- Rotas Protegidas para Admin --- */}
+                  {/* --- Rotas Protegidas para Admin (e Funcionários com permissão) --- */}
+                  
+                  {/* ✅ CORREÇÃO: Adicionamos a 'prop' permission a todas as rotas relevantes */}
                   <Route path="/admin/dashboard" element={<ProtectedRoute role="admin"><AdminDashboard /></ProtectedRoute>} />
-                  <Route path="/admin/pedidos" element={<ProtectedRoute role="admin"><AdminOrdersPage /></ProtectedRoute>} />
-                  <Route path="/admin/venda-fisica" element={<ProtectedRoute role="admin"><PhysicalSalePage /></ProtectedRoute>} />
-                  <Route path="/admin/financeiro" element={<ProtectedRoute role="admin"><FinancialDashboardPage /></ProtectedRoute>} />
-                  <Route path="/admin/clientes" element={<ProtectedRoute role="admin"><AdminCustomerInfoPage /></ProtectedRoute>} />
-                  <Route path="/admin/boletos" element={<ProtectedRoute role="admin"><AdminBoletosPage /></ProtectedRoute>} />
-                  <Route path="/admin/comandas" element={<ProtectedRoute role="admin"><AdminComandaPage /></ProtectedRoute>} />
-                  <Route path="/admin/funcionarios" element={<ProtectedRoute role="admin"><AdminFuncionariosPage /></ProtectedRoute>} />
+                  
+                  <Route path="/admin/pedidos" element={
+                    <ProtectedRoute role="admin" permission="admin_gerenciar_pedidos">
+                      <AdminOrdersPage />
+                    </ProtectedRoute>
+                  }/>
+                  
+                  <Route path="/admin/venda-fisica" element={
+                    <ProtectedRoute role="admin" permission="admin_registrar_venda_fisica">
+                      <PhysicalSalePage />
+                    </ProtectedRoute>
+                  }/>
+
+                  <Route path="/admin/financeiro" element={
+                    <ProtectedRoute role="admin" permission="admin_painel_financeiro">
+                      <FinancialDashboardPage />
+                    </ProtectedRoute>
+                  }/>
+                  
+                  <Route path="/admin/clientes" element={
+                    <ProtectedRoute role="admin" permission="admin_info_clientes">
+                      <AdminCustomerInfoPage />
+                    </ProtectedRoute>
+                  }/>
+
+                  <Route path="/admin/boletos" element={
+                    <ProtectedRoute role="admin" permission="sistema_boleto">
+                      <AdminBoletosPage />
+                    </ProtectedRoute>
+                  }/>
+
+                  <Route path="/admin/comandas" element={
+                    <ProtectedRoute role="admin" permission="admin_gerenciar_comandas">
+                      <AdminComandaPage />
+                    </ProtectedRoute>
+                  }/>
+
+                  <Route path="/admin/funcionarios" element={
+                    <ProtectedRoute role="admin" permission="admin_gerenciar_funcionarios">
+                      <AdminFuncionariosPage />
+                    </ProtectedRoute>
+                  }/>
+
                 </Routes>
               </main>
               <Footer />

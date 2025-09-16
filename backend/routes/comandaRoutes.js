@@ -2,16 +2,18 @@
 const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/comandaController');
-const { verifyToken, isAdmin } = require('../middleware/authMiddleware');
+// ✅ Importamos o 'verifyToken' e nosso novo middleware 'hasPermission'
+const { verifyToken, hasPermission } = require('../middleware/authMiddleware');
 
-router.use(verifyToken, isAdmin);
+// ❌ A regra geral 'router.use()' foi removida.
 
-router.get('/', ctrl.getAllAbertas);
-router.post('/', ctrl.criarComanda);
-router.get('/:id', ctrl.getDetalhesComanda);
-router.post('/item', ctrl.adicionarItem);
-router.put('/item/:itemId', ctrl.updateItemQuantidade);
-router.delete('/item/:itemId', ctrl.removerItem);
-router.post('/:comandaId/fechar', ctrl.fecharComanda);
+// ✅ Cada rota agora é protegida individualmente, exigindo a permissão específica.
+router.get('/', [verifyToken, hasPermission('admin_gerenciar_comandas')], ctrl.getAllAbertas);
+router.post('/', [verifyToken, hasPermission('admin_gerenciar_comandas')], ctrl.criarComanda);
+router.get('/:id', [verifyToken, hasPermission('admin_gerenciar_comandas')], ctrl.getDetalhesComanda);
+router.post('/item', [verifyToken, hasPermission('admin_gerenciar_comandas')], ctrl.adicionarItem);
+router.put('/item/:itemId', [verifyToken, hasPermission('admin_gerenciar_comandas')], ctrl.updateItemQuantidade);
+router.delete('/item/:itemId', [verifyToken, hasPermission('admin_gerenciar_comandas')], ctrl.removerItem);
+router.post('/:comandaId/fechar', [verifyToken, hasPermission('admin_gerenciar_comandas')], ctrl.fecharComanda);
 
 module.exports = router;

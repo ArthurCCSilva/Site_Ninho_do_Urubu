@@ -2,12 +2,11 @@
 const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/boletoPlanosController');
-const { verifyToken, isAdmin } = require('../middleware/authMiddleware');
+const { verifyToken, hasPermission } = require('../middleware/authMiddleware');
 
-router.use(verifyToken, isAdmin);
+router.get('/produto/:produtoId', [verifyToken, hasPermission('sistema_boleto')], ctrl.getPlanosPorProduto);
+router.post('/', [verifyToken, hasPermission('sistema_boleto')], ctrl.adicionarPlano);
+router.delete('/:id', [verifyToken, hasPermission('sistema_boleto')], ctrl.deletarPlano);
 
-router.get('/produto/:produtoId', ctrl.getPlanosPorProduto);
-router.post('/', ctrl.adicionarPlano);
-router.delete('/:id', ctrl.deletarPlano);
 
 module.exports = router;

@@ -2,12 +2,13 @@
 const express = require('express');
 const router = express.Router();
 const despesasController = require('../controllers/despesasController');
-const { verifyToken, isAdmin } = require('../middleware/authMiddleware');
+// ✅ Importamos o middleware 'hasPermission'
+const { verifyToken, hasPermission } = require('../middleware/authMiddleware');
 
-// Todas as rotas de despesas são apenas para admins
-router.use(verifyToken, isAdmin);
+// ❌ A regra geral 'router.use()' foi removida.
 
-router.post('/', despesasController.adicionarDespesa);
-router.get('/', despesasController.getDespesas);
+// ✅ Cada rota agora é protegida pela permissão 'admin_painel_financeiro'
+router.post('/', [verifyToken, hasPermission('admin_painel_financeiro')], despesasController.adicionarDespesa);
+router.get('/', [verifyToken, hasPermission('admin_painel_financeiro')], despesasController.getDespesas);
 
 module.exports = router;

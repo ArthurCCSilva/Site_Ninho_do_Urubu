@@ -2,10 +2,12 @@
 const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/funcionariosController');
-const { verifyToken, isAdmin } = require('../middleware/authMiddleware');
+// ✅ Importamos o middleware 'hasPermission'
+const { verifyToken, hasPermission } = require('../middleware/authMiddleware');
 
-router.use(verifyToken, isAdmin);
+// ❌ A regra geral 'router.use()' foi removida.
 
-router.post('/', ctrl.create);
+// ✅ A rota de criação agora verifica a permissão específica
+router.post('/', [verifyToken, hasPermission('admin_gerenciar_funcionarios')], ctrl.create);
 
 module.exports = router;

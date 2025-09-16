@@ -2,46 +2,39 @@
 const express = require('express');
 const router = express.Router();
 const pedidosController = require('../controllers/pedidosController');
-const { verifyToken, isAdmin } = require('../middleware/authMiddleware');
+// ✅ Importamos 'hasPermission'
+const { verifyToken, hasPermission } = require('../middleware/authMiddleware');
 
 // --- ROTAS PARA CLIENTES LOGADOS ---
-
-// Cria um novo pedido a partir do carrinho do usuário
+// ✅ ESTA SEÇÃO ESTÁ PERFEITA E NÃO FOI ALTERADA.
 router.post('/', [verifyToken], pedidosController.criarPedido);
-
-// Busca o histórico de pedidos do usuário logado
 router.get('/meus-pedidos', [verifyToken], pedidosController.getPedidosUsuario);
-
 router.get('/meus-boletos', [verifyToken], pedidosController.getBoletosAprovadosUsuario);
-
-// Busca os planos de boleto disponíveis para o carrinho atual
 router.get('/boleto-planos-carrinho', [verifyToken], pedidosController.getBoletoPlansForCart);
-
-// Busca os detalhes de um pedido específico (acessível por cliente dono do pedido ou admin)
 router.get('/:id', [verifyToken], pedidosController.getPedidoDetalhes);
-
-// Permite que um cliente cancele um pedido que ainda está em processamento
 router.patch('/:id/cancelar', [verifyToken], pedidosController.cancelarPedido);
 
 
-// --- ROTAS EXCLUSIVAS PARA ADMIN ---
+// --- ROTAS EXCLUSIVAS PARA ADMIN E FUNCIONÁRIOS AUTORIZADOS ---
+
+// ✅ As rotas abaixo foram atualizadas para usar 'hasPermission' com a chave correta.
 
 // Busca TODOS os pedidos para o painel do admin
-router.get('/admin/todos', [verifyToken, isAdmin], pedidosController.getTodosPedidosAdmin);
+router.get('/admin/todos', [verifyToken, hasPermission('admin_gerenciar_pedidos')], pedidosController.getTodosPedidosAdmin);
 
 // Cria um pedido a partir da tela de "Venda Física"
-router.post('/admin/venda-fisica', [verifyToken, isAdmin], pedidosController.criarVendaFisica);
+router.post('/admin/venda-fisica', [verifyToken, hasPermission('admin_registrar_venda_fisica')], pedidosController.criarVendaFisica);
 
 // Atualiza o status de um pedido
-router.patch('/:id/status', [verifyToken, isAdmin], pedidosController.updateStatusPedido);
+router.patch('/:id/status', [verifyToken, hasPermission('admin_gerenciar_pedidos')], pedidosController.updateStatusPedido);
 
 // Admin cancela um pedido (com motivo)
-router.patch('/admin/:id/cancelar', [verifyToken, isAdmin], pedidosController.cancelarPedidoAdmin);
+router.patch('/admin/:id/cancelar', [verifyToken, hasPermission('admin_gerenciar_pedidos')], pedidosController.cancelarPedidoAdmin);
 
 // Admin edita a quantidade de um item em um pedido existente
-router.patch('/itens/:itemId', [verifyToken, isAdmin], pedidosController.updateItemPedido);
+router.patch('/itens/:itemId', [verifyToken, hasPermission('admin_gerenciar_pedidos')], pedidosController.updateItemPedido);
 
 // Admin adiciona um pagamento parcial a um pedido "Fiado"
-router.post('/:id/pagamento-fiado', [verifyToken, isAdmin], pedidosController.adicionarPagamentoFiado);
+router.post('/:id/pagamento-fiado', [verifyToken, hasPermission('sistema_fiado')], pedidosController.adicionarPagamentoFiado);
 
 module.exports = router;

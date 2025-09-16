@@ -2,24 +2,17 @@
 const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/funcoesController');
-const { verifyToken, isAdmin } = require('../middleware/authMiddleware');
+// ✅ Importamos o middleware 'hasPermission'
+const { verifyToken, hasPermission } = require('../middleware/authMiddleware');
 
-// Aplica middleware a todas as rotas deste arquivo
-router.use(verifyToken, isAdmin);
+// ❌ A regra geral 'router.use()' foi removida.
 
-// GET /api/funcoes -> Busca todas as funções
-router.get('/', ctrl.getAll);
-
-// POST /api/funcoes -> Cria uma nova função
-router.post('/', ctrl.create);
-
-// ✅ CORREÇÃO: Rota atualizada para PUT /api/funcoes/:id e chama a função 'update'
-router.put('/:id', ctrl.update);
-
-// ✅ CORREÇÃO: Rota atualizada para usar o parâmetro ':id'
-router.delete('/:id', ctrl.delete);
-
-// GET /api/funcoes/permissoes -> Busca a lista de todas as permissões
-router.get('/permissoes', ctrl.getAllPermissoes);
+// ✅ Todas as rotas agora são protegidas pela permissão 'gerenciarFuncoes',
+// garantindo que qualquer usuário autorizado possa gerenciar funções por completo.
+router.get('/', [verifyToken, hasPermission('gerenciarFuncoes')], ctrl.getAll);
+router.post('/', [verifyToken, hasPermission('gerenciarFuncoes')], ctrl.create);
+router.put('/:id', [verifyToken, hasPermission('gerenciarFuncoes')], ctrl.update);
+router.delete('/:id', [verifyToken, hasPermission('gerenciarFuncoes')], ctrl.delete);
+router.get('/permissoes', [verifyToken, hasPermission('gerenciarFuncoes')], ctrl.getAllPermissoes);
 
 module.exports = router;

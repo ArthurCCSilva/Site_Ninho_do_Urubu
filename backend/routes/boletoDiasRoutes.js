@@ -2,14 +2,14 @@
 const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/boletoDiasController');
-const { verifyToken, isAdmin } = require('../middleware/authMiddleware');
+const { verifyToken, hasPermission } = require('../middleware/authMiddleware');
 
 // ✅ CORREÇÃO: A rota GET agora só precisa que o usuário esteja logado.
 // Removemos o 'isAdmin' desta linha.
-router.get('/', [verifyToken], ctrl.getAll);
+router.get('/', [verifyToken, hasPermission], ctrl.getAll);
 
 // As rotas de adicionar e deletar continuam apenas para admin.
-router.post('/', [verifyToken, isAdmin], ctrl.add);
-router.delete('/:id', [verifyToken, isAdmin], ctrl.delete);
+router.post('/', [verifyToken, hasPermission], ctrl.add);
+router.delete('/:id', [verifyToken, hasPermission], ctrl.delete);
 
 module.exports = router;
