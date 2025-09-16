@@ -388,37 +388,38 @@ exports.deleteUser = async (req, res) => {
 };
 
 exports.registerEmployee = async (req, res) => {
-  console.log("--- ROTA /register-employee ATINGIDA ---");
-  console.log("Dados recebidos:", req.body);
-
-  // O frontend enviará: nome, usuario (que é o email), senha, funcao_id
+  // ✅ Telefone foi removido da desestruturação principal pois é opcional
   const { nome, usuario, senha, funcao_id } = req.body;
+  const telefone = req.body.telefone || null; // Pega o telefone se ele existir, senão define como null
 
+  // ✅ Validação atualizada: Telefone não é mais obrigatório
   if (!nome || !usuario || !senha || !funcao_id) {
-    console.error("Erro: Campos obrigatórios faltando.");
     return res.status(400).json({ message: 'Nome, usuário (email), senha e cargo são obrigatórios.' });
   }
 
   try {
     const senhaHash = await bcrypt.hash(senha, 10);
     const sql = `
-      INSERT INTO usuarios (nome, email, senha_hash, role, funcao_id, is_active) 
-      VALUES (?, ?, ?, 'funcionario', ?, 1)
+      INSERT INTO usuarios (nome, email, senha_hash, telefone, role, funcao_id, is_active) 
+      VALUES (?, ?, ?, ?, 'funcionario', ?, 1)
     `;
     
-    // O 'usuario' do formulário é salvo na coluna 'email'
-    const params = [nome, usuario, senhaHash, funcao_id];
+    // ✅ Se o telefone existir, ele é sanitizado. Se não, NULL é passado para o banco.
+    const params = [
+      nome, 
+      usuario, 
+      senhaHash, 
+      telefone ? telefone.replace(/\D/g, '') : null, 
+      funcao_id
+    ];
 
     const [result] = await db.query(sql, params);
-    console.log("Funcionário inserido no banco com ID:", result.insertId);
-
-    res.status(201).json({ message: 'Funcionário cadastrado com sucesso!' });
-
+    res.status(201).json({ message: 'Funcionário cadastrado com sucesso!', userId: result.insertId });
   } catch (error) {
-    console.error("!!! ERRO NO BACKEND AO SALVAR !!!", error);
     if (error.code === 'ER_DUP_ENTRY') {
-      return res.status(409).json({ message: 'Este email de usuário já está cadastrado.' });
+      return res.status(409).json({ message: 'Este email ou telefone já está cadastrado.' });
     }
+    console.error("Erro ao registrar funcionário:", error);
     res.status(500).json({ message: 'Erro no servidor ao registrar funcionário.' });
   }
 };

@@ -7,9 +7,10 @@ const db = require('../db');
 // (Mantivemos a sua versão mais nova e completa)
 exports.register = async (req, res) => {
   try {
-    const { nome, email, senha, telefone, cpf} = req.body;
+    const { nome, email, senha, telefone, cpf } = req.body;
     let imagem_perfil_url = req.file ? req.file.filename : null;
 
+    // ✅ VALIDAÇÃO ATUALIZADA: Telefone agora é explicitamente obrigatório para clientes.
     if (!nome || !senha || !telefone) {
       return res.status(400).json({ message: 'Nome, senha e telefone são obrigatórios.' });
     }
