@@ -1,3 +1,4 @@
+// frontend/src/components/EditarFuncionarioModal.jsx
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 
@@ -14,7 +15,7 @@ function EditarFuncionarioModal({ onSave, funcionario }) {
   useEffect(() => {
     if (funcionario) {
       setDetails({ nome: funcionario.nomeCompleto || '', usuario: funcionario.usuario || '' });
-      setSelectedFuncaoId(funcionario.role?.id || '');
+      setSelectedFuncaoId(funcionario.funcao_id || funcionario.role?.id || '');
       setIsActive(funcionario.is_active);
       setError('');
       setSuccess('');
@@ -35,14 +36,14 @@ function EditarFuncionarioModal({ onSave, funcionario }) {
   }, []);
 
   const handleUpdate = async (endpoint, data, successMessage) => {
-    if (!funcionario) return; // Segurança extra
+    if (!funcionario) return;
     setLoading(true);
     setError('');
     setSuccess('');
     try {
       await api.patch(`/api/usuarios/${funcionario._id}/${endpoint}`, data);
       setSuccess(successMessage);
-      onSave();
+      // ❌ Não chamamos onSave() aqui para evitar a corrida
     } catch (err) {
       setError(err.response?.data?.message || `Erro ao atualizar.`);
     } finally {
@@ -54,24 +55,48 @@ function EditarFuncionarioModal({ onSave, funcionario }) {
   const handleUpdateDetails = () => handleUpdate('details', { nome: details.nome, email: details.usuario }, 'Dados atualizados!');
   const handleUpdateFunction = () => handleUpdate('function', { funcao_id: selectedFuncaoId }, 'Cargo atualizado!');
   const handleResetPassword = () => handleUpdate('password', { novaSenha }, 'Senha redefinida!');
-  const handleUpdateStatus = () => handleUpdate('status', { is_active: !isActive }, `Funcionário ${!isActive ? 'ativado' : 'desativado'}!`);
+  
+  const handleUpdateStatus = async () => {
+    if (!funcionario) return;
+    const newStatus = !isActive;
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    try {
+        await api.patch(`/api/usuarios/${funcionario._id}/status`, { is_active: newStatus });
+        setSuccess(`Funcionário ${newStatus ? 'ativado' : 'desativado'} com sucesso!`);
+        setIsActive(newStatus); 
+        // ❌ Também não chamamos onSave() aqui
+    } catch (err) {
+        setError(err.response?.data?.message || `Erro ao atualizar.`);
+    } finally {
+        setLoading(false);
+        setTimeout(() => { setSuccess(''); setError(''); }, 3000);
+    }
+  };
+
+  // ✅ NOVA FUNÇÃO CENTRALIZADA PARA FECHAR E ATUALIZAR
+  const handleCloseAndRefresh = () => {
+    if (onSave) {
+      onSave(); // Chama a função para atualizar a lista na página de trás
+    }
+    // O Bootstrap cuidará de fechar o modal através do 'data-bs-dismiss'
+  };
 
   return (
     <div className="modal fade" id="editarFuncionarioModal" tabIndex="-1">
       <div className="modal-dialog modal-lg">
         <div className="modal-content">
           <div className="modal-header">
-            {/* ✅ CORREÇÃO: Lida com 'funcionario' sendo null inicialmente */}
             <h5 className="modal-title">Editar Funcionário: {funcionario?.nomeCompleto || ''}</h5>
-            <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            {/* ✅ O botão 'X' agora chama a nova função */}
+            <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close" onClick={handleCloseAndRefresh}></button>
           </div>
           <div className="modal-body">
             {error && <div className="alert alert-danger">{error}</div>}
             {success && <div className="alert alert-success">{success}</div>}
 
-            {/* Card de Dados Cadastrais */}
-            <div className="card mb-3">
-              <div className="card-body">
+            <div className="card mb-3"><div className="card-body">
                 <h6 className="card-title">Dados Cadastrais</h6>
                 <div className="mb-3">
                   <label>Nome Completo</label>
@@ -82,12 +107,8 @@ function EditarFuncionarioModal({ onSave, funcionario }) {
                   <input type="email" className="form-control" value={details.usuario} onChange={e => setDetails({ ...details, usuario: e.target.value })} />
                 </div>
                 <button className="btn btn-primary btn-sm" onClick={handleUpdateDetails} disabled={loading}>Salvar Dados</button>
-              </div>
-            </div>
-
-            {/* Card de Cargo */}
-            <div className="card mb-3">
-              <div className="card-body">
+            </div></div>
+            <div className="card mb-3"><div className="card-body">
                 <h6 className="card-title">Cargo do Funcionário</h6>
                 <div className="mb-3">
                   <select className="form-select" value={selectedFuncaoId} onChange={e => setSelectedFuncaoId(e.target.value)}>
@@ -98,33 +119,25 @@ function EditarFuncionarioModal({ onSave, funcionario }) {
                   </select>
                 </div>
                 <button className="btn btn-primary btn-sm" onClick={handleUpdateFunction} disabled={loading}>Alterar Cargo</button>
-              </div>
-            </div>
-
-            {/* Card de Senha */}
-            <div className="card mb-3">
-              <div className="card-body">
+            </div></div>
+            <div className="card mb-3"><div className="card-body">
                 <h6 className="card-title">Redefinir Senha</h6>
                 <div className="mb-3">
                   <input type="password" placeholder="Digite a nova senha" className="form-control" value={novaSenha} onChange={e => setNovaSenha(e.target.value)} />
                 </div>
                 <button className="btn btn-warning btn-sm" onClick={handleResetPassword} disabled={loading || novaSenha.length < 6}>Redefinir Senha</button>
-              </div>
-            </div>
-
-            {/* Card de Status */}
-            <div className="card">
-              <div className="card-body">
+            </div></div>
+            <div className="card"><div className="card-body">
                 <h6 className="card-title">Status do Funcionário</h6>
                 <div className="form-check form-switch">
                   <input className="form-check-input" type="checkbox" role="switch" id="statusSwitch" checked={isActive} onChange={handleUpdateStatus} />
                   <label className="form-check-label" htmlFor="statusSwitch">{isActive ? 'Ativo' : 'Inativo'}</label>
                 </div>
-              </div>
-            </div>
+            </div></div>
           </div>
           <div className="modal-footer">
-            <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            {/* ✅ O botão 'Fechar' agora também chama a nova função */}
+            <button type="button" className="btn btn-secondary" data-bs-dismiss="modal" onClick={handleCloseAndRefresh}>Fechar</button>
           </div>
         </div>
       </div>
