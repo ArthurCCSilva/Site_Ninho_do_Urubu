@@ -3,9 +3,11 @@ import { useState, useEffect, useRef } from 'react';
 import { Modal } from 'bootstrap';
 import api from '../services/api';
 import { useFeatureFlags } from '../context/FeatureFlagContext';
+import { useAuth } from '../context/AuthContext'; // ✅ 1. Importa o useAuth
 
 function FecharComandaModal({ show, onHide, comanda, onSave }) {
     const { isEnabled } = useFeatureFlags();
+    const { user } = useAuth(); // ✅ 2. Pega o usuário logado
     const [formaPagamento, setFormaPagamento] = useState('Dinheiro');
     const [valorPago, setValorPago] = useState('');
     const modalRef = useRef();
@@ -58,7 +60,10 @@ function FecharComandaModal({ show, onHide, comanda, onSave }) {
                                 <option value="PIX">PIX</option>
                                 <option value="Cartão de Crédito">Cartão de Crédito</option>
                                 <option value="Cartão de Débito">Cartão de Débito</option>
-                                {isEnabled('sistema_fiado') && <option value="Fiado">Fiado (Registrar Dívida)</option>}
+                                
+                                {/* ✅ 3. VERIFICAÇÃO DUPLA: Feature está ligada E o usuário tem a permissão */}
+                                {isEnabled('sistema_fiado') && user?.permissoes?.includes('sistema_fiado') && 
+                                    <option value="Fiado">Fiado (Registrar Dívida)</option>}
                             </select>
                         </div>
                         {formaPagamento === 'Dinheiro' && (

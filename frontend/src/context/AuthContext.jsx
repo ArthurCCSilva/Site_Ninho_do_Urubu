@@ -78,7 +78,19 @@ export function AuthProvider({ children }) {
   }, [navigate]);
   
   // A função register não foi incluída aqui por brevidade, mas deve ser mantida no seu arquivo
-  const register = async (formData) => { /* ... sua lógica de register ... */ };
+  const register = useCallback(async (formData) => {
+  try {
+    const response = await api.post('/api/auth/register', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    // ✅ Em caso de sucesso, retorna os dados da resposta (importante!)
+    return response.data; 
+  } catch (error) {
+    console.error("Falha no cadastro no contexto:", error);
+    // Lança o erro para o formulário poder pegá-lo
+    throw error;
+  }
+}, []);
 
   const authContextValue = useMemo(() => ({
     user,

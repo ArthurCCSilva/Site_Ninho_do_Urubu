@@ -30,6 +30,7 @@ import { CartProvider } from './context/CartContext';
 import { FeatureFlagProvider } from './context/FeatureFlagContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import DevDashboardPage from './pages/DevDashboardPage';
+import TermosDeUsoPage from './pages/TermosDeUsoPage';
 
 function App() {
   return (
@@ -44,6 +45,7 @@ function App() {
                   {/* --- Rotas Públicas --- */}
                   <Route path="/" element={<HomePage />} />
                   <Route path="/login" element={<LoginPage />} />
+                  <Route path="/termos-de-uso" element={<TermosDeUsoPage />} />
                   <Route path="/produtos/:id" element={<ProductDetailPage />} />
 
                   {/* --- Rotas Protegidas para Clientes --- */}

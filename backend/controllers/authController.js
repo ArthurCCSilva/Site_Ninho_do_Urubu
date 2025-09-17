@@ -7,22 +7,27 @@ const db = require('../db');
 // (Mantivemos a sua versão mais nova e completa)
 exports.register = async (req, res) => {
   try {
-    const { nome, email, senha, telefone, cpf } = req.body;
+    // ✅ 1. Recebemos os novos campos de data
+    const { nome, email, senha, telefone, cpf, dia, mes, ano } = req.body;
     let imagem_perfil_url = req.file ? req.file.filename : null;
 
-    // ✅ VALIDAÇÃO ATUALIZADA: Telefone agora é explicitamente obrigatório para clientes.
-    if (!nome || !senha || !telefone) {
-      return res.status(400).json({ message: 'Nome, senha e telefone são obrigatórios.' });
+    // ✅ 2. Validamos todos os campos obrigatórios
+    if (!nome || !senha || !telefone || !dia || !mes || !ano) {
+      return res.status(400).json({ message: 'Todos os campos, incluindo a data de nascimento, são obrigatórios.' });
     }
+
+    // ✅ 3. Montamos a data no formato do banco de dados
+    const dataNascimento = `${ano}-${mes.toString().padStart(2, '0')}-${dia.toString().padStart(2, '0')}`;
 
     const telefoneSanitizado = telefone.replace(/\D/g, '');
     const cpfSanitizado = cpf ? cpf.replace(/\D/g, '') : null;
     const senhaHash = await bcrypt.hash(senha, 10);
     const emailParaSalvar = email || null;
 
+    // ✅ 4. Adicionamos a data de nascimento na query SQL
     const [result] = await db.query(
-      'INSERT INTO usuarios (nome, email, senha_hash, role, telefone, cpf, imagem_perfil_url) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [nome, emailParaSalvar, senhaHash, 'cliente', telefoneSanitizado, cpfSanitizado, imagem_perfil_url]
+      'INSERT INTO usuarios (nome, email, senha_hash, role, telefone, cpf, data_nascimento, imagem_perfil_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [nome, emailParaSalvar, senhaHash, 'cliente', telefoneSanitizado, cpfSanitizado, dataNascimento, imagem_perfil_url]
     );
 
     res.status(201).json({ message: 'Usuário criado com Sucesso!', userId: result.insertId });
@@ -30,7 +35,8 @@ exports.register = async (req, res) => {
     if (error.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({ message: 'Este e-mail, telefone ou CPF já está cadastrado.' })
     }
-    console.error("Erro no registro:", error);
+    // Adiciona um log mais detalhado do erro no backend
+    console.error("Erro detalhado no registro:", error);
     res.status(500).json({ message: 'Erro no servidor', error: error.message });
   }
 };
