@@ -1,8 +1,13 @@
 // src/context/FeatureFlagContext.jsx
 import { createContext, useState, useContext, useEffect } from 'react';
 import api from '../services/api';
+import { useAuth } from './AuthContext';
 
 const FeatureFlagContext = createContext({});
+
+export function useFeatureFlags() {
+    return useContext(FeatureFlagContext);
+}
 
 export function FeatureFlagProvider({ children }) {
     const [features, setFeatures] = useState({});
@@ -34,7 +39,3 @@ export function FeatureFlagProvider({ children }) {
         </FeatureFlagContext.Provider>
     );
 }
-
-export const useFeatureFlags = () => {
-    return useContext(FeatureFlagContext);
-};
