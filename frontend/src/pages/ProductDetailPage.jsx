@@ -13,15 +13,15 @@ import 'swiper/css';
 import 'swiper/css/navigation';
 
 function ProductDetailPage() {
-  const { id } = useParams(); 
+  const { id } = useParams();
   const { user } = useAuth();
   const { addToCart } = useCart();
   const navigate = useNavigate();
-  
+
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
   // ✅ Estado para guardar os produtos relacionados
   const [relatedProducts, setRelatedProducts] = useState([]);
 
@@ -54,7 +54,7 @@ function ProductDetailPage() {
           const params = new URLSearchParams();
           params.append('category', product.categoria_nome);
           const response = await api.get(`/api/produtos?${params.toString()}`);
-          
+
           const filteredProducts = response.data.produtos
             .filter(p => p.id !== product.id)
             .slice(0, 8);
@@ -98,14 +98,25 @@ function ProductDetailPage() {
     if (product.estoque_total <= 10) {
       return <p className="text-warning fw-bold mt-3">Últimas {product.estoque_total} unidades!</p>;
     }
-    return null; 
+    return null;
   };
 
   return (
     <div className="container my-5">
       <div className="row">
-        <div className="col-lg-6 mb-4">
-          <img src={imageUrl} alt={product.nome} className="img-fluid rounded shadow-sm" />
+        <div className="col-lg-5 mb-4">
+          <img
+            src={imageUrl}
+            alt={product.nome}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              borderRadius: '8px',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+            }}
+          />
+
         </div>
         <div className="col-lg-6">
           <nav aria-label="breadcrumb">
@@ -116,14 +127,14 @@ function ProductDetailPage() {
           </nav>
           <h1>{product.nome}</h1>
           {product.categoria_nome && (
-             <p className="lead text-muted">{product.categoria_nome}</p>
+            <p className="lead text-muted">{product.categoria_nome}</p>
           )}
           <h3 className="my-3 display-5">R$ {parseFloat(product.valor).toFixed(2).replace('.', ',')}</h3>
           <p className="mt-4">{product.descricao}</p>
-          
+
           <div className="d-grid gap-2 mt-4">
-            <button 
-              className="btn btn-primary btn-lg" 
+            <button
+              className="btn btn-primary btn-lg"
               type="button"
               onClick={handleAddToCart}
               disabled={isOutOfStock}

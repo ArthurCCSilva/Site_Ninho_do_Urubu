@@ -70,7 +70,6 @@ exports.getAllProdutos = async (req, res) => {
   }
 };
 
-
 // --- Função para buscar um produto pelo seu ID (com JOIN) ---
 exports.getProdutoById = async (req, res) => {
   try {
@@ -104,7 +103,6 @@ exports.createProduto = async (req, res) => {
     res.status(201).json({ message: 'Produto criado com sucesso!', produtoId: result.insertId });
   } catch (error) { res.status(500).json({ message: 'Erro ao criar produto.', error: error.message }); }
 };
-
 
 // ✅ FUNÇÃO ATUALIZADA: Agora salva a relação pai-filho
 exports.updateProduto = async (req, res) => {
@@ -344,31 +342,56 @@ exports.reactivateProduto = async (req, res) => {
 };
 
 exports.getInactiveProdutos = async (req, res) => {
-  try {
-    const { search, category, page = 1, limit = 10 } = req.query;
-    let baseSql = "FROM produtos p LEFT JOIN categorias c ON p.categoria_id = c.id";
-    let params = [];
-    let conditions = ["p.status = 'inativo'"];
-    if (search) {
-      conditions.push('(p.nome LIKE ?)');
-      params.push(`%${search}%`);
+    try {
+        const { page = 1, limit = 10, search, category } = req.query;
+        const offset = (page - 1) * limit;
+
+        // A condição WHERE agora usa a coluna 'status'
+        let whereClauses = ["p.status = 'inativo'"]; 
+        const params = [];
+
+        if (search) {
+            whereClauses.push('p.nome LIKE ?');
+            params.push(`%${search}%`);
+        }
+        if (category) {
+            whereClauses.push('c.nome = ?');
+            params.push(category);
+        }
+
+        const whereSql = `WHERE ${whereClauses.join(' AND ')}`;
+
+        // Query para contar o total de itens
+        const countQuery = `
+            SELECT COUNT(p.id) as total 
+            FROM produtos p
+            LEFT JOIN categorias c ON p.categoria_id = c.id
+            ${whereSql}
+        `;
+        const [countRows] = await db.query(countQuery, params);
+        const totalItems = countRows[0].total;
+        const totalPages = Math.ceil(totalItems / limit);
+
+        // Query para buscar os produtos inativos
+        const productsQuery = `
+            SELECT p.id, p.nome, p.imagem_produto_url, c.nome as categoria_nome
+            FROM produtos p
+            LEFT JOIN categorias c ON p.categoria_id = c.id
+            ${whereSql}
+            ORDER BY p.nome ASC
+            LIMIT ? OFFSET ?
+        `;
+        const finalParams = [...params, parseInt(limit), parseInt(offset)];
+        const [produtos] = await db.query(productsQuery, finalParams);
+        
+        res.status(200).json({
+            produtos,
+            totalPages,
+            currentPage: parseInt(page)
+        });
+
+    } catch (error) {
+        console.error("Erro ao buscar produtos inativos:", error);
+        res.status(500).json({ message: 'Erro no servidor ao buscar produtos inativos.' });
     }
-    if (category) {
-      conditions.push('c.nome = ?');
-      params.push(category);
-    }
-    baseSql += ' WHERE ' + conditions.join(' AND ');
-    const countSql = `SELECT COUNT(p.id) as total ${baseSql}`;
-    const [countRows] = await db.query(countSql, params);
-    const totalItems = countRows[0].total;
-    const totalPages = Math.ceil(totalItems / limit);
-    let sql = `SELECT p.id, p.nome, p.imagem_produto_url, c.nome AS categoria_nome ${baseSql} ORDER BY p.id DESC`;
-    const offset = (page - 1) * limit;
-    sql += ' LIMIT ? OFFSET ?';
-    const finalParams = [...params, parseInt(limit), parseInt(offset)];
-    const [produtos] = await db.query(sql, finalParams);
-    res.status(200).json({ produtos, totalPages, currentPage: parseInt(page) });
-  } catch (error) {
-    res.status(500).json({ message: 'Erro ao buscar produtos inativos.', error: error.message });
-  }
 };

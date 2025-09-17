@@ -74,9 +74,9 @@ function DevDashboardPage() {
                     <div className="card h-100">
                         <div className="card-header"><h4>Permissões por Página</h4></div>
                         <div className="card-body">
-                           <p className="small text-muted">Selecione uma área para gerenciar suas funcionalidades específicas.</p>
                            <div className="d-grid gap-2">
                                 <button className={`btn ${selectedPage === 'global' ? 'btn-primary' : 'btn-outline-primary'}`} onClick={() => handleSelectPage('global', 'Globais do Site')}>Permissões Globais</button>
+                                <button className={`btn ${selectedPage === 'dashboard' ? 'btn-primary' : 'btn-outline-primary'}`} onClick={() => handleSelectPage('dashboard', 'Painel Admin')}>Permissões de Dashboard</button>
                                 <button className={`btn ${selectedPage === 'home' ? 'btn-primary' : 'btn-outline-primary'}`} onClick={() => handleSelectPage('home', 'Página Home')}>Página Home</button>
                                 <button className={`btn ${selectedPage === 'pagamentos' ? 'btn-primary' : 'btn-outline-primary'}`} onClick={() => handleSelectPage('pagamentos', 'Pagamentos')}>Permissões de Pagamento</button>
                                 <button className={`btn ${selectedPage === 'financeiro' ? 'btn-warning' : 'btn-outline-warning'}`} onClick={() => handleSelectPage('financeiro', 'Painel Financeiro')}>Permissões Financeiras</button>
