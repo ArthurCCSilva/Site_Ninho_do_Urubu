@@ -4,10 +4,10 @@ const router = express.Router();
 const ctrl = require('../controllers/featureFlagsController');
 const { verifyToken, isDev } = require('../middleware/authMiddleware');
 
-// Rota pública para o frontend
-router.get('/', ctrl.getAllPublic);
+// ✅ CORRETO: A rota principal exige que o usuário esteja logado.
+router.get('/', [verifyToken], ctrl.getAllPublic);
 
-// Rotas protegidas para o dev
+// Rotas protegidas para o dev.
 router.get('/dev', [verifyToken, isDev], ctrl.getAllForDev);
 router.patch('/:id', [verifyToken, isDev], ctrl.updateFlag);
 
