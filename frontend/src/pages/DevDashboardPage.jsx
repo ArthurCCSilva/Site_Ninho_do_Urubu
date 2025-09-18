@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import EditProfileModal from '../components/EditProfileModal';
 
 function DevDashboardPage() {
     const { user } = useAuth();
@@ -9,7 +10,7 @@ function DevDashboardPage() {
     const [loading, setLoading] = useState(true);
     const [selectedPage, setSelectedPage] = useState('global');
     const [pageTitle, setPageTitle] = useState('Permissões (Globais do Site)');
-    
+    const [showEditModal, setShowEditModal] = useState(false);
     // ✅ CORREÇÃO: A propriedade correta é 'imagem_perfil_url'
     const profileImageUrl = user?.imagem_perfil_url 
         ? `http://localhost:3001/uploads/${user.imagem_perfil_url}` 
@@ -51,6 +52,13 @@ function DevDashboardPage() {
         setPageTitle(`Permissões (${title})`);
     };
 
+    const handleProfileUpdate = () => {
+        // A melhor forma de atualizar os dados é recarregando a página,
+        // o que força o AuthContext a buscar os dados novos do usuário.
+        window.location.reload();
+        setShowEditModal(false); // Garante que o modal feche
+    };
+
     return (
         <div>
             <h1 className="mb-4">Painel do Desenvolvedor</h1>
@@ -65,6 +73,9 @@ function DevDashboardPage() {
                                 <h5 className="card-title">{user?.nomeCompleto}</h5>
                                 <p className="card-text mb-0"><strong>Email:</strong> {user?.usuario || 'Não informado'}</p>
                                 <p className="card-text"><strong>Status:</strong> <span className="badge bg-danger text-uppercase">{user?.role}</span></p>
+                                <button className="btn btn-sm btn-outline-secondary mt-2" onClick={() => setShowEditModal(true)}>
+                                    Editar Perfil
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -115,6 +126,11 @@ function DevDashboardPage() {
                     }
                 </div>
             </div>
+            <EditProfileModal 
+                show={showEditModal} 
+                onHide={() => setShowEditModal(false)}
+                onSave={handleProfileUpdate}
+            />
         </div>
     );
 }

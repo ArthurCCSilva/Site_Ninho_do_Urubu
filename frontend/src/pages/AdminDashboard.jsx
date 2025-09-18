@@ -17,7 +17,7 @@ import { useFeatureFlags } from '../context/FeatureFlagContext';
 function AdminDashboard() {
   const { user } = useAuth();
   const { isEnabled } = useFeatureFlags();
-  
+
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -71,7 +71,7 @@ function AdminDashboard() {
       console.error(err);
     } finally { setLoading(false); }
   };
-  
+
   const fetchCategories = async () => {
     try {
       const response = await api.get('/api/categorias?limit=all');
@@ -91,7 +91,7 @@ function AdminDashboard() {
       console.error("Erro ao buscar todos os produtos para o seletor", err);
     }
   };
-  
+
   useEffect(() => {
     fetchCategories();
     fetchAllProductsForSelect();
@@ -104,8 +104,8 @@ function AdminDashboard() {
     return () => clearTimeout(debounceFetch);
   }, [limit, searchTerm, filterCategory, sortOrder, showInactive]);
 
-  useEffect(() => { 
-    if(!loading) fetchProducts(currentPage); 
+  useEffect(() => {
+    if (!loading) fetchProducts(currentPage);
   }, [currentPage]);
 
   const fetchStockProducts = async (page = 1) => {
@@ -119,7 +119,7 @@ function AdminDashboard() {
       setStockProducts(response.data.produtos || []);
       setStockTotalPages(response.data.totalPages);
       setStockCurrentPage(response.data.currentPage);
-    } catch (err) { console.error("Erro ao buscar produtos para estoque", err); } 
+    } catch (err) { console.error("Erro ao buscar produtos para estoque", err); }
     finally { setStockLoading(false); }
   };
 
@@ -143,7 +143,7 @@ function AdminDashboard() {
       setCorrectionProducts(response.data.produtos || []);
       setCorrectionTotalPages(response.data.totalPages);
       setCorrectionCurrentPage(response.data.currentPage);
-    } catch (err) { console.error("Erro ao buscar produtos para correção", err); } 
+    } catch (err) { console.error("Erro ao buscar produtos para correção", err); }
     finally { setCorrectionLoading(false); }
   };
 
@@ -155,10 +155,10 @@ function AdminDashboard() {
   }, [correctionSearchTerm, correctionFilterCategory]);
 
   useEffect(() => { if (correctionSearchTerm || correctionFilterCategory) { fetchCorrectionProducts(correctionCurrentPage); } }, [correctionCurrentPage]);
-  
+
   const handleStockValueChange = (productId, field, value) => { setStockUpdateValues(prev => ({ ...prev, [productId]: { ...prev[productId], [field]: value } })); };
   const handleStockCurrencyChange = (productId, field, value) => { setStockUpdateValues(prev => ({ ...prev, [productId]: { ...prev[productId], [field]: value || '' } })); };
-  
+
   const handleStockUpdate = async (productId) => {
     const values = stockUpdateValues[productId];
     if (!values || !values.qtd || !values.custo) { return alert("Preencha a Quantidade a Adicionar e o Custo de Entrada."); }
@@ -172,9 +172,9 @@ function AdminDashboard() {
       fetchProducts(currentPage);
     } catch (err) { alert(err.response?.data?.message || "Falha ao atualizar estoque."); }
   };
-  
+
   const handleCorrectionValueChange = (productId, value) => { setCorrectionValues(prev => ({ ...prev, [productId]: value })); };
-  
+
   const handleStockCorrection = async (productId, currentStock) => {
     const quantityToRemove = correctionValues[productId];
     if (!quantityToRemove || parseInt(quantityToRemove) <= 0) { return alert("Insira um valor positivo."); }
@@ -189,7 +189,7 @@ function AdminDashboard() {
       } catch (err) { alert(err.response?.data?.message || "Falha ao corrigir estoque."); }
     }
   };
-  
+
   const handleUnbundle = async () => {
     if (!unbundleProduct || !unbundleQty || parseInt(unbundleQty) <= 0) {
       return alert("Selecione um fardo e uma quantidade válida para desmembrar.");
@@ -211,7 +211,7 @@ function AdminDashboard() {
   const handleShowEditModal = (product) => { setProductToEdit(product); setShowModal(true); };
   const handleCloseModal = () => setShowModal(false);
   const handleSaveProduct = () => { setShowModal(false); fetchProducts(currentPage); fetchAllProductsForSelect(); };
-  
+
   const handleDelete = async (productId) => {
     if (window.confirm('Tem certeza que deseja DESATIVAR este produto? Ele não aparecerá mais na loja.')) {
       try {
@@ -229,13 +229,13 @@ function AdminDashboard() {
       } catch (err) { alert('Falha ao reativar produto.'); }
     }
   };
-  
+
   const handleProductReactivated = () => {
     fetchProducts(currentPage);
   };
-  
+
   const profileImageUrl = user?.imagem_perfil_url ? `http://localhost:3001/uploads/${user.imagem_perfil_url}` : 'https://placehold.co/150';
-  
+
   return (
     <div>
       <h1 className="mb-4">Painel do Administrador</h1>
@@ -245,7 +245,7 @@ function AdminDashboard() {
             <div className="card-header d-flex justify-content-between align-items-center"><h4>Informações do Admin</h4></div>
             <div className="card-body">
               <div className="row align-items-center">
-                <div className="col-md-3 text-center"><img src={profileImageUrl} alt="Foto de Perfil" className="img-fluid rounded-circle" style={{ width: '100px', height: '100px', objectFit: 'cover' }}/></div>
+                <div className="col-md-3 text-center"><img src={profileImageUrl} alt="Foto de Perfil" className="img-fluid rounded-circle" style={{ width: '100px', height: '100px', objectFit: 'cover' }} /></div>
                 <div className="col-md-9">
                   <h5 className="card-title">{user?.nomeCompleto}</h5>
                   <p className="card-text mb-0"><strong>Email:</strong> {user?.usuario || 'Não informado'}</p>
@@ -262,41 +262,38 @@ function AdminDashboard() {
           <div className="card h-100">
             <div className="card-header"><h4>Ações Gerais</h4></div>
             <div className="card-body">
-                <div className="d-none d-lg-flex">
-                    <div className="w-50 pe-2 d-grid gap-2">
-                        {isEnabled('admin_gerenciar_pedidos') && <Link to="/admin/pedidos" className="btn btn-primary">Gerenciar Pedidos</Link>}
-                        {isEnabled('admin_registrar_venda_fisica') && <Link to="/admin/venda-fisica" className="btn btn-success">Registrar Venda Física</Link>}
-                        {isEnabled('admin_gerenciar_comandas') && <Link to="/admin/comandas" className="btn btn-info">Gerenciar Comandas</Link>}
-                        {isEnabled('admin_painel_financeiro') && <Link to="/admin/financeiro" className="btn btn-warning">Painel Financeiro</Link>}
-                        {isEnabled('sistema_boleto') && <Link to="/admin/boletos" className="btn btn-dark">Gerenciar Boletos</Link>}
-                    </div>
-                    <div className="w-50 ps-2 d-grid gap-2">
-                        {isEnabled('admin_info_clientes') && <Link to="/admin/clientes" className="btn btn-secondary">Info Clientes</Link>}
-                        {isEnabled('admin_gerenciar_funcionarios') && <Link to="/admin/funcionarios" className="btn btn-primary">Gerenciar Funcionários</Link>}
-                        {isEnabled('admin_gerenciar_categorias') && <button className="btn btn-info w-100 mb-2" onClick={() => setShowCategoryModal(true)}>Gerenciar Categorias</button>}
-                        {isEnabled('admin_reativar_produtos') && <button className="btn btn-outline-success w-100 mb-2" onClick={() => setShowReactivateModal(true)}>Reativar Produtos</button>}
-                        {isEnabled('admin_editar_cliente') && <button className="btn btn-outline-info w-100" onClick={() => setShowAdminEditUserModal(true)}>Editar Cliente</button>}  
-                    </div>
-                </div>
-                <div className="d-lg-none d-grid gap-2">
-                    {isEnabled('admin_gerenciar_pedidos') && <Link to="/admin/pedidos" className="btn btn-primary">Gerenciar Pedidos</Link>}
-                    {isEnabled('admin_registrar_venda_fisica') && <Link to="/admin/venda-fisica" className="btn btn-success">Registrar Venda Física</Link>}
-                    {isEnabled('admin_gerenciar_comandas') && <Link to="/admin/comandas" className="btn btn-info">Gerenciar Comandas</Link>}
-                    {isEnabled('admin_painel_financeiro') && <Link to="/admin/financeiro" className="btn btn-warning">Painel Financeiro</Link>}
-                    {isEnabled('sistema_boleto') && <Link to="/admin/boletos" className="btn btn-dark">Gerenciar Boletos</Link>}
-                    {isEnabled('admin_info_clientes') && <Link to="/admin/clientes" className="btn btn-secondary">Info Clientes</Link>}
-                    {isEnabled('admin_gerenciar_funcionarios') && <Link to="/admin/funcionarios" className="btn btn-primary">Gerenciar Funcionários</Link>}
-                    {isEnabled('admin_gerenciar_categorias') && <button className="btn btn-info" onClick={() => setShowCategoryModal(true)}>Gerenciar Categorias</button>}
-                    {isEnabled('admin_reativar_produtos') && <button className="btn btn-outline-success" onClick={() => setShowReactivateModal(true)}>Reativar Produtos</button>}
-                    {isEnabled('admin_editar_cliente') && <button className="btn btn-outline-info" onClick={() => setShowAdminEditUserModal(true)}>Editar Cliente</button>}
-                </div>
+              <div className="d-none d-lg-grid gap-2" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+                {/* TODOS os botões agora são filhos diretos desta única div */}
+                {isEnabled('admin_gerenciar_pedidos') && <Link to="/admin/pedidos" className="btn btn-primary">Gerenciar Pedidos</Link>}
+                {isEnabled('admin_registrar_venda_fisica') && <Link to="/admin/venda-fisica" className="btn btn-success">Registrar Venda Física</Link>}
+                {isEnabled('admin_gerenciar_comandas') && <Link to="/admin/comandas" className="btn btn-info">Gerenciar Comandas</Link>}
+                {isEnabled('admin_painel_financeiro') && <Link to="/admin/financeiro" className="btn btn-warning">Painel Financeiro</Link>}
+                {isEnabled('sistema_boleto') && <Link to="/admin/boletos" className="btn btn-dark">Gerenciar Boletos</Link>}
+                {isEnabled('admin_info_clientes') && <Link to="/admin/clientes" className="btn btn-secondary">Info Clientes</Link>}
+                {isEnabled('admin_gerenciar_funcionarios') && <Link to="/admin/funcionarios" className="btn btn-primary">Gerenciar Funcionários</Link>}
+                {isEnabled('admin_gerenciar_categorias') && <button className="btn btn-info" onClick={() => setShowCategoryModal(true)}>Gerenciar Categorias</button>}
+                {isEnabled('admin_reativar_produtos') && <button className="btn btn-outline-success" onClick={() => setShowReactivateModal(true)}>Reativar Produtos</button>}
+                {isEnabled('admin_editar_cliente') && <button className="btn btn-outline-info" onClick={() => setShowAdminEditUserModal(true)}>Editar Cliente</button>}
+              </div>
+              <div className="d-lg-none d-grid gap-2">
+                {isEnabled('admin_gerenciar_pedidos') && <Link to="/admin/pedidos" className="btn btn-primary">Gerenciar Pedidos</Link>}
+                {isEnabled('admin_registrar_venda_fisica') && <Link to="/admin/venda-fisica" className="btn btn-success">Registrar Venda Física</Link>}
+                {isEnabled('admin_gerenciar_comandas') && <Link to="/admin/comandas" className="btn btn-info">Gerenciar Comandas</Link>}
+                {isEnabled('admin_painel_financeiro') && <Link to="/admin/financeiro" className="btn btn-warning">Painel Financeiro</Link>}
+                {isEnabled('sistema_boleto') && <Link to="/admin/boletos" className="btn btn-dark">Gerenciar Boletos</Link>}
+                {isEnabled('admin_info_clientes') && <Link to="/admin/clientes" className="btn btn-secondary">Info Clientes</Link>}
+                {isEnabled('admin_gerenciar_funcionarios') && <Link to="/admin/funcionarios" className="btn btn-primary">Gerenciar Funcionários</Link>}
+                {isEnabled('admin_gerenciar_categorias') && <button className="btn btn-info" onClick={() => setShowCategoryModal(true)}>Gerenciar Categorias</button>}
+                {isEnabled('admin_reativar_produtos') && <button className="btn btn-outline-success" onClick={() => setShowReactivateModal(true)}>Reativar Produtos</button>}
+                {isEnabled('admin_editar_cliente') && <button className="btn btn-outline-info" onClick={() => setShowAdminEditUserModal(true)}>Editar Cliente</button>}
+              </div>
             </div>
           </div>
         </div>
       </div>
-      
+
       {/* ✅ SEÇÕES CONDICIONAIS COM BASE NAS FEATURE FLAGS */}
-      
+
       {isEnabled('admin_gerenciar_produtos_secao') && (
         <>
           <div className="d-flex justify-content-between align-items-center my-4"><h2>Gerenciamento de Produtos</h2><button className="btn btn-primary" onClick={handleShowAddModal}>Adicionar Novo Produto</button></div>
@@ -306,15 +303,15 @@ function AdminDashboard() {
               <div className="col-lg-3"><Select options={categories} isClearable placeholder="Filtrar por Categoria..." onChange={(option) => setFilterCategory(option ? option.value : '')} /></div>
               <div className="col-lg-4"><div className="btn-group w-100" role="group"><button type="button" className={`btn btn-outline-secondary ${sortOrder === 'stock_asc' ? 'active' : ''}`} onClick={() => setSortOrder('stock_asc')}>Menor Estoque</button><button type="button" className={`btn btn-outline-secondary ${sortOrder === 'stock_desc' ? 'active' : ''}`} onClick={() => setSortOrder('stock_desc')}>Maior Estoque</button><button type="button" className={`btn btn-outline-secondary ${!sortOrder ? 'active' : ''}`} onClick={() => setSortOrder('')}>Padrão</button></div></div>
             </div>
-            <div className="row mt-3"><div className="col"><div className="form-check"><input className="form-check-input" type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} id="showInactiveCheck"/><label className="form-check-label" htmlFor="showInactiveCheck">Mostrar produtos inativos</label></div></div></div>
+            <div className="row mt-3"><div className="col"><div className="form-check"><input className="form-check-input" type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} id="showInactiveCheck" /><label className="form-check-label" htmlFor="showInactiveCheck">Mostrar produtos inativos</label></div></div></div>
           </div>
           <div className="card">
-            <div className="card-body">{loading ? ( <div className="text-center my-5"><div className="spinner-border" /></div> ) : error ? ( <div className="alert alert-danger">{error}</div> ) : ( <ProductAdminList products={products} onEdit={handleShowEditModal} onDelete={handleDelete} onReactivate={handleReactivate} /> )}</div>
+            <div className="card-body">{loading ? (<div className="text-center my-5"><div className="spinner-border" /></div>) : error ? (<div className="alert alert-danger">{error}</div>) : (<ProductAdminList products={products} onEdit={handleShowEditModal} onDelete={handleDelete} onReactivate={handleReactivate} />)}</div>
             <div className="card-footer d-flex justify-content-center"><Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={(page) => setCurrentPage(page)} /></div>
           </div>
         </>
       )}
-      
+
       {isEnabled('admin_atualizacao_estoque_secao') && (
         <div className="card mt-5">
           <div className="card-header"><h3 className="mb-0">Atualização Rápida de Estoque</h3></div>
@@ -324,7 +321,7 @@ function AdminDashboard() {
               <div className="col-md-6"><input type="text" className="form-control" placeholder="Pesquisar produto..." value={stockSearchTerm} onChange={(e) => setStockSearchTerm(e.target.value)} /></div>
               <div className="col-md-6"><Select options={categories} isClearable placeholder="Filtrar por Categoria..." onChange={(option) => setStockFilterCategory(option ? option.value : '')} /></div>
             </div>
-            {stockLoading ? ( <div className="text-center"><div className="spinner-border" /></div> ) : (<div>{stockProducts.map(product => (<div key={`stock-${product.id}`} className="d-flex align-items-center border-bottom py-2 flex-wrap"><img src={product.imagem_produto_url ? `http://localhost:3001/uploads/${product.imagem_produto_url}` : 'https://placehold.co/60'} alt={product.nome} className="rounded" style={{ width: '60px', height: '60px', objectFit: 'cover' }} /><div className="flex-grow-1 mx-3"><strong>{product.nome}</strong><div className="text-muted">Estoque: {product.estoque_total} | Venda: R$ {parseFloat(product.valor).toFixed(2)}</div></div><div className="d-flex" style={{ minWidth: '400px' }}><input type="number" className="form-control me-2" placeholder="+ Qtd." value={stockUpdateValues[product.id]?.qtd || ''} onChange={(e) => handleStockValueChange(product.id, 'qtd', e.target.value)} /><CurrencyInput name="custo" className="form-control me-2" placeholder="Custo/un. (R$)" value={stockUpdateValues[product.id]?.custo} onValueChange={(value) => handleStockCurrencyChange(product.id, 'custo', value)} intlConfig={{ locale: 'pt-BR', currency: 'BRL' }} decimalScale={2} /><CurrencyInput name="valorVenda" className="form-control me-2" placeholder="Novo Valor Venda (Opc.)" value={stockUpdateValues[product.id]?.valorVenda} onValueChange={(value) => handleStockCurrencyChange(product.id, 'valorVenda', value)} intlConfig={{ locale: 'pt-BR', currency: 'BRL' }} decimalScale={2} /><button className="btn btn-success" onClick={() => handleStockUpdate(product.id)}>Atualizar</button></div></div>))}</div>)}
+            {stockLoading ? (<div className="text-center"><div className="spinner-border" /></div>) : (<div>{stockProducts.map(product => (<div key={`stock-${product.id}`} className="d-flex align-items-center border-bottom py-2 flex-wrap"><img src={product.imagem_produto_url ? `http://localhost:3001/uploads/${product.imagem_produto_url}` : 'https://placehold.co/60'} alt={product.nome} className="rounded" style={{ width: '60px', height: '60px', objectFit: 'cover' }} /><div className="flex-grow-1 mx-3"><strong>{product.nome}</strong><div className="text-muted">Estoque: {product.estoque_total} | Venda: R$ {parseFloat(product.valor).toFixed(2)}</div></div><div className="d-flex" style={{ minWidth: '400px' }}><input type="number" className="form-control me-2" placeholder="+ Qtd." value={stockUpdateValues[product.id]?.qtd || ''} onChange={(e) => handleStockValueChange(product.id, 'qtd', e.target.value)} /><CurrencyInput name="custo" className="form-control me-2" placeholder="Custo/un. (R$)" value={stockUpdateValues[product.id]?.custo} onValueChange={(value) => handleStockCurrencyChange(product.id, 'custo', value)} intlConfig={{ locale: 'pt-BR', currency: 'BRL' }} decimalScale={2} /><CurrencyInput name="valorVenda" className="form-control me-2" placeholder="Novo Valor Venda (Opc.)" value={stockUpdateValues[product.id]?.valorVenda} onValueChange={(value) => handleStockCurrencyChange(product.id, 'valorVenda', value)} intlConfig={{ locale: 'pt-BR', currency: 'BRL' }} decimalScale={2} /><button className="btn btn-success" onClick={() => handleStockUpdate(product.id)}>Atualizar</button></div></div>))}</div>)}
           </div>
           <div className="card-footer d-flex justify-content-center"><Pagination currentPage={stockCurrentPage} totalPages={stockTotalPages} onPageChange={(page) => setStockCurrentPage(page)} /></div>
         </div>
@@ -339,7 +336,7 @@ function AdminDashboard() {
               <div className="col-md-8"><input type="text" className="form-control" placeholder="Pesquisar produto..." value={correctionSearchTerm} onChange={(e) => setCorrectionSearchTerm(e.target.value)} /></div>
               <div className="col-md-4"><Select options={categories} isClearable placeholder="Filtrar por Categoria..." onChange={(option) => setCorrectionFilterCategory(option ? option.value : '')} /></div>
             </div>
-            {correctionLoading ? ( <div className="text-center"><div className="spinner-border" /></div> ) : (<div>{correctionProducts.map(product => (<div key={`corr-${product.id}`} className="d-flex align-items-center border-bottom py-2 flex-wrap"><img src={product.imagem_produto_url ? `http://localhost:3001/uploads/${product.imagem_produto_url}` : 'https://placehold.co/60'} alt={product.nome} className="rounded" style={{ width: '60px', height: '60px', objectFit: 'cover' }} /><div className="flex-grow-1 mx-3"><strong>{product.nome}</strong><div className="text-muted">Estoque: {product.estoque_total}</div></div><div className="d-flex" style={{ minWidth: '250px' }}><input type="number" className="form-control me-2" placeholder="Qtd. a remover" value={correctionValues[product.id] || ''} onChange={(e) => handleCorrectionValueChange(product.id, e.target.value)} /><button className="btn btn-warning" onClick={() => handleStockCorrection(product.id, product.estoque_total)}>Corrigir</button></div></div>))}</div>)}
+            {correctionLoading ? (<div className="text-center"><div className="spinner-border" /></div>) : (<div>{correctionProducts.map(product => (<div key={`corr-${product.id}`} className="d-flex align-items-center border-bottom py-2 flex-wrap"><img src={product.imagem_produto_url ? `http://localhost:3001/uploads/${product.imagem_produto_url}` : 'https://placehold.co/60'} alt={product.nome} className="rounded" style={{ width: '60px', height: '60px', objectFit: 'cover' }} /><div className="flex-grow-1 mx-3"><strong>{product.nome}</strong><div className="text-muted">Estoque: {product.estoque_total}</div></div><div className="d-flex" style={{ minWidth: '250px' }}><input type="number" className="form-control me-2" placeholder="Qtd. a remover" value={correctionValues[product.id] || ''} onChange={(e) => handleCorrectionValueChange(product.id, e.target.value)} /><button className="btn btn-warning" onClick={() => handleStockCorrection(product.id, product.estoque_total)}>Corrigir</button></div></div>))}</div>)}
           </div>
           <div className="card-footer d-flex justify-content-center"><Pagination currentPage={correctionCurrentPage} totalPages={correctionTotalPages} onPageChange={(page) => setCorrectionCurrentPage(page)} /></div>
         </div>
@@ -358,12 +355,12 @@ function AdminDashboard() {
           </div>
         </div>
       )}
-      
+
       <ProductModal show={showModal} onHide={handleCloseModal} productToEdit={productToEdit} onSave={handleSaveProduct} />
       <CategoryModal show={showCategoryModal} onHide={() => setShowCategoryModal(false)} onUpdate={() => { fetchCategories(); fetchProducts(currentPage); }} />
       <EditProfileModal show={showEditProfileModal} onHide={() => setShowEditProfileModal(false)} />
       <ReactivateProductModal show={showReactivateModal} onHide={() => setShowReactivateModal(false)} onReactivated={handleProductReactivated} />
-      <AdminEditUserModal 
+      <AdminEditUserModal
         show={showAdminEditUserModal}
         onHide={() => setShowAdminEditUserModal(false)}
       />

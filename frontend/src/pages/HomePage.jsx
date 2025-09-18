@@ -12,6 +12,11 @@ import 'swiper/css';
 import 'swiper/css/navigation';
 import { useFeatureFlags } from '../context/FeatureFlagContext';
 
+// Importa o novo CSS e a biblioteca de animações
+import './HomePage.css';
+import AOS from 'aos';
+import 'aos/dist/aos.css';
+
 function HomePage() {
   const [products, setProducts] = useState([]);
   const [featuredProducts, setFeaturedProducts] = useState([]);
@@ -29,6 +34,16 @@ function HomePage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [limit] = useState(12);
+
+  const { isEnabled } = useFeatureFlags();
+
+  // ✅ 2. Inicializa a biblioteca de animações AOS
+  useEffect(() => {
+    AOS.init({
+      duration: 1000, // Duração da animação em milissegundos
+      once: true,     // Animação acontece apenas uma vez
+    });
+  }, []);
 
   // useEffect "assistente" para a barra de busca (debounce)
   useEffect(() => {
@@ -90,12 +105,37 @@ function HomePage() {
       setCurrentPage(1);
     }
   };
-  const { isEnabled } = useFeatureFlags();
+
 
   if (error) return <div className="alert alert-danger">{error}</div>;
 
   return (
     <div>
+      {/* ✅ 3. ADICIONA A NOVA SEÇÃO DE "HERÓI" AQUI */}
+      <header>
+        {/* A 'section' agora é naturalmente de largura total */}
+        <section id="hero" className="img-home d-flex align-items-center text-center">
+          {/* O 'container' agora está DENTRO, para centralizar apenas o conteúdo */}
+          <div className="container">
+            <div className="row justify-content-center">
+              <div className="col-12 col-md-10 col-lg-8">
+                <h1 data-aos="fade-left" className="text-white text-uppercase fw-semibold display-1">
+                  Ninho do Urubu Store
+                </h1>
+                <h5 data-aos="fade-right" className="text-white mt-3 mb-4">
+                  Produtos oficiais e licenciados do seu time de coração.
+                </h5>
+                <div>
+                  <a data-aos="fade-up" href="#nossos-produtos" className="btn btn-light">
+                    Ver Produtos
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </header>
+
       {isEnabled('produtos_destaque') && (
  
         // Condição interna que você já tinha, para só mostrar se houver produtos
