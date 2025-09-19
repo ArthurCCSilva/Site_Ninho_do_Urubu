@@ -393,8 +393,11 @@ exports.cancelarPedidoAdmin = async (req, res) => {
 };
 
 exports.criarVendaFisica = async (req, res) => {
-  const { itens, usuario_id, forma_pagamento } = req.body;
+  const { itens, usuario_id, forma_pagamento, valor_pago_cliente } = req.body;
   const connection = await db.getConnection();
+  const valorPagoNumerico = valor_pago_cliente 
+        ? parseFloat(String(valor_pago_cliente).replace(',', '.')) 
+        : null;
   try {
     await connection.beginTransaction();
 
@@ -414,8 +417,8 @@ exports.criarVendaFisica = async (req, res) => {
     
     // 2. Cria o pedido na tabela 'pedidos'
     const [resultadoPedido] = await connection.query(
-      "INSERT INTO pedidos (usuario_id, valor_total, status, data_entrega, forma_pagamento) VALUES (?, ?, 'Entregue', NOW(), ?)",
-      [usuario_id, valorTotal, forma_pagamento]
+      "INSERT INTO pedidos (usuario_id, valor_total, status, data_entrega, forma_pagamento, valor_pago_cliente) VALUES (?, ?, 'Entregue', NOW(), ?, ?)",
+      [usuario_id, valorTotal, forma_pagamento, valorPagoNumerico] // E passamos a variável aqui
     );
     const pedidoId = resultadoPedido.insertId;
 

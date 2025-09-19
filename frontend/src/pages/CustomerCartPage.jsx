@@ -186,7 +186,7 @@ function CustomerCartPage() {
               {formaPagamento === 'Dinheiro' && (
                 <div className="mb-3">
                   <label htmlFor="valor-pago" className="form-label">Pagar com (para troco)</label>
-                  <input type="tel" step="0.01" id="valor-pago" className="form-control" placeholder="Ex: 50" value={valorPago} onChange={(e) => setValorPago(e.target.value)} />
+                  <input type="number" step="0.01" id="valor-pago" className="form-control" placeholder="Ex: 50" value={valorPago} onChange={(e) => setValorPago(e.target.value)} />
                   {(() => {
                     // 1. Converte o valor digitado (ex: "50,25") para um número (ex: 50.25)
                     const valorPagoNumerico = parseFloat(String(valorPago).replace(',', '.')) || 0;

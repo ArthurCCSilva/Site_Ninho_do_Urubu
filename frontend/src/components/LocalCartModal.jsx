@@ -36,7 +36,7 @@ function LocalCartModal({ show, onHide, cartItems, onUpdateQuantity, onRemoveIte
       alert('Para pagamento em dinheiro, informe um valor igual ou maior que o total da compra para o cálculo do troco.');
       return;
     }
-    onFinalizeSale(formaPagamento);
+    onFinalizeSale(formaPagamento, valorPago);
   }
 
   return (
@@ -87,11 +87,11 @@ function LocalCartModal({ show, onHide, cartItems, onUpdateQuantity, onRemoveIte
                 <div className="mb-3">
                   <label htmlFor="valor-pago-local" className="form-label">Pagar com (para troco)</label>
                   <input
-                    type="tel"
+                    type="number"
                     step="0.01"
                     id="valor-pago-local"
                     className="form-control"
-                    placeholder="Ex: 30"
+                    placeholder="Ex: 50"
                     value={valorPago}
                     onChange={(e) => setValorPago(e.target.value)}
                   />

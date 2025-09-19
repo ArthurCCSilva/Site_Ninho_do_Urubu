@@ -303,7 +303,6 @@ function AdminDashboard() {
               <div className="col-lg-3"><Select options={categories} isClearable placeholder="Filtrar por Categoria..." onChange={(option) => setFilterCategory(option ? option.value : '')} /></div>
               <div className="col-lg-4"><div className="btn-group w-100" role="group"><button type="button" className={`btn btn-outline-secondary ${sortOrder === 'stock_asc' ? 'active' : ''}`} onClick={() => setSortOrder('stock_asc')}>Menor Estoque</button><button type="button" className={`btn btn-outline-secondary ${sortOrder === 'stock_desc' ? 'active' : ''}`} onClick={() => setSortOrder('stock_desc')}>Maior Estoque</button><button type="button" className={`btn btn-outline-secondary ${!sortOrder ? 'active' : ''}`} onClick={() => setSortOrder('')}>Padrão</button></div></div>
             </div>
-            <div className="row mt-3"><div className="col"><div className="form-check"><input className="form-check-input" type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} id="showInactiveCheck" /><label className="form-check-label" htmlFor="showInactiveCheck">Mostrar produtos inativos</label></div></div></div>
           </div>
           <div className="card">
             <div className="card-body">{loading ? (<div className="text-center my-5"><div className="spinner-border" /></div>) : error ? (<div className="alert alert-danger">{error}</div>) : (<ProductAdminList products={products} onEdit={handleShowEditModal} onDelete={handleDelete} onReactivate={handleReactivate} />)}</div>

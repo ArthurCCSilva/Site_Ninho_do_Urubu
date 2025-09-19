@@ -139,7 +139,8 @@ function PhysicalSalePage() {
       const response = await api.post('/api/pedidos/admin/venda-fisica', {
         itens: itens,
         usuario_id: finalCustomerId,
-        forma_pagamento: formaPagamento
+        forma_pagamento: formaPagamento,
+        valor_pago_cliente: valorPago
       });
       alert(`Venda #${response.data.pedidoId} registrada com sucesso!`);
       setLocalCart([]);
