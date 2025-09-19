@@ -11,7 +11,7 @@ function CustomerCartPage() {
   const { isEnabled } = useFeatureFlags();
   const { cartItems, removeFromCart, checkout, updateQuantity } = useCart();
   const navigate = useNavigate();
-  
+
   const [formaPagamento, setFormaPagamento] = useState('Cartão de Crédito');
   const [localEntrega, setLocalEntrega] = useState('');
   const [loadingCheckout, setLoadingCheckout] = useState(false);
@@ -50,7 +50,7 @@ function CustomerCartPage() {
         // ✅ CORREÇÃO AQUI
         // 1. Calcula o valor total de UM produto com o plano selecionado
         const valorTotalPlanoPorUnidade = parseFloat(planoSelecionado.numero_parcelas) * parseFloat(planoSelecionado.valor_parcela);
-        
+
         // 2. Descobre a quantidade do item no carrinho que usa este plano
         // (Assumindo que só há um tipo de produto no carrinho quando boleto é elegível)
         const quantidadeNoCarrinho = cartItems.length > 0 ? cartItems[0].quantidade : 1;
@@ -59,10 +59,10 @@ function CustomerCartPage() {
         return valorTotalPlanoPorUnidade * quantidadeNoCarrinho;
       }
     }
-    
+
     return baseTotal;
   }, [cartItems, formaPagamento, selectedPlano, boletoInfo.planos]);
-  
+
   const troco = valorPago > totalFinal ? valorPago - totalFinal : 0;
 
   useEffect(() => {
@@ -107,7 +107,7 @@ function CustomerCartPage() {
     }
     setShowMixedCartWarning(false);
   };
-  
+
   const handleClearAndContinue = () => {
     clearCart(); // Supondo que você tenha uma função clearCart no seu CartContext
     setShowMixedCartWarning(false);
@@ -137,7 +137,7 @@ function CustomerCartPage() {
                     <td style={{ width: '120px' }}><img src={item.imagem_produto_url ? `http://localhost:3001/uploads/${item.imagem_produto_url}` : 'https://placehold.co/100'} alt={item.nome} className="cart-product-image rounded" /></td>
                     <td>
                       {item.nome}
-                      {item.elegivel_boleto && isEnabled('sistema_boleto') ? ( <span className="badge bg-info ms-2">Opção Boleto</span> ) : null}
+                      {item.elegivel_boleto && isEnabled('sistema_boleto') ? (<span className="badge bg-info ms-2">Opção Boleto</span>) : null}
                     </td>
                     <td className="text-center">R$ {parseFloat(item.valor).toFixed(2).replace('.', ',')}</td>
                     <td className="text-center"><div className="input-group input-group-sm justify-content-center" style={{ width: '110px', margin: 'auto' }}><button className="btn btn-outline-secondary" type="button" onClick={() => updateQuantity(item.produto_id, item.quantidade - 1)}>-</button><span className="form-control text-center">{item.quantidade}</span><button className="btn btn-outline-secondary" type="button" onClick={() => updateQuantity(item.produto_id, item.quantidade + 1)} disabled={item.quantidade >= item.estoque_total}>+</button></div></td>
@@ -186,8 +186,24 @@ function CustomerCartPage() {
               {formaPagamento === 'Dinheiro' && (
                 <div className="mb-3">
                   <label htmlFor="valor-pago" className="form-label">Pagar com (para troco)</label>
-                  <input type="tel" step="0.01" id="valor-pago" className="form-control" placeholder="Ex: 50.00" value={valorPago} onChange={(e) => setValorPago(e.target.value)} />
-                  {valorPago > totalFinal && (<div className="form-text text-success fw-bold">Troco: R$ {troco.toFixed(2).replace('.', ',')}</div>)}
+                  <input type="tel" step="0.01" id="valor-pago" className="form-control" placeholder="Ex: 50" value={valorPago} onChange={(e) => setValorPago(e.target.value)} />
+                  {(() => {
+                    // 1. Converte o valor digitado (ex: "50,25") para um número (ex: 50.25)
+                    const valorPagoNumerico = parseFloat(String(valorPago).replace(',', '.')) || 0;
+
+                    // 2. Se o valor pago for maior que o total...
+                    if (valorPagoNumerico > totalFinal) {
+                      // 3. ...calcula e exibe o troco formatado.
+                      const troco = valorPagoNumerico - totalFinal;
+                      return (
+                        <div className="form-text text-success fw-bold">
+                          Troco: {troco.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </div>
+                      );
+                    }
+                    // 4. Se não houver troco, não mostra nada.
+                    return null;
+                  })()}
                 </div>
               )}
               <hr />
@@ -197,20 +213,20 @@ function CustomerCartPage() {
           </div>
         </div>
       </div>
-      <WarningModal 
+      <WarningModal
         show={showMixedCartWarning}
         onHide={() => {
-            setShowMixedCartWarning(false);
-            setFormaPagamento('Cartão de Crédito'); // Volta para uma forma de pagamento segura
+          setShowMixedCartWarning(false);
+          setFormaPagamento('Cartão de Crédito'); // Volta para uma forma de pagamento segura
         }}
         title="Carrinho com Itens Diversos"
       >
         <p>O pagamento com "Boleto Virtual" só é permitido para a compra de **um tipo de produto por vez** (você pode comprar várias unidades do mesmo produto).</p>
         <p>Seu carrinho contém itens diferentes. Por favor, escolha uma das opções abaixo:</p>
         <div className="d-grid gap-2">
-            <button className="btn btn-primary" onClick={() => setFormaPagamento('PIX')}>Pagar com PIX</button>
-            <button className="btn btn-secondary" onClick={handleRemoveOneAndContinue}>Remover Último Item e Tentar Novamente</button>
-            <button className="btn btn-danger" onClick={handleClearAndContinue}>Limpar Carrinho</button>
+          <button className="btn btn-primary" onClick={() => setFormaPagamento('PIX')}>Pagar com PIX</button>
+          <button className="btn btn-secondary" onClick={handleRemoveOneAndContinue}>Remover Último Item e Tentar Novamente</button>
+          <button className="btn btn-danger" onClick={handleClearAndContinue}>Limpar Carrinho</button>
         </div>
       </WarningModal>
     </div>

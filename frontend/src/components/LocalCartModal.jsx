@@ -91,7 +91,7 @@ function LocalCartModal({ show, onHide, cartItems, onUpdateQuantity, onRemoveIte
                     step="0.01"
                     id="valor-pago-local"
                     className="form-control"
-                    placeholder="Ex: 50.00"
+                    placeholder="Ex: 30"
                     value={valorPago}
                     onChange={(e) => setValorPago(e.target.value)}
                   />
