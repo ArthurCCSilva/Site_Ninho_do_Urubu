@@ -69,7 +69,7 @@ function FecharComandaModal({ show, onHide, comanda, onSave }) {
                         {formaPagamento === 'Dinheiro' && (
                             <div className="mb-3">
                                 <label className="form-label">Valor Pago pelo Cliente (para troco)</label>
-                                <input type="number" className="form-control" value={valorPago} onChange={e => setValorPago(e.target.value)} placeholder="Ex: 50.00" />
+                                <input type="tel" className="form-control" value={valorPago} onChange={e => setValorPago(e.target.value)} placeholder="Ex: 50.00" />
                                 {troco > 0 && <div className="form-text text-success fw-bold">Troco: {formatCurrency(troco)}</div>}
                             </div>
                         )}

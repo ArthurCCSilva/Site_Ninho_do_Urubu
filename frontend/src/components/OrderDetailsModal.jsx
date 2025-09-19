@@ -179,7 +179,7 @@ function OrderDetailsModal({ show, onHide, pedidoId, onBack, onOrderUpdate }) {
                       </ul>
                       <h6>Registrar Novo Pagamento:</h6>
                       <div className="input-group">
-                        <CurrencyInput className="form-control" placeholder="0,00" value={novoPagamento} onValueChange={(value) => setNovoPagamento(value || '')} intlConfig={{ locale: 'pt-BR', currency: 'BRL' }} />
+                        <CurrencyInput type="tel" className="form-control" placeholder="0,00" value={novoPagamento} onValueChange={(value) => setNovoPagamento(value || '')} intlConfig={{ locale: 'pt-BR', currency: 'BRL' }} />
                         <button className="btn btn-primary" type="button" onClick={handleRegistrarPagamento}>Registrar</button>
                       </div>
                       {pedido.pagamentos_fiado && pedido.pagamentos_fiado.length > 0 && (

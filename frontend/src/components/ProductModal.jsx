@@ -222,11 +222,11 @@ function ProductModal({ show, onHide, productToEdit, onSave }) {
                 <div className="mb-3"><label className="form-label">Nome</label><input type="text" name="nome" value={formData.nome} onChange={handleChange} className="form-control" required /></div>
                 <div className="mb-3"><label className="form-label">Descrição</label><textarea rows="3" name="descricao" value={formData.descricao} onChange={handleChange} className="form-control" /></div>
                 <div className="row">
-                  <div className="col"><div className="mb-3"><label className="form-label">Valor de Venda (R$)</label><CurrencyInput id="valor" name="valor" className="form-control" value={formData.valor} onValueChange={handleCurrencyChange} intlConfig={{ locale: 'pt-BR', currency: 'BRL' }} decimalScale={2} placeholder="R$ 0,00" required /></div></div>
+                  <div className="col"><div className="mb-3"><label className="form-label">Valor de Venda (R$)</label><CurrencyInput type="tel" id="valor" name="valor" className="form-control" value={formData.valor} onValueChange={handleCurrencyChange} intlConfig={{ locale: 'pt-BR', currency: 'BRL' }} decimalScale={2} placeholder="R$ 0,00" required /></div></div>
                   {!productToEdit && (
                     <>
                       <div className="col"><div className="mb-3"><label className="form-label">Estoque Inicial</label><input type="number" name="estoque" value={formData.estoque} onChange={handleChange} className="form-control" required /></div></div>
-                      <div className="col"><div className="mb-3"><label className="form-label">Custo/un. (R$)</label><CurrencyInput id="custo" name="custo" className="form-control" value={formData.custo} onValueChange={handleCurrencyChange} intlConfig={{ locale: 'pt-BR', currency: 'BRL' }} decimalScale={2} placeholder="R$ 0,00" required /></div></div>
+                      <div className="col"><div className="mb-3"><label className="form-label">Custo/un. (R$)</label><CurrencyInput type="tel" id="custo" name="custo" className="form-control" value={formData.custo} onValueChange={handleCurrencyChange} intlConfig={{ locale: 'pt-BR', currency: 'BRL' }} decimalScale={2} placeholder="R$ 0,00" required /></div></div>
                     </>
                   )}
                 </div>

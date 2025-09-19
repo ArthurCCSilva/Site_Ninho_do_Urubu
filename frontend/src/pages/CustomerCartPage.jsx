@@ -186,7 +186,7 @@ function CustomerCartPage() {
               {formaPagamento === 'Dinheiro' && (
                 <div className="mb-3">
                   <label htmlFor="valor-pago" className="form-label">Pagar com (para troco)</label>
-                  <input type="number" step="0.01" id="valor-pago" className="form-control" placeholder="Ex: 50.00" value={valorPago} onChange={(e) => setValorPago(e.target.value)} />
+                  <input type="tel" step="0.01" id="valor-pago" className="form-control" placeholder="Ex: 50.00" value={valorPago} onChange={(e) => setValorPago(e.target.value)} />
                   {valorPago > totalFinal && (<div className="form-text text-success fw-bold">Troco: R$ {troco.toFixed(2).replace('.', ',')}</div>)}
                 </div>
               )}

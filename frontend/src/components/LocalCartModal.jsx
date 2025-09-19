@@ -87,7 +87,7 @@ function LocalCartModal({ show, onHide, cartItems, onUpdateQuantity, onRemoveIte
                 <div className="mb-3">
                   <label htmlFor="valor-pago-local" className="form-label">Pagar com (para troco)</label>
                   <input
-                    type="number"
+                    type="tel"
                     step="0.01"
                     id="valor-pago-local"
                     className="form-control"

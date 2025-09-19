@@ -139,7 +139,7 @@ function AddExpenseModal({ show, onHide, onSave }) {
               <div className="mb-3"><label>Descrição</label><input type="text" name="descricao" value={formData.descricao} onChange={handleChange} className="form-control" required /></div>
               <div className="mb-3">
                 <label>Valor (R$)</label>
-                <CurrencyInput name="valor" className="form-control" value={formData.valor} onValueChange={handleCurrencyChange} disabled={!!selectedProduto} intlConfig={{ locale: 'pt-BR', currency: 'BRL' }} decimalScale={2} placeholder="R$ 0,00" required />
+                <CurrencyInput type="tel" name="valor" className="form-control" value={formData.valor} onValueChange={handleCurrencyChange} disabled={!!selectedProduto} intlConfig={{ locale: 'pt-BR', currency: 'BRL' }} decimalScale={2} placeholder="R$ 0,00" required />
               </div>
               <div className="mb-3"><label>Categoria</label><select className="form-select" name="categoria_id" value={formData.categoria_id} onChange={handleChange}><option value="">Selecione...</option>{categorias.map(cat => (<option key={cat.value} value={cat.value}>{cat.label}</option>))}</select></div>
               <div className="mb-3"><label className="form-label d-block">Data da Despesa</label><DatePicker selected={formData.data} onChange={(date) => setFormData({...formData, data: date})} className="form-control" dateFormat="dd/MM/yyyy" locale="pt-BR" /></div>

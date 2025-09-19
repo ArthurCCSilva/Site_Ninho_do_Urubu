@@ -65,7 +65,7 @@ function AddExtraIncomeModal({ show, onHide, onSave }) {
               <div className="mb-3"><label htmlFor="income-descricao" className="form-label">Descrição</label><input type="text" className="form-control" id="income-descricao" name="descricao" value={formData.descricao} onChange={handleChange} required /></div>
               <div className="mb-3">
                 <label htmlFor="income-valor" className="form-label">Valor (R$)</label>
-                <CurrencyInput id="income-valor" name="valor" className="form-control" value={formData.valor} onValueChange={handleCurrencyChange} intlConfig={{ locale: 'pt-BR', currency: 'BRL' }} decimalScale={2} placeholder="R$ 0,00" required />
+                <CurrencyInput type="tel" id="income-valor" name="valor" className="form-control" value={formData.valor} onValueChange={handleCurrencyChange} intlConfig={{ locale: 'pt-BR', currency: 'BRL' }} decimalScale={2} placeholder="R$ 0,00" required />
               </div>
               <div className="mb-3"><label className="form-label d-block">Data da Renda</label><DatePicker selected={formData.data} onChange={(date) => setFormData({...formData, data: date})} className="form-control" dateFormat="dd/MM/yyyy" locale="pt-BR" /></div>
             </div>
