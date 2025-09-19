@@ -134,7 +134,7 @@ function ProductDetailPage() {
 
           <div className="d-grid gap-2 mt-4">
             <button
-              className="btn btn-primary btn-lg"
+              className="btn btn-dark btn-lg"
               type="button"
               onClick={handleAddToCart}
               disabled={isOutOfStock}

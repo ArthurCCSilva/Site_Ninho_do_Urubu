@@ -2,9 +2,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,500;0,600&display=swap');
 
 :root {
-    --azul-principal: #152c3c;
-    --azul-principal-claro: #33668b;
-    --laranja-principal: #e13e27;
+    --azul-principal: #000000;
+    --azul-principal-claro: #a6ff72;
+    --laranja-principal: #ff0000;
     --transition: all 0.5s ease;
 }
 
@@ -27,7 +27,7 @@ footer.bg-footer {
 
 footer .footer-top {
     padding: 40px 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 54, 54, 0.199);
 }
 
 footer .footer-bottom {
@@ -36,7 +36,7 @@ footer .footer-bottom {
 
 footer h5 {
     text-align: left;
-    color: #45daff;
+    color: #970000;
     margin-bottom: 10px;
 }
 

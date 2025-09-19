@@ -2,7 +2,7 @@
 
 /*IMAGEM DE ABERTURA DEPOS DO NAV*/
 #hero {
-    min-height: 100vh; /* Ajustado para não ocupar a tela inteira, deixando espaço para o conteúdo abaixo */
+    min-height: 100vh;
 }
 
 .img-home {
@@ -21,7 +21,7 @@
     border-radius: 5px;
     padding: 10px 20px;
     text-decoration: none;
-    color: #33668b; /* --azul-principal-claro */
+    color: #960000;
     transition: all 0.5s ease;
     box-shadow: 0px 3px 15px rgba(21, 44, 60, 0.1);
 }

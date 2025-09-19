@@ -563,3 +563,36 @@ exports.getBoletosAprovadosUsuario = async (req, res) => {
     res.status(500).json({ message: 'Erro ao buscar seus boletos.' });
   }
 };
+
+exports.getDashboardCounts = async (req, res) => {
+    const usuarioId = req.user.id;
+    try {
+        const [andamento] = await db.query(
+            "SELECT COUNT(id) as total FROM pedidos WHERE usuario_id = ? AND status IN (?)",
+            [usuarioId, ['Processando', 'Enviado']]
+        );
+        const [historico] = await db.query(
+            "SELECT COUNT(id) as total FROM pedidos WHERE usuario_id = ? AND status IN (?)",
+            [usuarioId, ['Entregue', 'Cancelado']]
+        );
+        const [fiado] = await db.query(
+            "SELECT COUNT(id) as total FROM pedidos WHERE usuario_id = ? AND status = 'Fiado'",
+            [usuarioId]
+        );
+        const [boletos] = await db.query(
+            "SELECT COUNT(id) as total FROM pedidos WHERE usuario_id = ? AND status = 'Boleto em Pagamento'",
+            [usuarioId]
+        );
+
+        res.status(200).json({
+            andamento: andamento[0].total,
+            historico: historico[0].total,
+            fiado: fiado[0].total,
+            boletos: boletos[0].total
+        });
+
+    } catch (error) {
+        console.error("Erro ao buscar contagens do painel do cliente:", error);
+        res.status(500).json({ message: 'Erro ao buscar dados do painel.' });
+    }
+};

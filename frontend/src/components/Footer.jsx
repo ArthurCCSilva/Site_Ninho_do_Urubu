@@ -19,13 +19,13 @@ function Footer() {
                         <div className="col-lg-3 col-sm-6">
                             {/* Ajuste o caminho da imagem da logo aqui */}
                             {/* <a href="#"><img src={logoFooter} alt="Logo" /></a> */}
+                            <Link className="navbar-brand" to="/"><img src="/logo_Bar_Ninho_do_Urubu_pq.png" alt="Logo Bar Ninho do Urubu - pequena em png" style={{ height: '56px', width: 'auto' }} /></Link>
                             <div className="line"></div>
-                            <p>Sua loja de produtos oficiais e licenciados.</p>
+                            
+                            <p>O bar do torcedor.</p>
                             <div className="sociais-icons">
-                                <a href="#" target="_blank"><i className="ri-whatsapp-fill"></i></a>
-                                <a href="#" target="_blank"><i className="ri-mail-fill"></i></a>
-                                <a href="#" target="_blank"><i className="ri-instagram-fill"></i></a>
-                                <a href="#" target="_blank"><i className="ri-facebook-circle-fill"></i></a>
+                                <a href="https://wa.me/556796355477?text=" target="_blank"><i className="ri-whatsapp-fill"></i></a>
+                                <a href="https://www.instagram.com/ninho.do.urubu_?igsh=a3N0MzRibG8zZGd4" target="_blank"><i className="ri-instagram-fill"></i></a>
                             </div>
                         </div>
                         <div className="col-lg-3 col-sm-6">
@@ -33,7 +33,7 @@ function Footer() {
                             <div className="line"></div>
                             <ul>
                                 <li><Link to="/">Página Inicial</Link></li>
-                                <li><Link to="/produtos">Produtos</Link></li>
+                                <li><Link to="/login">Login</Link></li>
                                 <li><Link to="/meus-pedidos">Meus Pedidos</Link></li>
                                 <li><Link to="/termos-de-uso">Termos de Uso</Link></li>
                             </ul>
@@ -42,18 +42,17 @@ function Footer() {
                             <h5 className="mb-0">CONTATO</h5>
                             <div className="line"></div>
                             <ul>
-                                <li>WhatsApp: (XX) 9 XXXX-XXXX</li>
-                                <li>Instagram: @seu_instagram</li>
-                                <li>E-mail: contato@seuemail.com</li>
+                                <li>WhatsApp: (67) 9 9635-5477</li>
+                                <li>Instagram: @ninho.do.urubu_</li>
                             </ul>
                         </div>
                         <div className="col-lg-3 col-sm-6">
                             <h5 className="mb-0">ENDEREÇO</h5>
                             <div className="line"></div>
                             <ul>
-                                <li>Cidade - UF</li>
-                                <li>Nome da Rua, Nº XX</li>
-                                <li>Bairro</li>
+                                <li>Senador Sá - CE</li>
+                                <li>Avenida 23 de Agosto, 359</li>
+                                <li>Centro</li>
                             </ul>
                         </div>
                     </div>
@@ -63,7 +62,7 @@ function Footer() {
                 <div className="container">
                     <div className="row g-4 justify-content-between">
                         <div className="col-auto">
-                            <p className="mb-0">© {new Date().getFullYear()} Todos os direitos reservados a Ninho do Urubu Store.</p>
+                            <p className="mb-0">© {new Date().getFullYear()} Todos os direitos reservados a Bar Ninho do Urubu.</p>
                         </div>
                         <div className="col-auto">
                             <p className="mb-0">Criado por: <a href="https://www.instagram.com/connect_si_15/" target="_blank">Connect - Soluções Inovadoras</a></p>

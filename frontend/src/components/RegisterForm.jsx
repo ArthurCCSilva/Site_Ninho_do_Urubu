@@ -133,7 +133,7 @@ function RegisterForm() {
         </label>
       </div>
 
-      <button type="submit" className="btn btn-success w-100" disabled={loading}>{loading ? 'Cadastrando...' : 'Criar Cadastro'}</button>
+      <button type="submit" className="btn btn-primary w-100" disabled={loading}>{loading ? 'Cadastrando...' : 'Criar Cadastro'}</button>
     </form>
   );
 }

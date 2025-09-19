@@ -120,16 +120,11 @@ function HomePage() {
             <div className="row justify-content-center">
               <div className="col-12 col-md-10 col-lg-8">
                 <h1 data-aos="fade-left" className="text-white text-uppercase fw-semibold display-1">
-                  Ninho do Urubu Store
+                  Bar Ninho do Urubu
                 </h1>
                 <h5 data-aos="fade-right" className="text-white mt-3 mb-4">
-                  Produtos oficiais e licenciados do seu time de coração.
+                  O melhor Bar da Região!
                 </h5>
-                <div>
-                  <a data-aos="fade-up" href="#nossos-produtos" className="btn btn-light">
-                    Ver Produtos
-                  </a>
-                </div>
               </div>
             </div>
           </div>

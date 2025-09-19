@@ -9,6 +9,7 @@ const { verifyToken, hasPermission } = require('../middleware/authMiddleware');
 // ✅ ESTA SEÇÃO ESTÁ PERFEITA E NÃO FOI ALTERADA.
 router.post('/', [verifyToken], pedidosController.criarPedido);
 router.get('/meus-pedidos', [verifyToken], pedidosController.getPedidosUsuario);
+router.get('/meus-pedidos/counts', [verifyToken], pedidosController.getDashboardCounts);
 router.get('/meus-boletos', [verifyToken], pedidosController.getBoletosAprovadosUsuario);
 router.get('/boleto-planos-carrinho', [verifyToken], pedidosController.getBoletoPlansForCart);
 router.get('/:id', [verifyToken], pedidosController.getPedidoDetalhes);

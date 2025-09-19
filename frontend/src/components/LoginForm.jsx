@@ -82,7 +82,7 @@ function LoginForm() {
         />
         <label className="form-check-label" htmlFor="lembrarMe">Lembrar-me</label>
       </div>
-      <button type="submit" className="btn btn-primary w-100" disabled={loading}>
+      <button type="submit" className="btn btn-dark w-100" disabled={loading}>
         {loading ? 'Entrando...' : 'Entrar'}
       </button>
     </form>

@@ -4,7 +4,6 @@ import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 
-// O nome do componente deve ser consistente, vamos usar Navbar
 function Navbar() {
   const { user, logout } = useAuth();
   const { cartItems } = useCart();
@@ -42,8 +41,6 @@ function Navbar() {
     }
   }, [isNavExpanded]);
 
-  // ✅ LÓGICA DE VERIFICAÇÃO DE ROLE CORRIGIDA
-  // Usamos 'user.role', que agora é uma string simples ('admin', 'dev', etc.)
   const isAdmin = user?.role === 'admin';
   const isDev = user?.role === 'dev';
   const isFuncionario = user?.role === 'funcionario';
@@ -52,7 +49,7 @@ function Navbar() {
   return (
     <nav className="navbar navbar-expand-lg navbar-dark bg-dark"> 
       <div className="container">
-        <Link className="navbar-brand" to="/">Ninho do Urubu Store</Link>
+        <Link className="navbar-brand" to="/"><img src="/logo_Bar_Ninho_do_Urubu_pq.png" alt="Logo Bar Ninho do Urubu - pequena em png" style={{ height: '56px', width: 'auto' }} /></Link>
         <button 
           ref={togglerRef} 
           className="navbar-toggler" 
@@ -78,8 +75,8 @@ function Navbar() {
                 <li className="nav-item">
                   <NavLink className="nav-link" to="/" onClick={handleNavLinkClick}>Home</NavLink>
                 </li>
-                {/* Carrinho só para clientes logados */}
-                {isClient && (
+                {/* ✅ CORREÇÃO: Carrinho agora aparece para Clientes E Admins */}
+                {(isClient || isAdmin) && (
                   <li className="nav-item">
                     <NavLink className="nav-link position-relative" to="/carrinho" onClick={handleNavLinkClick}>
                       Carrinho
@@ -98,50 +95,27 @@ function Navbar() {
               // Se o usuário estiver logado...
               <li className="nav-item dropdown">
                 <a className="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                  {/* ✅ CORREÇÃO DO NOME: Usamos 'nomeCompleto' */}
                   Olá, {user?.nomeCompleto?.split(' ')[0] || 'Usuário'}
                 </a>
                 <ul className="dropdown-menu dropdown-menu-dark dropdown-menu-end">
                   
                   {isDev && (
-                    <li>
-                      <Link className="dropdown-item" to="/dev/dashboard" onClick={handleNavLinkClick}>
-                        Painel do Desenvolvedor
-                      </Link>
-                    </li>
+                    <li><Link className="dropdown-item" to="/dev/dashboard" onClick={handleNavLinkClick}>Painel do Desenvolvedor</Link></li>
                   )}
-
                   {isAdmin && (
-                    <li>
-                      <Link className="dropdown-item" to="/admin/dashboard" onClick={handleNavLinkClick}>
-                        Dashboard Admin
-                      </Link>
-                    </li>
+                    <li><Link className="dropdown-item" to="/admin/dashboard" onClick={handleNavLinkClick}>Dashboard Admin</Link></li>
                   )}
-
                   {isFuncionario && (
-                    <li>
-                      <Link className="dropdown-item" to="/funcionario/dashboard" onClick={handleNavLinkClick}>
-                        Painel do Funcionário
-                      </Link>
-                    </li>
+                    <li><Link className="dropdown-item" to="/funcionario/dashboard" onClick={handleNavLinkClick}>Painel do Funcionário</Link></li>
                   )}
                   
-                  {isClient && (
-                    <li>
-                      <Link className="dropdown-item" to="/meus-pedidos" onClick={handleNavLinkClick}>
-                        Painel do Cliente
-                      </Link>
-                    </li>
+                  {/* ✅ CORREÇÃO: Painel do Cliente agora aparece para Clientes E Admins */}
+                  {(isClient || isAdmin) && (
+                    <li><Link className="dropdown-item" to="/meus-pedidos" onClick={handleNavLinkClick}>Painel do Cliente</Link></li>
                   )}
                   
                   <li><hr className="dropdown-divider" /></li>
-
-                  <li>
-                    <button className="dropdown-item" onClick={() => { logout(); handleNavLinkClick(); }}>
-                      Sair
-                    </button>
-                  </li>
+                  <li><button className="dropdown-item" onClick={() => { logout(); handleNavLinkClick(); }}>Sair</button></li>
                 </ul>
               </li>
             ) : (
@@ -157,5 +131,4 @@ function Navbar() {
   );
 }
 
-// Lembre-se de exportar com o nome correto
 export default Navbar;

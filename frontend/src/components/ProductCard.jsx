@@ -68,7 +68,7 @@ function ProductCard({ product }) {
             <button className="btn btn-secondary" disabled>Sem Estoque</button>
           </div>
         ) : (
-          <button className="btn btn-primary w-100" onClick={handleAddToCart}>
+          <button className="btn btn-dark w-100" onClick={handleAddToCart}>
             Adicionar ao Carrinho
           </button>
         )}
