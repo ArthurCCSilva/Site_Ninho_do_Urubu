@@ -51,7 +51,7 @@ function CustomerOrderDetailsModal({ show, onHide, pedidoId }) {
         <div className="modal-content">
           <div className="modal-header">
             <h5 className="modal-title">Detalhes do Pedido #{pedidoId}</h5>
-            <button type="button" className="btn-close" onClick={onHide}></button>
+            <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div className="modal-body">
             {loading && <div className="text-center my-5"><div className="spinner-border" /></div>}
@@ -162,7 +162,7 @@ function CustomerOrderDetailsModal({ show, onHide, pedidoId }) {
             )}
           </div>
           <div className="modal-footer">
-            <button type="button" className="btn btn-secondary" onClick={onHide}>Fechar</button>
+            <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
           </div>
         </div>
       </div>
