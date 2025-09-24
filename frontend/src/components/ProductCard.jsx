@@ -44,8 +44,8 @@ function ProductCard({ product }) {
       <div className="product-content">
         {/* A imagem e o selo ficam juntos no image-wrapper */}
         <Link to={`/produtos/${product.id}`} className="image-wrapper">
-          {product.promocao && <div className="promotion-badge">PROMOÇÃO</div>}
-          <img src={imageUrl} alt={product.nome} />
+          {product.promocao ? <div className="promotion-badge">PROMOÇÃO</div> : null}
+          <img src={imageUrl} alt={product.nome}  />
         </Link>
         
         {/* Wrapper para informações, necessário para o layout responsivo */}
