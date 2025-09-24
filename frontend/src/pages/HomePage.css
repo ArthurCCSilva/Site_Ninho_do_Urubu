@@ -48,3 +48,10 @@
     margin-top: -1.5rem;
     min-height: 80vh; 
 }
+
+/* --- CORREÇÃO PARA O CARROSSEL NO DESKTOP --- */
+
+.product-carousel .swiper-slide {
+  height: auto;
+  display: flex;
+}

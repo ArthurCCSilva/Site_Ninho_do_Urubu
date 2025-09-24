@@ -149,7 +149,7 @@ function HomePage() {
                 }}
               >
                 {featuredProducts.map(product => (
-                  <SwiperSlide key={product.id} className="h-100">
+                  <SwiperSlide key={product.id}>
                     <ProductCard product={product} />
                   </SwiperSlide>
                 ))}

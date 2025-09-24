@@ -1,98 +1,208 @@
 /* src/components/ProductCard.css */
 
-/* --- Estilos Gerais do Card de Produto --- */
+/* Reset básico para consistência */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* CARD DE PRODUTO - VERSÃO ROBUSTA E FLEXÍVEL
+*/
 .product-card {
+  /* ✅ O card ocupa 100% da altura e largura do seu container (seja .col ou .swiper-slide) */
   width: 100%;
-  max-width: 280px;
-  margin-left: auto;
-  margin-right: auto;
-  border: 1px solid #e9ecef;
-  border-radius: 8px;
-  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-  overflow: hidden;
-  /* ✅ Garante que o card é um container flexbox vertical */
-  display: flex;       
+  height: 100%; 
+  
+  /* ✅ É um container flex para que o .product-content possa crescer */
+  display: flex; 
   flex-direction: column;
+
+  background-color: #fff;
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 .product-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-6px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
 }
 
-.product-card .card-img-top {
-  height: 200px;
+/* Conteúdo interno principal */
+.product-content {
+  /* ✅ Este é o container principal que cresce para preencher o card */
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Imagem */
+.image-wrapper {
+  position: relative;
+  display: block;
+  /* ✅ Impede que a imagem encolha, mantendo a altura fixa */
+  flex-shrink: 0; 
+}
+
+.image-wrapper img {
   width: 100%;
+  height: 220px;
   object-fit: contain;
+  display: block;
+  transition: transform 0.3s ease;
 }
 
-.product-card .card-body {
-  /* ✅ ESTA É A REGRA MÁGICA:
-     Faz o corpo do card esticar e ocupar todo o espaço vago,
-     empurrando o rodapé para a base do card. */
-  flex-grow: 1; 
-  padding: 1rem;
-  padding-bottom: 0.5rem;
-  text-align: center;
+.product-card:hover img {
+  transform: scale(1.02);
 }
 
-.product-card .card-title {
-  font-size: 1rem; /* Mantivemos o tamanho da fonte */
-  font-weight: 700;  /* '700' é o valor para negrito (bold) */
-  margin-bottom: 0.5rem;
-  color: #212529; /* Uma cor de texto mais escura para maior destaque */
-}
-
-.product-card .card-footer {
-  padding: 0.75rem 1rem;
-  border-top: none;
-  background-color: transparent;
-  text-align: center;
-}
-
-.product-card .fs-5 {
-  font-size: 1.25rem !important;
-}
-
-/* --- ESTILOS ESPECÍFICOS PARA O CARROSSEL --- */
-/* Estes estilos só se aplicam a um card que está DENTRO de um .product-carousel */
-
-.product-carousel .product-card {
-  max-width: none; /* No carrossel, removemos a largura máxima */
-}
-
-.product-carousel .card-img-top {
-  height: 160px; /* Altura da imagem menor */
-}
-
-.product-carousel .card-title {
-  font-size: 0.95rem; /* Fonte do título menor */
-}
-
-.product-carousel .card-footer {
-  padding: 0.5rem; /* Menos preenchimento no rodapé */
-}
-
-.product-carousel .fs-5 {
-  font-size: 1.1rem !important; /* Fonte do preço menor */
-  margin-bottom: 0.5rem !important;
-}
-
-.product-carousel .btn {
-  font-size: 0.85rem; /* Texto do botão menor */
-  padding: 0.25rem 0.5rem;
-}
-
-/* ✅ Estilo para o selo de promoção */
+/* Selo de promoção */
 .promotion-badge {
   position: absolute;
-  bottom: 10px; /* Posição sobre a imagem */
-  right: 10px;  /* Posição sobre a imagem */
-  background-color: yellow;
-  color: red;
-  padding: 3px 8px;
+  top: 14px;
+  left: 14px;
+  background: red;
+  color: yellow;
   font-size: 0.75rem;
   font-weight: bold;
-  border-radius: 5px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
   z-index: 10;
+}
+
+/* Wrapper para toda a informação textual */
+.info-wrapper {
+  /* ✅ Este wrapper cresce para ocupar o espaço entre a imagem e o fim do card */
+  flex-grow: 1;
+  
+  /* ✅ Também é um container flex para alinhar o body e o footer */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Corpo do card (título) */
+.card-body {
+  padding: 18px 18px 0; /* Ajuste no padding para separar melhor do footer */
+  
+  /* ✅ ESTA É A MÁGICA: O corpo cresce para empurrar o footer para baixo */
+  flex-grow: 1; 
+}
+
+.card-title a {
+  text-decoration: none;
+  color: #212529;
+  font-size: 1.2rem;
+  font-weight: 600;
+  transition: color 0.3s ease;
+}
+
+.card-title a:hover {
+  color: #2b1515;
+}
+
+/* Rodapé do card */
+.card-footer {
+  padding: 18px;
+  background-color: #f1f3f5;
+  border-top: 1px solid #dee2e6;
+  text-align: center;
+  /* ✅ Impede que o rodapé encolha */
+  flex-shrink: 0;
+}
+
+/* Mensagem de estoque */
+.stock-message {
+  font-size: 0.9rem;
+  margin-bottom: 6px;
+  font-weight: bold;
+}
+.stock-message.in-stock { color: #28a745; }
+.stock-message.low-stock { color: #fd7e14; }
+
+/* Preço */
+.price {
+  font-size: 1.3rem;
+  font-weight: bold;
+  color: #212529;
+  margin-bottom: 14px;
+}
+
+/* Botão moderno */
+.btn-add {
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(to right, #212529, #343a40);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.3s ease, transform 0.2s ease;
+}
+
+.btn-add:hover {
+  background: linear-gradient(to right, #343a40, #495057);
+  transform: scale(1.02);
+}
+
+.btn-add:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* --- Layout Responsivo para Telas Pequenas --- */
+@media (max-width: 600px) {
+  /* As regras responsivas que você já tinha continuam funcionando bem */
+  .product-card {
+    width: 100%;
+    flex-direction: row;
+    min-height: 180px;
+  }
+  .product-content {
+    flex-direction: row;
+    width: 100%;
+  }
+  .image-wrapper {
+    width: 40%;
+    height: 100%;
+  }
+  .image-wrapper img {
+    height: 100%;
+  }
+  .promotion-badge {
+    font-size: 0.6rem;
+    padding: 3px 6px;
+    top: 8px;
+    left: 8px;
+    border-radius: 4px;
+  }
+  .info-wrapper {
+    padding: 12px;
+  }
+  .card-body, .card-footer {
+    padding: 0;
+    background-color: transparent;
+    border-top: none;
+    text-align: left;
+  }
+  .card-title a {
+    font-size: 1rem;
+  }
+  .stock-message {
+    font-size: 0.8rem;
+    margin-bottom: 4px;
+  }
+  .price {
+    font-size: 1.1rem;
+    margin-bottom: 8px;
+  }
+  .btn-add {
+    font-size: 0.9rem;
+    padding: 8px;
+  }
 }
